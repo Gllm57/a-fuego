@@ -2,7 +2,8 @@
 
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
-  recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan
+  recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
+  evaluatePurchase, previousRestaurant, recipeProgress
 } from './shared/index.js';
 import { createApi, ApiError } from './api.js';
 import { Kitchen } from './game.js';
@@ -294,7 +295,7 @@ function restaurantCard(r, i) {
     <button class="rest ${owned ? '' : 'is-locked'}" role="listitem" data-rest="${r.id}" aria-pressed="${r.id === app.restaurantId}"
       style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">
       <span class="rest__art">${storefrontSvg(r.theme, i)}
-        ${owned ? '' : `<span class="rest__lock">${icon('lock')}<span>${level() < r.reqLevel ? `Nivel ${r.reqLevel}` : 'Disponible'} · ${coinSvg()} ${fmt(r.cost)}</span></span>`}
+        ${owned ? '' : `<span class="rest__lock">${icon('lock')}<span>${lockLabel(r)} · ${coinSvg()} ${fmt(r.cost)}</span></span>`}
       </span>
       <span class="rest__body">
         <span class="rest__cuisine">Cocina ${r.cuisine}</span>
@@ -304,10 +305,25 @@ function restaurantCard(r, i) {
     </button>`;
 }
 
+// Qué falta para abrir un local: recetas del anterior, nivel o nada.
+function lockLabel(r) {
+  const prev = previousRestaurant(r.id);
+  if (prev) {
+    const p = recipeProgress(st(), prev.id);
+    if (p.learned < p.total) return `Recetas ${p.learned}/${p.total}`;
+  }
+  return level() < r.reqLevel ? `Nivel ${r.reqLevel}` : 'Disponible';
+}
+
 function openRestaurant(r) {
   const s = st();
-  const can = level() >= r.reqLevel && s.coins >= r.cost;
-  const reason = level() < r.reqLevel ? `Necesitas nivel de chef ${r.reqLevel} (tienes ${level()}).` : s.coins < r.cost ? `Te faltan ${fmt(r.cost - s.coins)} monedas.` : '¡Ya puedes abrirlo!';
+  const d = evaluatePurchase(s, 'restaurant', r.id);
+  const can = d.ok;
+  const prev = previousRestaurant(r.id);
+  const reason = d.ok ? '¡Ya puedes abrirlo!'
+    : d.reason === 'recetas_pendientes' ? `Primero aprende las ${d.total} recetas de ${prev.name}: llevas ${d.learned}/${d.total}.`
+    : d.reason === 'nivel_insuficiente' ? `Necesitas nivel de chef ${r.reqLevel} (tienes ${level()}).`
+    : d.reason === 'sin_dinero' ? `Te faltan ${fmt(r.cost - s.coins)} monedas.` : '';
   const recipes = recipesOf(r.id);
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
@@ -315,9 +331,12 @@ function openRestaurant(r) {
     <p class="note">Cocina ${r.cuisine}: ${recipes.length} recetas, ${recipes.filter((x) => x.learnCost === 0).length} incluidas. Platos más caros, clientes más exigentes y gastos de ${fmt(r.upkeep)} por servicio.</p>
     <div class="comp-list">${recipes.map((x) => `<span class="comp">${ingredientSvg(x.components[0].ingredient)}${escapeHtml(x.name)}</span>`).join('')}</div>
     <p class="note"><strong>${reason}</strong></p>
-    <button class="btn btn--xl btn--gold" data-buy ${can ? '' : 'disabled'}>${coinSvg()} Abrir por ${fmt(r.cost)}</button>
+    ${d.reason === 'recetas_pendientes'
+      ? `<button class="btn btn--xl" data-go-recipes="${prev.id}">${icon('book')} Ver recetas de ${prev.cuisine.toLowerCase()}</button>`
+      : `<button class="btn btn--xl btn--gold" data-buy ${can ? '' : 'disabled'}>${coinSvg()} Abrir por ${fmt(r.cost)}</button>`}
   `, (sheet, close) => {
-    sheet.querySelector('[data-buy]').addEventListener('click', async () => {
+    sheet.querySelector('[data-go-recipes]')?.addEventListener('click', (e) => { close(); app.recipeTab = e.currentTarget.dataset.goRecipes; go('recipes'); });
+    sheet.querySelector('[data-buy]')?.addEventListener('click', async () => {
       if (await buy('restaurant', r.id)) {
         close();
         app.restaurantId = r.id;
@@ -514,12 +533,25 @@ function renderRecipes() {
       ${RESTAURANTS.map((r) => `<button class="chip" data-chip="${r.id}" aria-pressed="${r.id === rid}">${s.restaurants.includes(r.id) ? '' : icon('lock')}${r.cuisine}</button>`).join('')}
     </div>
     ${s.restaurants.includes(rid) ? '' : `<div class="card" style="display:flex;gap:12px;align-items:center;border-radius:999px">${icon('lock', 'style="width:28px;height:28px;flex-shrink:0"')}<span class="note"><strong>${rest.name}</strong> está cerrado. Ábrelo desde Inicio para aprender estas recetas.</span></div>`}
+    ${nextUnlockNote(rid)}
     <div class="stagger" style="display:flex;flex-direction:column;gap:12px">${recipesOf(rid).map((r) => recipeCard(r)).join('')}</div>
     <p class="note" style="text-align:center">El margen es lo que cobras menos lo que cuestan sus ingredientes en el mercado.</p>`;
   screen.querySelectorAll('[data-chip]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.recipeTab = b.dataset.chip; renderRecipes(); }));
   screen.querySelectorAll('[data-learn]').forEach((b) => b.addEventListener('click', async () => {
     if (await buy('recipe', b.dataset.learn)) { toast('¡Receta aprendida! Compra sus ingredientes en el mercado', 'good'); renderRecipes(); }
   }));
+}
+
+function nextUnlockNote(rid) {
+  const idx = RESTAURANTS.findIndex((x) => x.id === rid);
+  const next = RESTAURANTS[idx + 1];
+  if (!next || !st().restaurants.includes(rid) || st().restaurants.includes(next.id)) return '';
+  const p = recipeProgress(st(), rid);
+  const pct = Math.round((p.learned / p.total) * 100);
+  return `<div class="card" style="display:flex;flex-direction:column;gap:8px;border-radius:30px">
+    <span class="note"><strong>${p.learned}/${p.total} recetas</strong> · ${p.learned < p.total ? `aprende las ${p.total} para poder abrir ${escapeHtml(next.name)}` : `¡completo! Ya puedes abrir ${escapeHtml(next.name)}`}</span>
+    <span class="progress"><span class="progress__fill" style="width:${pct}%"></span></span>
+  </div>`;
 }
 
 function recipeCard(r) {

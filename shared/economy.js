@@ -54,6 +54,14 @@ export function evaluatePurchase(state, kind, id) {
     const rest = RESTAURANT_BY_ID[id];
     if (!rest) return no('no_existe');
     if (state.restaurants.includes(id)) return no('ya_comprado');
+    // Hay que dominar la cocina anterior: tenerla abierta y saber sus 8 recetas.
+    const prev = previousRestaurant(id);
+    if (prev) {
+      const progress = recipeProgress(state, prev.id);
+      if (!state.restaurants.includes(prev.id) || progress.learned < progress.total) {
+        return no('recetas_pendientes', { restaurant: prev.id, learned: progress.learned, total: progress.total });
+      }
+    }
     if (level < rest.reqLevel) return no('nivel_insuficiente', { reqLevel: rest.reqLevel });
     if (state.coins < rest.cost) return no('sin_dinero', { price: rest.cost });
     const freeRecipes = recipesOf(id).filter((x) => x.learnCost === 0).map((x) => x.id);
@@ -241,19 +249,33 @@ export function titleFor(pct) {
 }
 
 // Sugiere el siguiente objetivo concreto en el que invertir.
+export function previousRestaurant(id) {
+  const idx = RESTAURANTS.findIndex((r) => r.id === id);
+  return idx > 0 ? RESTAURANTS[idx - 1] : null;
+}
+
+export function recipeProgress(state, restaurantId) {
+  const list = recipesOf(restaurantId);
+  return { learned: list.filter((r) => state.recipes.includes(r.id)).length, total: list.length };
+}
+
+// Siguiente objetivo concreto: primero completar el recetario del último local
+// abierto (requisito para el siguiente), luego abrir el siguiente restaurante.
 export function nextGoal(state) {
   const level = levelFromXp(state.xp);
   const nextRest = RESTAURANTS.find((x) => !state.restaurants.includes(x.id));
-  const learnable = RECIPES
-    .filter((x) => !state.recipes.includes(x.id) && state.restaurants.includes(x.restaurant) && level >= x.reqLevel)
-    .sort((a, b) => a.learnCost - b.learnCost)[0];
-  const candidates = [];
-  if (nextRest) candidates.push({ kind: 'restaurant', id: nextRest.id, name: `Abrir ${nextRest.name}`, price: nextRest.cost, reqLevel: nextRest.reqLevel });
-  if (learnable) candidates.push({ kind: 'recipe', id: learnable.id, name: `Aprender ${learnable.name}`, price: learnable.learnCost, reqLevel: learnable.reqLevel });
-  const affordable = candidates.filter((c) => level >= c.reqLevel);
-  const pick = affordable.find((c) => c.kind === 'restaurant') ?? affordable[0] ?? candidates[0];
-  if (!pick) return { kind: 'done', name: '¡Eres Chef Leyenda!', price: 0, reqLevel: 0 };
-  return pick;
+  const pending = RECIPES
+    .filter((x) => !state.recipes.includes(x.id) && state.restaurants.includes(x.restaurant))
+    .sort((a, b) => a.reqLevel - b.reqLevel || a.learnCost - b.learnCost);
+  const asGoal = (r) => ({ kind: 'recipe', id: r.id, name: `Aprender ${r.name}`, price: r.learnCost, reqLevel: r.reqLevel });
+  if (nextRest) {
+    const prev = previousRestaurant(nextRest.id);
+    const blocking = prev ? pending.filter((r) => r.restaurant === prev.id) : [];
+    if (blocking.length) return asGoal(blocking.find((r) => level >= r.reqLevel) ?? blocking[0]);
+    return { kind: 'restaurant', id: nextRest.id, name: `Abrir ${nextRest.name}`, price: nextRest.cost, reqLevel: nextRest.reqLevel };
+  }
+  if (pending.length) return asGoal(pending.find((r) => level >= r.reqLevel) ?? pending[0]);
+  return { kind: 'done', name: '¡Eres Chef Leyenda!', price: 0, reqLevel: 0 };
 }
 
 // Reto del día: mismo para todos los jugadores con los mismos restaurantes.

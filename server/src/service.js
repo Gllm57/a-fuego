@@ -17,6 +17,7 @@ const PURCHASE_ERRORS = {
   nivel_insuficiente: [403, 'Necesitas más nivel de chef'],
   sin_dinero: [409, 'No tienes suficientes monedas'],
   restaurante_cerrado: [403, 'Primero abre ese restaurante'],
+  recetas_pendientes: [403, 'Primero aprende todas las recetas del restaurante anterior'],
   nivel_maximo: [409, 'Ya está al nivel máximo'],
   tipo_invalido: [400, 'Tipo de compra inválido'],
   carrito_vacio: [400, 'El carrito está vacío'],
@@ -142,7 +143,7 @@ export class GameService {
       const decision = evaluatePurchase(state, kind, itemId);
       if (!decision.ok) {
         const [status, msg] = PURCHASE_ERRORS[decision.reason] ?? [400, 'Compra inválida'];
-        throw new AppError(status, decision.reason, msg, { price: decision.price, reqLevel: decision.reqLevel });
+        throw new AppError(status, decision.reason, msg, { price: decision.price, reqLevel: decision.reqLevel, restaurant: decision.restaurant, learned: decision.learned, total: decision.total });
       }
       if (decision.price > 0) this.#debit(playerId, decision.price, `compra_${kind}`, itemId);
       for (const g of decision.grants) this.#grant(playerId, g.kind, g.id, g.level ?? 1);

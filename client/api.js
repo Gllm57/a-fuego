@@ -254,6 +254,6 @@ class LocalApi {
 const PURCHASE_MSG = {
   no_existe: 'Ese artículo no existe', ya_comprado: 'Ya lo tienes', nivel_insuficiente: 'Necesitas más nivel de chef',
   sin_dinero: 'No tienes suficientes monedas', restaurante_cerrado: 'Primero abre ese restaurante', nivel_maximo: 'Ya está al nivel máximo',
-  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', carrito_vacio: 'El carrito está vacío',
+  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', recetas_pendientes: 'Primero aprende todas las recetas del restaurante anterior', carrito_vacio: 'El carrito está vacío',
   no_disponible: 'Ese ingrediente no se vende para tus recetas', cantidad_invalida: 'Cantidad inválida'
 };

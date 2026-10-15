@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -80,9 +80,12 @@ test('las mejoras aceleran la cocina y añaden mesas', () => {
 
 test('la economía exige dinero y nivel', () => {
   const s = newPlayerState();
-  assert.equal(evaluatePurchase(s, 'restaurant', 'diner').reason, 'nivel_insuficiente');
-  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(3) }, 'restaurant', 'diner').reason, 'sin_dinero');
-  const rich = { ...s, xp: xpForLevel(3), coins: 5000 };
+  assert.equal(evaluatePurchase(s, 'restaurant', 'diner').reason, 'recetas_pendientes');
+  assert.equal(evaluatePurchase({ ...s, recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) }, 'restaurant', 'diner').reason, 'nivel_insuficiente');
+  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(3), recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) }, 'restaurant', 'diner').reason, 'sin_dinero');
+  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(6), coins: 9000 }, 'restaurant', 'diner').reason, 'recetas_pendientes');
+  const allTaco = RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id);
+  const rich = { ...s, xp: xpForLevel(3), coins: 5000, recipes: allTaco };
   const d = evaluatePurchase(rich, 'restaurant', 'diner');
   assert.ok(d.ok);
   const after = applyGrants(rich, d.price, d.grants);
@@ -207,4 +210,13 @@ test('equipo extra: exige nivel y permite cocinar en paralelo', () => {
   assert.equal(two.stations.olla, 2);
   // Ají de gallina lleva 3 cosas hervidas: con dos ollas el mínimo baja.
   assert.ok(minPrepMs(two, 'aji_gallina') < minPrepMs(one, 'aji_gallina'));
+});
+
+test('la siguiente meta guía a completar el recetario antes de abrir otro local', () => {
+  const s = { ...newPlayerState(), xp: xpForLevel(6) };
+  const g = nextGoal(s);
+  assert.equal(g.kind, 'recipe');
+  assert.equal(RECIPES.find((r) => r.id === g.id).restaurant, 'taqueria');
+  const all = { ...s, recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) };
+  assert.deepEqual([nextGoal(all).kind, nextGoal(all).id], ['restaurant', 'diner']);
 });
