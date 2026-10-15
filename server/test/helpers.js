@@ -1,6 +1,6 @@
 import { loadConfig } from '../src/config.js';
 import { buildApp } from '../src/app.js';
-import { ordersForConfig, minPrepMs } from '../../shared/index.js';
+import { ordersForConfig, minPrepMs, recipeIngredients, RECIPE_BY_ID } from '../../shared/index.js';
 
 export async function makeApp(overrides = {}) {
   const clock = { t: Date.UTC(2026, 9, 15, 12, 0, 0) };
@@ -19,10 +19,14 @@ export async function makeApp(overrides = {}) {
 // Un jugador honesto: atiende a los clientes en orden de llegada, con un ritmo humano.
 export function honestServes(config, { pace = 2500 } = {}) {
   const serves = [];
+  const stock = { ...(config.stock ?? {}) };
   let last = 0;
   for (const o of ordersForConfig(config)) {
     const t = Math.max(o.arriveAt + minPrepMs(config.stats, o.recipeId) + 2000, last + pace);
     if (t > o.arriveAt + o.patienceMs || t > config.durationMs) continue;
+    const need = recipeIngredients(RECIPE_BY_ID[o.recipeId]);
+    if (config.stock && Object.entries(need).some(([ing, n]) => (stock[ing] ?? 0) < n)) continue;
+    for (const [ing, n] of Object.entries(need)) stock[ing] -= n;
     serves.push({ orderId: o.id, recipeId: o.recipeId, servedAt: t, perfects: 1 });
     last = t;
   }

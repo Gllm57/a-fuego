@@ -75,7 +75,17 @@ export const ICONS = {
   sparkle: `<path d="M12 3l2 6 6 2-6 2-2 6-2-6-6-2 6-2z"/>`,
   arrow: `<path d="M5 12h14M13 6l6 6-6 6"/>`,
   back: `<path d="M15 5l-7 7 7 7"/>`,
-  refresh: `<path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 5v6h-6"/>`
+  refresh: `<path d="M20 11a8 8 0 1 0-2 6"/><path d="M20 5v6h-6"/>`,
+  market: `<path d="M3 10c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3c0 1.7 1.3 3 3 3s3-1.3 3-3L19 4H5z"/><path d="M5 13v8h14v-8M10 21v-5h4v5"/>`,
+  journal: `<path d="M6 3h12v18l-3-2-3 2-3-2-3 2z"/><path d="M9 8h6M9 12h6M9 16h3"/>`,
+  fire: `<path d="M12 22c4 0 7-3 7-7 0-5-5-7-4-12-3 1-6 5-6 8-1-1-2-2-2-4-2 2-2 5-2 8 0 4 3 7 7 7z" fill="currentColor" stroke="none"/><path d="M12 22c-2 0-3-1.5-3-3.5S11 15 11 13c2 1 4 3 4 5.5S14 22 12 22z" fill="#FFE066" stroke="none"/>`,
+  basket: `<path d="M4 10h16l-2 10H6z"/><path d="M8 10l3-6M16 10l-3-6M9 14v3M12 14v3M15 14v3"/>`,
+  crown: `<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>`,
+  up: `<path d="M12 19V5M6 11l6-6 6 6"/>`,
+  down: `<path d="M12 5v14M6 13l6 6 6-6"/>`,
+  chart: `<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`,
+  minus: `<path d="M6 12h12"/>`,
+  plus: `<path d="M12 6v12M6 12h12"/>`
 };
 
 export function icon(name, extra = '') {
@@ -84,7 +94,8 @@ export function icon(name, extra = '') {
 
 export const UPGRADE_ICONS = {
   cuchillos: PROCESS_ICONS.cortar, batidora: PROCESS_ICONS.batir, sarten: PROCESS_ICONS.freir,
-  horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table
+  horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table,
+  refri: `<rect x="5" y="2" width="14" height="20" rx="4"/><path d="M5 10h14M9 5v2M9 13v3"/>`
 };
 
 export function coinSvg(cls = 'coin') {
@@ -100,7 +111,7 @@ const SKIN = ['#F6C9A0', '#E3A877', '#B97A4E', '#8A5634', '#F2D2B6', '#D49A6A'];
 const HAIR = ['#2B1A12', '#6B3A1E', '#C77A2E', '#1A1A1A', '#8C8C8C', '#4A2A18'];
 const SHIRT = ['#2F5FD0', '#1E8A5F', '#B3264A', '#C77A00', '#6A3FC2', '#0F7C8A'];
 
-export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face') {
+export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vip = false) {
   const s = SKIN[look % 6], h = HAIR[look % 6], sh = SHIRT[look % 6];
   const hair = [
     `<path d="M10 22c0-10 8-15 14-15s14 5 14 15c-3-5-8-7-14-7s-11 2-14 7z" fill="${h}"/>`,
@@ -125,16 +136,18 @@ export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face') {
     ${hair}${brows}
     <ellipse cx="19" cy="24" rx="1.9" ry="2.4" fill="#24160E"/><ellipse cx="29" cy="24" rx="1.9" ry="2.4" fill="#24160E"/>
     ${cheeks}${mouth}
+    ${vip ? `<path d="M9 15c0-6 7-10 15-10s15 3 15 8c-6-2-12-3-30 2z" fill="#2A170D"/><circle cx="24" cy="5" r="2.5" fill="#2A170D"/><circle cx="19" cy="24" r="4.2" fill="none" stroke="#B7791F" stroke-width="1.6"/><circle cx="29" cy="24" r="4.2" fill="none" stroke="#B7791F" stroke-width="1.6"/><path d="M23 24h2" stroke="#B7791F" stroke-width="1.6"/><path d="M18 36l6 4 6-4" fill="#FFC23D"/>` : ''}
     ${mood === 'angry' ? `<path d="M37 9l3-4M40 12l4-2M38 5l1 4" stroke="#D2362A" stroke-width="2" stroke-linecap="round"/>` : ''}
   </svg>`;
 }
 
+// Estaciones vistas desde arriba: van dentro de un fogón redondo.
 export const STATION_ART = {
-  tabla: `<svg class="base" viewBox="0 0 56 46" aria-hidden="true"><rect x="4" y="12" width="48" height="30" rx="8" fill="#D8A869"/><rect x="4" y="34" width="48" height="8" rx="4" fill="#B98443"/><circle cx="46" cy="18" r="2.5" fill="#B98443"/></svg>`,
-  bol: `<svg class="base" viewBox="0 0 56 46" aria-hidden="true"><path d="M6 20h44c0 13-10 22-22 22S6 33 6 20z" fill="#9EC5E8"/><ellipse cx="28" cy="20" rx="22" ry="5" fill="#C9E0F3"/><path d="M14 28c4 6 10 8 16 8" stroke="#fff" stroke-width="2.5" fill="none" opacity=".6" stroke-linecap="round"/></svg>`,
-  sarten: `<svg class="base" viewBox="0 0 56 46" aria-hidden="true"><rect x="40" y="22" width="16" height="6" rx="3" fill="#3B2A20"/><ellipse cx="24" cy="26" rx="22" ry="16" fill="#3B2A20"/><ellipse cx="24" cy="25" rx="18" ry="12.5" fill="#54402F"/></svg>`,
-  horno: `<svg class="base" viewBox="0 0 56 46" aria-hidden="true"><rect x="4" y="4" width="48" height="40" rx="7" fill="#5A4536"/><rect x="10" y="14" width="36" height="24" rx="4" fill="#2A1A10"/><rect x="10" y="14" width="36" height="24" rx="4" fill="#FF8A3D" opacity="var(--glow, .25)"/><circle cx="14" cy="9" r="2" fill="#FFC23D"/><circle cx="22" cy="9" r="2" fill="#E2CDB2"/></svg>`,
-  olla: `<svg class="base" viewBox="0 0 56 46" aria-hidden="true"><rect x="2" y="18" width="8" height="5" rx="2.5" fill="#6A7A88"/><rect x="46" y="18" width="8" height="5" rx="2.5" fill="#6A7A88"/><path d="M8 16h40v18a8 8 0 0 1-8 8H16a8 8 0 0 1-8-8z" fill="#8A9AA8"/><ellipse cx="28" cy="16" rx="20" ry="5" fill="#5E7FA0"/><ellipse cx="28" cy="16" rx="17" ry="3.5" fill="#7FB2E0"/></svg>`
+  tabla: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#C98B52"/><circle cx="24" cy="24" r="17" fill="#DDA86E"/><path d="M12 20c6-3 18-3 24 0M11 28c7-3 19-3 26 0" stroke="#C98B52" stroke-width="1.6" fill="none" opacity=".7"/><circle cx="38" cy="14" r="2.4" fill="#8E5A2C"/></svg>`,
+  bol: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#7FB2E0"/><circle cx="24" cy="24" r="16" fill="#C9E0F3"/><path d="M14 18a12 12 0 0 1 10-6" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".8"/></svg>`,
+  sarten: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#2E2019"/><circle cx="24" cy="24" r="17" fill="#4A372A"/><circle cx="24" cy="24" r="12" fill="none" stroke="#5C4636" stroke-width="1.5"/><path d="M14 16a14 14 0 0 1 8-5" stroke="#7A604C" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`,
+  horno: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#5A4536"/><circle cx="24" cy="24" r="16" fill="#2A1A10"/><circle cx="24" cy="24" r="16" fill="#FF8A3D" opacity="var(--glow, .25)"/><path d="M12 24h24M14 18h20M14 30h20" stroke="#6E5442" stroke-width="1.5"/></svg>`,
+  olla: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><rect x="0" y="21" width="8" height="6" rx="3" fill="#6A7A88"/><rect x="40" y="21" width="8" height="6" rx="3" fill="#6A7A88"/><circle cx="24" cy="24" r="19" fill="#8A9AA8"/><circle cx="24" cy="24" r="15" fill="#5E8FC0"/><circle cx="20" cy="20" r="3" fill="#A9D2F5" opacity=".8"/><circle cx="29" cy="27" r="2" fill="#A9D2F5" opacity=".8"/></svg>`
 };
 
 export function plateSvgItems(recipe, filled = null) {
@@ -143,24 +156,33 @@ export function plateSvgItems(recipe, filled = null) {
   ).join('');
 }
 
-// Fachada del restaurante para las tarjetas del inicio.
-export function storefrontSvg(theme) {
+// Fachada con arco para las tarjetas de restaurante. Cada cocina tiene un detalle propio.
+const SIGNS = [
+  (p) => `<circle cx="150" cy="40" r="16" fill="#FFC23D"/><path d="M150 18v-8M150 70v-8M128 40h-8M180 40h-8" stroke="#FFC23D" stroke-width="4" stroke-linecap="round"/>`,
+  (p) => `<rect x="118" y="26" width="64" height="26" rx="13" fill="#fff"/><text x="150" y="45" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="16" fill="${p}">66</text>`,
+  (p) => `<path d="M134 52h32l-4-26h-24z" fill="#fff"/><circle cx="150" cy="22" r="6" fill="${p}"/>`,
+  (p) => `<ellipse cx="128" cy="40" rx="11" ry="15" fill="#E8452C"/><ellipse cx="172" cy="40" rx="11" ry="15" fill="#E8452C"/><path d="M128 25v-6M172 25v-6M128 55v5M172 55v5" stroke="#2A170D" stroke-width="3"/>`,
+  (p) => `<path d="M126 48c8-16 40-16 48 0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="30" r="9" fill="#fff"/>`
+];
+
+export function storefrontSvg(theme, idx = 0) {
   const p = theme.primary, d = theme.deep;
-  const stripes = Array.from({ length: 8 }, (_, i) => `<path d="M${30 + i * 30} 40h30v18a15 15 0 0 1-30 0z" fill="${i % 2 ? '#fff' : p}"/>`).join('');
-  return `<svg viewBox="0 0 300 132" preserveAspectRatio="xMidYMax slice" aria-hidden="true">
-    <rect x="0" y="118" width="300" height="14" fill="${d}" opacity=".25"/>
-    <rect x="30" y="40" width="240" height="92" fill="#FFF8EE"/>
-    <rect x="22" y="28" width="256" height="16" rx="4" fill="${d}"/>
-    ${stripes}
-    <rect x="48" y="74" width="70" height="44" rx="6" fill="${p}" opacity=".18"/>
-    <rect x="48" y="74" width="70" height="44" rx="6" fill="none" stroke="${d}" stroke-width="4"/>
-    <path d="M83 74v44M48 96h70" stroke="${d}" stroke-width="3"/>
-    <rect x="184" y="70" width="64" height="62" rx="6" fill="${d}"/>
-    <circle cx="236" cy="102" r="3" fill="#FFC23D"/>
-    <rect x="132" y="80" width="40" height="30" rx="15" fill="${p}"/>
-    <path d="M140 95h24" stroke="#fff" stroke-width="3" stroke-linecap="round"/>
-    <circle cx="20" cy="112" r="14" fill="#5E9E4A"/><rect x="17" y="112" width="6" height="20" fill="#7A4B1E"/>
-    <circle cx="282" cy="108" r="16" fill="#4E8E3A"/><rect x="279" y="110" width="6" height="22" fill="#7A4B1E"/>
+  const scallops = Array.from({ length: 9 }, (_, i) => `<circle cx="${62 + i * 22}" cy="98" r="11" fill="${i % 2 ? '#fff' : p}"/>`).join('');
+  return `<svg viewBox="0 0 300 240" aria-hidden="true">
+    <ellipse cx="150" cy="236" rx="140" ry="14" fill="${d}" opacity=".18"/>
+    <path d="M40 236V120a110 110 0 0 1 220 0v116z" fill="#FFF8EE"/>
+    <path d="M40 120a110 110 0 0 1 220 0" fill="none" stroke="${d}" stroke-width="10"/>
+    ${(SIGNS[idx] ?? SIGNS[0])(p)}
+    <path d="M50 98h200v10H50z" fill="${p}"/>
+    ${scallops}
+    <circle cx="86" cy="156" r="24" fill="${p}" opacity=".16"/><circle cx="86" cy="156" r="24" fill="none" stroke="${d}" stroke-width="5"/>
+    <path d="M86 132v48M62 156h48" stroke="${d}" stroke-width="3"/>
+    <circle cx="214" cy="156" r="24" fill="${p}" opacity=".16"/><circle cx="214" cy="156" r="24" fill="none" stroke="${d}" stroke-width="5"/>
+    <path d="M214 132v48M190 156h48" stroke="${d}" stroke-width="3"/>
+    <path d="M124 236v-62a26 26 0 0 1 52 0v62z" fill="${d}"/>
+    <circle cx="166" cy="206" r="3.5" fill="#FFC23D"/>
+    <circle cx="28" cy="214" r="18" fill="#5E9E4A"/><circle cx="18" cy="200" r="12" fill="#77B85E"/><path d="M16 236l4-20h16l4 20z" fill="#C2703A"/>
+    <circle cx="272" cy="214" r="18" fill="#4E8E3A"/><circle cx="284" cy="200" r="11" fill="#6AAA52"/><path d="M260 236l4-20h16l4 20z" fill="#C2703A"/>
   </svg>`;
 }
 

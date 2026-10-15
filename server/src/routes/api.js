@@ -67,6 +67,29 @@ export default async function api(app, { service, config }) {
     }
   }, async (req) => service.purchase(req.playerId, req.body.kind, req.body.id, req.headers['idempotency-key']));
 
+  app.get('/me/runs', { preHandler: auth }, async (req) => ({ entries: service.history(req.playerId) }));
+
+  app.get('/market', { preHandler: auth }, async (req) => service.market(req.playerId));
+
+  app.post('/market/buy', {
+    preHandler: auth,
+    schema: {
+      headers: { type: 'object', properties: { 'idempotency-key': { type: 'string', minLength: 8, maxLength: 80 } } },
+      body: {
+        type: 'object', additionalProperties: false, required: ['items'],
+        properties: {
+          items: {
+            type: 'object', minProperties: 1, maxProperties: 40,
+            propertyNames: { pattern: '^[a-z_]{2,20}$' },
+            additionalProperties: { type: 'integer', minimum: 1, maximum: 99 }
+          }
+        }
+      }
+    }
+  }, async (req) => service.marketBuy(req.playerId, req.body.items, req.headers['idempotency-key']));
+
+  app.post('/market/basket', { preHandler: auth }, async (req) => service.claimBasket(req.playerId));
+
   app.post('/runs', {
     preHandler: auth,
     config: { rateLimit: { max: 30, timeWindow: '1 minute' } },
@@ -99,6 +122,11 @@ export default async function api(app, { service, config }) {
                 perfects: { type: 'integer', minimum: 0, maximum: 10, default: 0 }
               }
             }
+          },
+          waste: {
+            type: 'object', maxProperties: 40,
+            propertyNames: { pattern: '^[a-z_]{2,20}$' },
+            additionalProperties: { type: 'integer', minimum: 0, maximum: 999 }
           }
         }
       }

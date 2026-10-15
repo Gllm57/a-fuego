@@ -13,7 +13,8 @@ test('crear invitado devuelve perfil inicial con bono de bienvenida', async () =
   const { app, call } = await makeApp();
   const { token, profile } = await guest(call);
   assert.ok(token);
-  assert.equal(profile.state.coins, 150);
+  assert.equal(profile.state.coins, 200);
+  assert.equal(profile.state.inventory.tortilla, 8);
   assert.deepEqual(profile.state.restaurants, ['taqueria']);
   const me = await call('GET', '/api/v1/me', { token });
   assert.equal(me.status, 200);
@@ -62,7 +63,12 @@ test('partida completa: valida, paga, es idempotente y aparece en el ranking', a
   const done = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.ok(done.body.result.coins > 0);
-  assert.equal(done.body.profile.state.coins, 150 + done.body.result.coins);
+  assert.equal(done.body.profile.state.coins, 200 + done.body.result.coins);
+  // La despensa se descontó.
+  const used = done.body.result.used;
+  for (const [ing, n] of Object.entries(used)) assert.equal(done.body.profile.state.inventory[ing] ?? 0, config.stock[ing] - n);
+  const hist = await call('GET', '/api/v1/me/runs', { token });
+  assert.equal(hist.body.entries.length, 1);
 
   const again = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
   assert.deepEqual(again.body, done.body);
@@ -112,6 +118,7 @@ test('reto diario paga bono una sola vez', async () => {
   const { token } = await guest(call);
   let bonus = 0;
   for (let i = 0; i < 2; i++) {
+    app.service.db.run('UPDATE inventory SET qty = 10');
     const { body } = await call('POST', '/api/v1/runs', { token, body: { mode: 'daily' } });
     clock.t += body.config.durationMs + 2000;
     const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: honestServes(body.config, { pace: 1500 }) } });
@@ -133,5 +140,39 @@ test('registro y login conservan la cuenta e invalidan el token de invitado', as
   const ok = await call('POST', '/api/v1/auth/login', { body: { username: 'chef_ana', password: 'contraseña-segura' } });
   assert.equal(ok.status, 200);
   assert.equal(ok.body.profile.player.registered, true);
+  await app.close();
+});
+
+test('mercado: comprar, canasta diaria y despensa llena', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const m = await call('GET', '/api/v1/market', { token });
+  assert.equal(m.status, 200);
+  assert.equal(m.body.capacity, 40);
+  assert.equal(m.body.used, 20);
+  const price = m.body.items.find((i) => i.id === 'cebolla').price;
+  const buy = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 3 } } });
+  assert.equal(buy.status, 200, JSON.stringify(buy.body));
+  assert.equal(buy.body.profile.state.coins, 200 - price * 3);
+  assert.equal(buy.body.profile.state.inventory.cebolla, 7);
+  const full = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 30 } } });
+  assert.equal(full.body.error.code, 'despensa_llena');
+  const notSold = await call('POST', '/api/v1/market/buy', { token, body: { items: { salmon: 1 } } });
+  assert.equal(notSold.status, 400);
+  const b1 = await call('POST', '/api/v1/market/basket', { token });
+  assert.equal(b1.status, 200);
+  const b2 = await call('POST', '/api/v1/market/basket', { token });
+  assert.equal(b2.body.error.code, 'ya_reclamada');
+  await app.close();
+});
+
+test('no se puede servir más de lo que hay en la despensa', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  clock.t += body.config.durationMs + 2000;
+  const greedy = honestServes({ ...body.config, stock: undefined });
+  const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: greedy } });
+  if (greedy.length > 8) assert.equal(res.body.error.details.reason, 'sin_ingredientes');
   await app.close();
 });

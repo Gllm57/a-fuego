@@ -5,7 +5,8 @@ import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
   newPlayerState, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
-  dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError
+  dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
+  marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT
 } from '../../shared/index.js';
 import { AppError, badRequest, conflict, forbidden, notFound, unauthorized } from './errors.js';
 import { hashPassword, verifyPassword, signToken } from './auth.js';
@@ -17,7 +18,11 @@ const PURCHASE_ERRORS = {
   sin_dinero: [409, 'No tienes suficientes monedas'],
   restaurante_cerrado: [403, 'Primero abre ese restaurante'],
   nivel_maximo: [409, 'Ya está al nivel máximo'],
-  tipo_invalido: [400, 'Tipo de compra inválido']
+  tipo_invalido: [400, 'Tipo de compra inválido'],
+  carrito_vacio: [400, 'El carrito está vacío'],
+  no_disponible: [400, 'Ese ingrediente no se vende para tus recetas'],
+  cantidad_invalida: [400, 'Cantidad inválida'],
+  despensa_llena: [409, 'No cabe en tu despensa: mejora el refrigerador']
 };
 
 const GUEST_NAMES = ['Chef Pimienta', 'Chef Canela', 'Chef Albahaca', 'Chef Azafrán', 'Chef Comino', 'Chef Romero', 'Chef Vainilla', 'Chef Paprika'];
@@ -40,6 +45,7 @@ export class GameService {
       this.#credit(id, start.coins, 'bono_bienvenida', null);
       for (const r of start.restaurants) this.#grant(id, 'restaurant', r, 1);
       for (const r of start.recipes) this.#grant(id, 'recipe', r, 1);
+      this.#addInventory(id, start.inventory);
     });
     return { token: this.issueToken(id), profile: this.profile(id) };
   }
@@ -90,13 +96,18 @@ export class GameService {
     const p = this.#player(playerId);
     const unlocks = this.db.all('SELECT kind, item_id, level FROM unlocks WHERE player_id = ?', playerId);
     const order = new Map(RESTAURANTS.map((r, i) => [r.id, i]));
+    const inventory = Object.fromEntries(
+      this.db.all('SELECT ingredient_id, qty FROM inventory WHERE player_id = ? AND qty > 0', playerId).map((r) => [r.ingredient_id, r.qty])
+    );
     return {
       coins: p.coins,
       xp: p.xp,
       restaurants: unlocks.filter((u) => u.kind === 'restaurant').map((u) => u.item_id).sort((a, b) => order.get(a) - order.get(b)),
       recipes: unlocks.filter((u) => u.kind === 'recipe').map((u) => u.item_id),
       upgrades: Object.fromEntries(unlocks.filter((u) => u.kind === 'upgrade').map((u) => [u.item_id, u.level])),
-      dailyClaimed: p.daily_claimed
+      inventory,
+      dailyClaimed: p.daily_claimed,
+      basketClaimed: p.basket_claimed
     };
   }
 
@@ -140,6 +151,71 @@ export class GameService {
         this.db.run('INSERT INTO idempotency (player_id, key, response, created_at) VALUES (?, ?, ?, ?)', playerId, idempotencyKey, JSON.stringify(response), this.now());
       }
       return response;
+    });
+  }
+
+  // ── Mercado ───────────────────────────────────────────────
+  market(playerId) {
+    const state = this.state(playerId);
+    const day = todayUTC(new Date(this.now()));
+    const prices = marketPrices(day);
+    return {
+      day,
+      items: marketIngredients(state).map((id) => ({ id, ...prices[id] })),
+      inventory: state.inventory,
+      used: inventoryCount(state.inventory),
+      capacity: storageCapacity(state.upgrades),
+      bulk: { qty: BULK_QTY, discount: BULK_DISCOUNT },
+      basket: dailyBasket(day, state)
+    };
+  }
+
+  marketBuy(playerId, items, idempotencyKey) {
+    return this.db.tx(() => {
+      if (idempotencyKey) {
+        const prev = this.db.get('SELECT response FROM idempotency WHERE player_id = ? AND key = ?', playerId, idempotencyKey);
+        if (prev) return JSON.parse(prev.response);
+      }
+      const day = todayUTC(new Date(this.now()));
+      const decision = evaluateMarketBuy(this.state(playerId), items, day);
+      if (!decision.ok) {
+        const [status, msg] = PURCHASE_ERRORS[decision.reason] ?? [400, 'Compra inválida'];
+        throw new AppError(status, decision.reason, msg, { price: decision.price, capacity: decision.capacity });
+      }
+      this.#debit(playerId, decision.price, 'mercado', day);
+      this.#addInventory(playerId, decision.delta);
+      const response = { spent: decision.price, profile: this.profile(playerId), market: this.market(playerId) };
+      if (idempotencyKey) {
+        this.db.run('INSERT INTO idempotency (player_id, key, response, created_at) VALUES (?, ?, ?, ?)', playerId, idempotencyKey, JSON.stringify(response), this.now());
+      }
+      return response;
+    });
+  }
+
+  claimBasket(playerId) {
+    return this.db.tx(() => {
+      const day = todayUTC(new Date(this.now()));
+      const basket = dailyBasket(day, this.state(playerId));
+      if (basket.claimed) throw conflict('ya_reclamada', 'Ya recogiste la canasta de hoy');
+      if (Object.keys(basket.items).length === 0) throw conflict('despensa_llena', 'No cabe nada más en tu despensa');
+      this.#addInventory(playerId, basket.items);
+      this.db.run('UPDATE players SET basket_claimed = ?, updated_at = ? WHERE id = ?', day, this.now(), playerId);
+      return { items: basket.items, profile: this.profile(playerId), market: this.market(playerId) };
+    });
+  }
+
+  history(playerId, limit = 20) {
+    return this.db.all(
+      `SELECT id, restaurant_id AS restaurantId, mode, finished_at AS finishedAt, score, stars, coins, result_json
+         FROM runs WHERE player_id = ? AND status = 'completed' ORDER BY finished_at DESC LIMIT ?`,
+      playerId, limit
+    ).map((r) => {
+      const res = JSON.parse(r.result_json).result;
+      return {
+        id: r.id, restaurantId: r.restaurantId, mode: r.mode, finishedAt: r.finishedAt, stars: r.stars,
+        gross: res.gross, upkeep: res.upkeep, net: res.coins, served: res.served, totalOrders: res.totalOrders,
+        ingredientCost: res.ingredientCost, vipServed: res.vipServed
+      };
     });
   }
 
@@ -197,6 +273,10 @@ export class GameService {
 
       const before = this.state(playerId);
       const levelBefore = levelFromXp(before.xp);
+      // Se descuenta de la despensa lo usado y lo desperdiciado.
+      const consumed = { ...result.used };
+      for (const [ing, n] of Object.entries(result.waste)) consumed[ing] = (consumed[ing] ?? 0) + n;
+      this.#takeInventory(playerId, consumed);
       if (result.coins > 0) this.#credit(playerId, result.coins, 'servicio', runId);
       this.db.run('UPDATE players SET xp = xp + ?, updated_at = ? WHERE id = ?', result.xp, now, playerId);
 
@@ -272,6 +352,24 @@ export class GameService {
     const row = this.db.get('UPDATE players SET coins = coins + ?, updated_at = ? WHERE id = ? AND coins + ? >= 0 RETURNING coins', delta, this.now(), playerId, delta);
     if (!row) throw conflict('sin_dinero', 'No tienes suficientes monedas');
     this.db.run('INSERT INTO ledger (player_id, delta, balance_after, reason, ref, created_at) VALUES (?, ?, ?, ?, ?, ?)', playerId, delta, row.coins, reason, ref, this.now());
+  }
+
+  #addInventory(playerId, delta) {
+    for (const [ing, n] of Object.entries(delta)) {
+      if (n <= 0) continue;
+      this.db.run(
+        `INSERT INTO inventory (player_id, ingredient_id, qty) VALUES (?, ?, ?)
+         ON CONFLICT (player_id, ingredient_id) DO UPDATE SET qty = qty + excluded.qty`,
+        playerId, ing, n
+      );
+    }
+  }
+
+  #takeInventory(playerId, delta) {
+    for (const [ing, n] of Object.entries(delta)) {
+      if (n <= 0) continue;
+      this.db.run('UPDATE inventory SET qty = MAX(0, qty - ?) WHERE player_id = ? AND ingredient_id = ?', n, playerId, ing);
+    }
   }
 
   #grant(playerId, kind, itemId, level) {

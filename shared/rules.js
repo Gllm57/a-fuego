@@ -1,19 +1,29 @@
 // Reglas derivadas: cómo afectan las mejoras a la cocina, y los tiempos
 // mínimos que el servidor usa para detectar partidas imposibles.
 
-import { PROCESSES, STATIONS, RECIPE_BY_ID, UPGRADE_BY_ID } from './data/catalog.js';
+import { PROCESSES, RECIPE_BY_ID, UPGRADE_BY_ID, STATIONS } from './data/catalog.js';
 
 export const RUN_DURATION_MS = 120_000;
 export const BASE_SLOTS = 3;
+export const BASE_STORAGE = 40;
 // Un humano no puede tocar más rápido que esto de forma sostenida.
 export const MIN_TAP_MS = 90;
 // Ventana tras terminar un proceso para recogerlo con calificación "perfecto".
-export const PERFECT_WINDOW_MS = 1200;
+export const PERFECT_WINDOW_MS = 900;
+// Los críticos gastronómicos pagan más y tienen menos paciencia.
+export const VIP_PRICE_MULT = 2;
+export const VIP_PATIENCE_MULT = 0.7;
+// Toques necesarios para apagar un fuego en una estación.
+export const FIRE_TAPS = 6;
 
 export function upgradeLevel(upgrades, id) {
   const lvl = Number(upgrades?.[id] ?? 0);
   const max = UPGRADE_BY_ID[id]?.costs.length ?? 0;
   return Math.max(0, Math.min(max, Number.isFinite(lvl) ? Math.floor(lvl) : 0));
+}
+
+export function storageCapacity(upgrades = {}) {
+  return BASE_STORAGE + 20 * upgradeLevel(upgrades, 'refri');
 }
 
 export function kitchenStats(upgrades = {}) {
@@ -65,9 +75,17 @@ export function minPrepMs(stats, recipeId) {
   return Object.values(load).reduce((m, v) => Math.max(m, v), 0);
 }
 
-export function patienceMs(stats, recipe) {
+export function patienceMs(stats, recipe, { vip = false, tier = 0 } = {}) {
   const timed = recipe.components.filter((c) => PROCESSES[c.process].kind !== 'raw').length;
-  return Math.round((22_000 + 6_500 * recipe.components.length + 2_500 * timed) * stats.patienceMult);
+  const base = (18_000 + 5_500 * recipe.components.length + 2_000 * timed) * (1 - 0.04 * tier);
+  return Math.round(base * stats.patienceMult * (vip ? VIP_PATIENCE_MULT : 1));
+}
+
+// Ingredientes que consume un plato (una unidad por componente).
+export function recipeIngredients(recipe) {
+  const need = {};
+  for (const c of recipe.components) need[c.ingredient] = (need[c.ingredient] ?? 0) + 1;
+  return need;
 }
 
 export const STATION_ORDER = Object.freeze(Object.keys(STATIONS));

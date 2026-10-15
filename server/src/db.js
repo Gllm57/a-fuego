@@ -70,6 +70,16 @@ const MIGRATIONS = [
     created_at INTEGER NOT NULL,
     PRIMARY KEY (player_id, key)
   );
+  `,
+  // 2: despensa (inventario de ingredientes) y canasta diaria
+  `
+  CREATE TABLE inventory (
+    player_id     TEXT NOT NULL REFERENCES players(id) ON DELETE CASCADE,
+    ingredient_id TEXT NOT NULL,
+    qty           INTEGER NOT NULL CHECK (qty >= 0),
+    PRIMARY KEY (player_id, ingredient_id)
+  );
+  ALTER TABLE players ADD COLUMN basket_claimed TEXT;
   `
 ];
 

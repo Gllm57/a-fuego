@@ -1,9 +1,9 @@
 // Motor de la cocina. Corre a 60 fps con requestAnimationFrame y registra
-// qué pedidos se sirvieron y cuándo; el servidor valida y paga.
+// qué pedidos se sirvieron, cuándo y qué se desperdició; el servidor valida y paga.
 
 import {
-  RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig,
-  PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS
+  RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig, plateEarnings,
+  rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS
 } from './shared/index.js';
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, coinSvg, icon } from './art.js';
 import { sfx } from './audio.js';
@@ -25,6 +25,12 @@ export class Kitchen {
       return { ...o, recipe, status: 'waiting', filled: recipe.components.map(() => false), busy: recipe.components.map(() => false), perfects: 0 };
     });
     this.stations = Object.fromEntries(STATION_IDS.map((s) => [s, null]));
+    this.fires = {};
+    this.events = generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
+    this.rush = rushWindow(config.seed, config.durationMs);
+    this.rushState = 'before';
+    this.stock = { ...(config.stock ?? {}) };
+    this.waste = {};
     this.t = 0;
     this.running = false;
     this.paused = false;
@@ -44,21 +50,27 @@ export class Kitchen {
     this.host.innerHTML = `
       <div class="game" role="application" aria-label="Cocina">
         <div class="game__inner">
-          <div class="hud">
-            <button class="icon-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
-            <div class="timer" aria-live="off">
-              <div class="timer__row"><span>${escapeHtml(this.restaurant.name)}</span><span class="timer__clock">2:00</span></div>
-              <div class="timer__bar"><div class="timer__fill"></div></div>
+          <div class="wall">
+            <div class="hud">
+              <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
+              <div class="timer">
+                <span class="ring timer__ring"><span class="ring__inner timer__clock">2:00</span></span>
+                <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span><span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span></span>
+              </div>
+              <span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
             </div>
-            <div class="hud__score"><small>GANADO</small><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span></div>
           </div>
-          <div class="customers" style="--slots:${this.stats.slots}"></div>
-          <div class="order-wrap" style="position:relative"><div class="order"></div><div class="combo" aria-live="polite"></div></div>
-          <div class="stations">${STATION_IDS.map((s) => this.#stationShell(s)).join('')}</div>
-          <div class="pantry">
-            <div class="pantry__head"><span>Despensa</span><span class="pantry__tip">Toca lo que pide el cliente</span></div>
-            <div class="pantry__grid" style="--cols:${this.pantryIds.length <= 4 ? Math.max(3, this.pantryIds.length) : this.pantryIds.length <= 8 ? 4 : 5}">${this.pantryIds.map((id) => `
-              <button class="ing" data-ing="${id}" aria-label="${INGREDIENTS[id].name}">${ingredientSvg(id)}<span class="ing__label">${INGREDIENTS[id].name}</span></button>`).join('')}
+          <div class="bar">
+            <div class="lamps" aria-hidden="true"><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span></div>
+            <div class="bar__counter"></div>
+            <div class="customers" style="--slots:${this.stats.slots}"></div>
+          </div>
+          <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
+          <div class="counter">${STATION_IDS.map((s) => this.#stationShell(s)).join('')}</div>
+          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 70 : this.pantryIds.length <= 10 ? 60 : 52}px">
+            <div class="shelf__head"><span class="shelf__count"></span><span>Toca lo que pide el cliente</span></div>
+            <div class="shelf__grid">${this.pantryIds.map((id) => `
+              <button class="jar" data-ing="${id}" aria-label="${INGREDIENTS[id].name}">${ingredientSvg(id, { title: '' })}<span class="jar__qty"></span></button>`).join('')}
             </div>
           </div>
         </div>
@@ -66,19 +78,21 @@ export class Kitchen {
     this.el = {
       root: this.host.querySelector('.game__inner'),
       clock: this.host.querySelector('.timer__clock'),
+      ring: this.host.querySelector('.timer__ring'),
       timer: this.host.querySelector('.timer'),
-      fill: this.host.querySelector('.timer__fill'),
       coins: this.host.querySelector('.hud__coins'),
       coinNum: this.host.querySelector('.hud__num'),
       combo: this.host.querySelector('.combo'),
       customers: this.host.querySelector('.customers'),
       order: this.host.querySelector('.order'),
       stations: Object.fromEntries(STATION_IDS.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
-      pantry: [...this.host.querySelectorAll('.ing')]
+      pantry: [...this.host.querySelectorAll('.jar')],
+      shelfCount: this.host.querySelector('.shelf__count')
     };
     this.#bind();
     this.#renderCustomers();
     this.#renderOrder();
+    this.#renderStock();
     STATION_IDS.forEach((s) => this.#renderStation(s));
     this.#intro();
   }
@@ -93,7 +107,6 @@ export class Kitchen {
       const cust = e.target.closest('[data-order]');
       if (cust) { e.preventDefault(); return this.#select(Number(cust.dataset.order)); }
     });
-    // Teclado: Enter/Espacio en botones enfocados.
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const target = e.target.closest('[data-ing],[data-station],[data-order]');
@@ -119,15 +132,17 @@ export class Kitchen {
   #intro() {
     const ov = document.createElement('div');
     ov.className = 'overlay';
+    const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
     if (this.firstTime) {
       ov.innerHTML = `
         <h2>Cómo se juega</h2>
         <div class="howto">
-          <div><b>1</b>Toca a un cliente para ver su pedido</div>
-          <div><b>2</b>Toca los ingredientes resaltados</div>
-          <div><b>3</b>Toca las estaciones para cortar, batir o recoger</div>
+          <div><b>1</b>Toca a un cliente para ver su comanda</div>
+          <div><b>2</b>Toca los frascos resaltados de la despensa</div>
+          <div><b>3</b>Toca los fogones para cortar, batir o recoger</div>
+          <div><b>4</b>Si hay fuego, tócalo rápido para apagarlo</div>
         </div>
-        <p>Recoge justo al estar listo para un <strong>¡Perfecto!</strong> Sirve seguido para subir el combo.</p>
+        <p>Sólo cocinas con lo que compraste en el mercado (${units} ingredientes). Los críticos con boina pagan el doble.</p>
         <button class="btn btn--gold btn--xl" data-act="go">¡A cocinar!</button>`;
       ov.querySelector('[data-act="go"]').addEventListener('click', () => { ov.remove(); this.#countdown(); });
       this.el.root.appendChild(ov);
@@ -169,7 +184,7 @@ export class Kitchen {
     ov.className = 'overlay';
     ov.innerHTML = `
       <h2>Pausa</h2>
-      <p>Los clientes esperan sentados. Si sales, este servicio no cuenta.</p>
+      <p>Los clientes esperan. Si sales, este servicio no cuenta, pero los ingredientes que ya usaste se quedan en tu despensa.</p>
       <button class="btn btn--gold btn--xl" data-act="resume">Continuar</button>
       <button class="btn btn--ghost" data-act="quit">Salir del servicio</button>`;
     ov.querySelector('[data-act="resume"]').addEventListener('click', () => {
@@ -193,30 +208,66 @@ export class Kitchen {
     this.raf = requestAnimationFrame(this.frame);
   }
 
+  #addWaste(ing, n = 1) {
+    this.waste[ing] = (this.waste[ing] ?? 0) + n;
+  }
+
   #update() {
     const t = this.t;
     let changed = false;
     for (const o of this.orders) {
-      if (o.status === 'waiting' && o.arriveAt <= t) { o.status = 'seated'; changed = true; }
-      else if (o.status === 'seated' && t > o.arriveAt + o.patienceMs) {
+      if (o.status === 'waiting' && o.arriveAt <= t) {
+        o.status = 'seated';
+        changed = true;
+        if (o.vip) this.#ribbon('¡Crítico gastronómico!', 'Paga el doble pero tiene poca paciencia');
+      } else if (o.status === 'seated' && t > o.arriveAt + o.patienceMs) {
         o.status = 'left';
         changed = true;
         this.combo = 0;
         this.#comboUi();
         sfx.angry();
+        // Lo que ya estaba en su plato se desperdicia.
+        o.recipe.components.forEach((c, i) => { if (o.filled[i]) this.#addWaste(c.ingredient); });
         const el = this.custEls.get(o.id);
         if (el) floatText(el, '¡Me voy!', 'bad');
       }
     }
-    // Cosas en estaciones de clientes que se fueron: se tiran.
     for (const st of STATION_IDS) {
       const item = this.stations[st];
       if (item && this.orders[item.orderId].status === 'left') {
         this.stations[st] = null;
+        this.#addWaste(item.ingredient);
         floatText(this.el.stations[st], 'Se fue', 'bad');
       }
     }
-    // Avisos de estado en estaciones de tiempo.
+    // Eventos de fuego.
+    for (const ev of this.events) {
+      if (ev.done || t < ev.at) continue;
+      ev.done = true;
+      const st = ev.station;
+      const item = this.stations[st];
+      if (item) {
+        this.stations[st] = null;
+        this.orders[item.orderId].busy[item.compIndex] = false;
+        this.#addWaste(item.ingredient);
+        this.sig.order = '';
+      }
+      this.fires[st] = { taps: FIRE_TAPS };
+      this.sig.stations[st] = '';
+      sfx.burn();
+      this.#ribbon(`¡Fuego en ${st === 'sarten' ? 'la sartén' : 'el horno'}!`, 'Tócalo rápido para apagarlo', 'fire');
+    }
+    // Hora pico.
+    if (this.rushState === 'before' && t >= this.rush.from) {
+      this.rushState = 'on';
+      this.#ribbon('¡Hora pico!', 'Llegan clientes sin parar');
+      this.rushGlow = document.createElement('div');
+      this.rushGlow.className = 'rush-glow';
+      this.el.root.appendChild(this.rushGlow);
+    } else if (this.rushState === 'on' && t >= this.rush.to) {
+      this.rushState = 'after';
+      this.rushGlow?.remove();
+    }
     for (const st of STATION_IDS) {
       const item = this.stations[st];
       if (!item || item.kind !== 'timer') continue;
@@ -239,6 +290,14 @@ export class Kitchen {
       }
       this.#renderCustomers();
     }
+  }
+
+  #ribbon(title, sub, variant = '') {
+    const r = document.createElement('div');
+    r.className = `ribbon ${variant ? `ribbon--${variant}` : ''}`;
+    r.innerHTML = `${escapeHtml(title)}${sub ? `<small>${escapeHtml(sub)}</small>` : ''}`;
+    this.el.root.appendChild(r);
+    setTimeout(() => r.remove(), 2300);
   }
 
   #visible() {
@@ -264,20 +323,20 @@ export class Kitchen {
     const secs = Math.ceil(left / 1000);
     const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
     if (this.el.clock.textContent !== clock) this.el.clock.textContent = clock;
-    this.el.fill.style.transform = `scaleX(${left / this.config.durationMs})`;
+    this.el.ring.style.setProperty('--p', ((left / this.config.durationMs) * 100).toFixed(1));
     this.el.timer.classList.toggle('is-low', secs <= 15);
 
     for (const o of this.#visible()) {
       const el = this.custEls.get(o.id);
       if (!el) continue;
       const frac = Math.max(0, 1 - (this.t - o.arriveAt) / o.patienceMs);
-      el.querySelector('.patience__fill').style.width = `${frac * 100}%`;
+      el.querySelector('.avatar').style.setProperty('--p', (frac * 100).toFixed(1));
       const mood = frac > 0.5 ? 'happy' : frac > 0.25 ? 'worried' : 'angry';
       if (el.dataset.mood !== mood) {
         el.dataset.mood = mood;
         el.classList.toggle('is-worried', mood === 'worried');
         el.classList.toggle('is-angry', mood === 'angry');
-        el.querySelector('.customer__face').outerHTML = customerSvg(o.look, mood);
+        el.querySelector('.avatar__face').innerHTML = customerSvg(o.look, mood, '', o.vip);
       }
     }
 
@@ -285,13 +344,19 @@ export class Kitchen {
       this.#renderStation(st);
       const item = this.stations[st];
       const el = this.el.stations[st];
-      if (item?.kind === 'timer') {
+      if (this.fires[st]) {
+        el.style.setProperty('--p', (1 - this.fires[st].taps / FIRE_TAPS).toFixed(3));
+      } else if (item?.kind === 'timer') {
         const state = this.#timerState(item);
         let p;
         if (state === 'cooking') p = (this.t - item.startedAt) / (item.readyAt - item.startedAt);
         else if (state === 'burnt' || item.burnAt === Infinity) p = 1;
-        else p = (this.t - item.readyAt) / (item.burnAt - item.readyAt);
+        else p = 1 - (this.t - item.readyAt) / (item.burnAt - item.readyAt);
         el.style.setProperty('--p', Math.min(1, Math.max(0, p)).toFixed(3));
+      } else if (item?.kind === 'tap') {
+        el.style.setProperty('--p', (item.taps / item.need).toFixed(3));
+      } else {
+        el.style.setProperty('--p', '0');
       }
     }
     this.#renderOrder();
@@ -303,30 +368,31 @@ export class Kitchen {
     const box = this.el.customers;
     const visible = this.#visible();
     const ids = new Set(visible.map((o) => o.id));
-    // Salidas animadas: el elemento se fija en su sitio y se desvanece.
     for (const [id, el] of this.custEls) {
       if (ids.has(id)) continue;
       const o = this.orders[id];
       const r = el.getBoundingClientRect();
       const pr = box.getBoundingClientRect();
-      Object.assign(el.style, { position: 'absolute', left: `${r.left - pr.left}px`, top: `${r.top - pr.top}px`, width: `${r.width}px`, height: `${r.height}px`, zIndex: 2 });
+      Object.assign(el.style, { position: 'absolute', left: `${r.left - pr.left}px`, top: `${r.top - pr.top}px`, width: `${r.width}px`, zIndex: 2 });
       el.classList.remove('is-selected');
       el.classList.add(o.status === 'served' ? 'is-served' : 'is-leaving');
       setTimeout(() => el.remove(), 800);
       this.custEls.delete(id);
     }
-    box.querySelectorAll('.slot-empty, .queue-badge').forEach((n) => n.remove());
+    box.querySelectorAll('.seat-empty, .queue-badge').forEach((n) => n.remove());
     for (const o of visible) {
       if (this.custEls.has(o.id)) continue;
       const el = document.createElement('button');
-      el.className = 'customer';
+      el.className = `customer ${o.vip ? 'is-vip' : ''}`;
       el.dataset.order = o.id;
       el.dataset.mood = 'happy';
-      el.setAttribute('aria-label', `Cliente pide ${o.recipe.name}`);
-      el.innerHTML = `${customerSvg(o.look, 'happy')}
-        <div class="customer__dish">${o.recipe.components.slice(0, 4).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</div>
-        <div class="customer__name">${escapeHtml(o.recipe.name)}</div>
-        <div class="patience"><div class="patience__fill"></div></div>`;
+      el.setAttribute('aria-label', `${o.vip ? 'Crítico gastronómico' : 'Cliente'} pide ${o.recipe.name}`);
+      el.innerHTML = `
+        <span class="bubble">
+          <span class="bubble__dish">${o.recipe.components.slice(0, 4).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span>
+          <span class="bubble__name">${escapeHtml(o.recipe.name)}</span>
+        </span>
+        <span class="avatar" style="--p:100"><span class="avatar__face">${customerSvg(o.look, 'happy', '', o.vip)}</span>${o.vip ? '<span class="vip-tag">VIP</span>' : ''}</span>`;
       el.addEventListener('animationend', (e) => { if (e.animationName === 'customer-in') el.style.animation = 'none'; });
       box.appendChild(el);
       this.custEls.set(o.id, el);
@@ -334,8 +400,8 @@ export class Kitchen {
     }
     for (let i = visible.length; i < this.stats.slots; i++) {
       const s = document.createElement('div');
-      s.className = 'slot-empty';
-      s.textContent = 'Mesa libre';
+      s.className = 'seat-empty';
+      s.innerHTML = '<i></i><span>Libre</span>';
       box.appendChild(s);
     }
     const q = this.#queueCount();
@@ -362,32 +428,39 @@ export class Kitchen {
     }
   }
 
-  // ── Pedido seleccionado ─────────────────────────────────
+  // ── Comanda del pedido seleccionado ─────────────────────
   #renderOrder() {
     const o = this.selected !== null ? this.orders[this.selected] : null;
-    const sig = o ? `${o.id}|${o.filled.join()}|${o.busy.join()}` : 'none';
+    const stockSig = o ? o.recipe.components.map((c) => (this.stock[c.ingredient] ?? 0) > 0 ? 1 : 0).join('') : '';
+    const sig = o ? `${o.id}|${o.filled.join()}|${o.busy.join()}|${stockSig}` : `none|${this.t < 2000}`;
     if (sig === this.sig.order) return;
     this.sig.order = sig;
     const el = this.el.order;
     if (!o) {
-      el.className = 'order order--empty';
+      el.className = 'ticket order order--empty';
       el.innerHTML = `<span>${this.t < 2000 ? 'Abriendo el restaurante…' : 'Esperando clientes…'}</span>`;
       return;
     }
-    el.className = 'order';
+    el.className = 'ticket order';
     const next = o.recipe.components.findIndex((c, i) => !o.filled[i] && !o.busy[i]);
-    const hint = next >= 0
-      ? `Siguiente: ${INGREDIENTS[o.recipe.components[next].ingredient].name} · ${PROCESSES[o.recipe.components[next].process].verb}`
-      : 'Recoge lo que está en las estaciones';
+    let hint = 'Recoge lo que está en los fogones';
+    if (next >= 0) {
+      const c = o.recipe.components[next];
+      hint = (this.stock[c.ingredient] ?? 0) <= 0
+        ? `Sin ${INGREDIENTS[c.ingredient].name}: no podrás servirlo`
+        : `Siguiente: ${INGREDIENTS[c.ingredient].name} · ${PROCESSES[c.process].verb}`;
+    }
     el.innerHTML = `
       <div class="order__plate"><div class="plate__dish"></div>
         <div class="order__stack">${o.recipe.components.map((c, i) => o.filled[i] ? ingredientSvg(c.ingredient, { title: '' }) : '').join('')}</div>
       </div>
       <div>
-        <div class="order__title">${escapeHtml(o.recipe.name)}</div>
+        <div class="order__title">${escapeHtml(o.recipe.name)}${o.vip ? ` <span class="tag tag--deal" style="padding:2px 8px;font-size:11px">${icon('crown', 'style="width:12px;height:12px"')} ×2</span>` : ''}</div>
         <div class="order__hint">${hint}</div>
-        <div class="order__comps">${o.recipe.components.map((c, i) => `
-          <span class="need ${o.filled[i] ? 'is-done' : o.busy[i] ? 'is-busy' : ''}">${ingredientSvg(c.ingredient)}${processSvg(c.process)}</span>`).join('')}
+        <div class="order__comps">${o.recipe.components.map((c, i) => {
+          const out = !o.filled[i] && !o.busy[i] && (this.stock[c.ingredient] ?? 0) <= 0;
+          return `<span class="need ${o.filled[i] ? 'is-done' : o.busy[i] ? 'is-busy' : out ? 'is-out' : ''}">${ingredientSvg(c.ingredient)}${processSvg(c.process)}</span>`;
+        }).join('')}
         </div>
       </div>`;
   }
@@ -395,7 +468,7 @@ export class Kitchen {
   #renderPantry() {
     const o = this.selected !== null ? this.orders[this.selected] : null;
     const needed = new Set();
-    if (o) o.recipe.components.forEach((c, i) => { if (!o.filled[i] && !o.busy[i]) needed.add(c.ingredient); });
+    if (o) o.recipe.components.forEach((c, i) => { if (!o.filled[i] && !o.busy[i] && (this.stock[c.ingredient] ?? 0) > 0) needed.add(c.ingredient); });
     const sig = o ? [...needed].join() : '-';
     if (sig === this.sig.pantry) return;
     this.sig.pantry = sig;
@@ -406,59 +479,80 @@ export class Kitchen {
       b.classList.toggle('is-dim', Boolean(o) && !n);
       if (n && !first) first = b;
     }
-    // En pantallas pequeñas la despensa se desplaza: muestra lo que hace falta.
+    // En pantallas pequeñas la repisa se desplaza: muestra lo que hace falta.
     first?.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
   }
 
-  // ── Estaciones ──────────────────────────────────────────
+  #renderStock() {
+    let total = 0;
+    for (const b of this.el.pantry) {
+      const n = this.stock[b.dataset.ing] ?? 0;
+      total += n;
+      const q = b.querySelector('.jar__qty');
+      q.textContent = n;
+      q.classList.toggle('is-low', n > 0 && n <= 2);
+      b.classList.toggle('is-out', n <= 0);
+      b.setAttribute('aria-label', `${INGREDIENTS[b.dataset.ing].name}: quedan ${n}`);
+    }
+    this.el.shelfCount.textContent = `Despensa · ${total} ingredientes`;
+    this.sig.pantry = '';
+    this.sig.order = '';
+  }
+
+  // ── Fogones ─────────────────────────────────────────────
   #stationShell(st) {
     return `<button class="station" data-station="${st}" aria-label="${STATIONS[st].name}">
+      <span class="station__ring"><span class="station__disc">${STATION_ART[st]}<span class="station__slot"></span></span></span>
       <span class="station__name">${STATIONS[st].name}</span>
-      <span class="station__art">${STATION_ART[st]}<span class="station__slot"></span></span>
       <span class="station__status">Libre</span>
-      <span class="station__foot"></span>
     </button>`;
   }
 
   #renderStation(st) {
     const item = this.stations[st];
+    const fire = this.fires[st];
     const el = this.el.stations[st];
-    const state = !item ? 'idle' : item.kind === 'tap' ? 'working' : this.#timerState(item);
-    const sig = item ? `${item.id}|${state}|${item.taps ?? ''}` : 'idle';
+    const state = fire ? 'fire' : !item ? 'idle' : item.kind === 'tap' ? 'working' : this.#timerState(item);
+    const sig = fire ? `fire|${fire.taps}` : item ? `${item.id}|${state}|${item.taps ?? ''}` : 'idle';
     if (this.sig.stations[st] === sig) return;
     this.sig.stations[st] = sig;
-    el.classList.remove('is-working', 'is-ready', 'is-burning', 'is-burnt');
+    el.classList.remove('is-working', 'is-ready', 'is-burning', 'is-burnt', 'is-fire');
     const slot = el.querySelector('.station__slot');
     const status = el.querySelector('.station__status');
-    const foot = el.querySelector('.station__foot');
+    if (fire) {
+      el.classList.add('is-fire');
+      slot.dataset.item = '';
+      slot.innerHTML = '<span class="flames"><i></i><i></i><i></i></span>';
+      status.textContent = `¡Apaga! ×${fire.taps}`;
+      el.setAttribute('aria-label', `${STATIONS[st].name}: en llamas, toca ${fire.taps} veces`);
+      return;
+    }
     if (!item) {
+      slot.dataset.item = '';
       slot.innerHTML = '';
       status.textContent = 'Libre';
-      foot.innerHTML = '';
       el.style.removeProperty('--glow');
       el.setAttribute('aria-label', `${STATIONS[st].name}: libre`);
       return;
     }
-    const prevItem = slot.dataset.item;
-    if (prevItem !== String(item.id)) {
+    if (slot.dataset.item !== String(item.id)) {
       slot.dataset.item = item.id;
       slot.innerHTML = ingredientSvg(item.ingredient, { className: 'station__item', title: '' });
     }
-    slot.querySelectorAll('.fx-steam,.fx-sizzle,.fx-smoke').forEach((n) => n.remove());
+    slot.querySelectorAll('.fx-steam,.fx-sizzle,.fx-smoke,.station__taps').forEach((n) => n.remove());
     let label;
     if (item.kind === 'tap') {
       el.classList.add('is-working');
       status.textContent = st === 'tabla' ? '¡Corta!' : '¡Bate!';
-      foot.innerHTML = `<span class="station__taps">${Array.from({ length: item.need }, (_, i) => `<i class="${i < item.taps ? 'is-on' : ''}"></i>`).join('')}</span>`;
+      slot.insertAdjacentHTML('beforeend', `<span class="station__taps">${Array.from({ length: item.need }, (_, i) => `<i class="${i < item.taps ? 'is-on' : ''}"></i>`).join('')}</span>`);
       label = `${STATIONS[st].name}: toca ${item.need - item.taps} veces más`;
     } else {
       const fx = state === 'burning' || state === 'burnt' ? 'smoke' : st === 'sarten' ? 'sizzle' : 'steam';
       slot.insertAdjacentHTML('beforeend', `<span class="fx-${fx}">${'<i></i>'.repeat(fx === 'sizzle' ? 4 : 3)}</span>`);
       if (st === 'horno') el.style.setProperty('--glow', state === 'cooking' ? '.6' : '.3');
-      const text = { cooking: PROCESSES[item.process].verb + '…', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Quemado' }[state];
+      const text = { cooking: PROCESSES[item.process].verb + '…', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Tirar' }[state];
       status.textContent = text;
       if (state !== 'cooking') el.classList.add(`is-${state}`);
-      foot.innerHTML = state === 'burnt' ? '<span class="station__name">Toca para tirar</span>' : '<span class="station__bar"><i></i></span>';
       label = `${STATIONS[st].name}: ${text}`;
     }
     el.setAttribute('aria-label', label);
@@ -467,6 +561,7 @@ export class Kitchen {
   // ── Acciones del jugador ────────────────────────────────
   #onIngredient(ingId, btn) {
     if (!this.running || this.paused) return;
+    if ((this.stock[ingId] ?? 0) <= 0) { floatText(btn, 'Agotado', 'bad'); shake(btn); sfx.error(); return; }
     const o = this.selected !== null ? this.orders[this.selected] : null;
     if (!o) { floatText(btn, 'Elige un cliente', 'bad'); sfx.error(); return; }
     const idx = o.recipe.components.findIndex((c, i) => c.ingredient === ingId && !o.filled[i] && !o.busy[i]);
@@ -480,6 +575,7 @@ export class Kitchen {
     const comp = o.recipe.components[idx];
     const proc = PROCESSES[comp.process];
     if (proc.kind === 'raw') {
+      this.#take(ingId);
       o.filled[idx] = true;
       sfx.plate();
       flyIcon(btn, this.el.order.querySelector('.order__plate') ?? this.el.order, ingredientSvg(ingId, { title: '' }));
@@ -487,12 +583,14 @@ export class Kitchen {
       return;
     }
     const st = proc.station;
+    if (this.fires[st]) { shake(this.el.stations[st]); floatText(this.el.stations[st], '¡Hay fuego!', 'bad'); sfx.error(); return; }
     if (this.stations[st]) {
       shake(this.el.stations[st]);
-      floatText(this.el.stations[st], 'Ocupada', 'bad');
+      floatText(this.el.stations[st], 'Ocupado', 'bad');
       sfx.error();
       return;
     }
+    this.#take(ingId);
     const base = { id: ++this.itemSeq, orderId: o.id, compIndex: idx, ingredient: ingId, process: comp.process, startedAt: this.t };
     if (proc.kind === 'tap') {
       this.stations[st] = { ...base, kind: 'tap', need: this.stats.taps[comp.process], taps: 0, lastTapAt: -Infinity };
@@ -507,13 +605,27 @@ export class Kitchen {
     flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
   }
 
+  #take(ingId) {
+    this.stock[ingId] = (this.stock[ingId] ?? 0) - 1;
+    this.#renderStock();
+  }
+
   #onStation(st, el) {
     if (!this.running || this.paused) return;
-    const item = this.stations[st];
-    if (!item) {
-      floatText(el, STATIONS[st].hint, '');
+    const fire = this.fires[st];
+    if (fire) {
+      fire.taps -= 1;
+      sfx.whisk();
+      if (fire.taps <= 0) {
+        delete this.fires[st];
+        floatText(el, '¡Apagado!', 'good');
+        sfx.ready();
+      }
+      this.sig.stations[st] = '';
       return;
     }
+    const item = this.stations[st];
+    if (!item) { floatText(el, STATIONS[st].hint, ''); return; }
     if (item.kind === 'tap') {
       // Toques más rápidos que un humano no cuentan (igual que valida el servidor).
       if (this.t - item.lastTapAt < MIN_TAP_MS) return;
@@ -531,6 +643,7 @@ export class Kitchen {
     if (state === 'cooking') { floatText(el, 'Aún no', ''); return; }
     if (state === 'burnt') {
       this.stations[st] = null;
+      this.#addWaste(item.ingredient);
       floatText(el, 'A la basura', 'bad');
       sfx.tap();
       return;
@@ -541,7 +654,7 @@ export class Kitchen {
   #deliver(st, item, perfect) {
     this.stations[st] = null;
     const o = this.orders[item.orderId];
-    if (o.status !== 'seated') { floatText(this.el.stations[st], 'Se fue', 'bad'); return; }
+    if (o.status !== 'seated') { this.#addWaste(item.ingredient); floatText(this.el.stations[st], 'Se fue', 'bad'); return; }
     o.filled[item.compIndex] = true;
     o.busy[item.compIndex] = false;
     if (perfect) {
@@ -560,11 +673,8 @@ export class Kitchen {
     const servedAt = Math.round(this.t);
     this.serves.push({ orderId: o.id, recipeId: o.recipeId, servedAt, perfects: o.perfects });
     this.combo += 1;
-    // Estimación en vivo; el servidor calcula el pago real con la misma fórmula.
-    const patienceLeft = Math.max(0, 1 - (servedAt - o.arriveAt) / o.patienceMs);
-    const tip = o.recipe.price * 0.5 * patienceLeft * (1 + this.stats.tipBonus);
-    const mult = 1 + 0.1 * Math.min(this.combo - 1, MAX_COMBO_STEPS);
-    const earned = Math.round((o.recipe.price + tip + o.recipe.price * 0.05 * o.perfects) * mult);
+    // Estimación en vivo con la misma fórmula que usa el servidor.
+    const { earned } = plateEarnings(o, o.recipe, servedAt, o.perfects, this.combo, this.stats);
     this.coins += earned;
     const el = this.custEls.get(o.id);
     if (el) floatText(el, `+${earned}`, 'gold big');
@@ -582,7 +692,7 @@ export class Kitchen {
     const c = this.el.combo;
     c.classList.toggle('is-on', this.combo >= 2);
     if (this.combo >= 2) {
-      c.textContent = `¡Combo x${(1 + 0.1 * Math.min(this.combo - 1, MAX_COMBO_STEPS)).toFixed(1)}!`;
+      c.textContent = `Combo ×${(1 + 0.1 * Math.min(this.combo - 1, MAX_COMBO_STEPS)).toFixed(1)}`;
       if (bump) { c.classList.remove('is-bump'); void c.offsetWidth; c.classList.add('is-bump'); }
     }
   }
@@ -590,12 +700,19 @@ export class Kitchen {
   #finish() {
     this.running = false;
     cancelAnimationFrame(this.raf);
+    this.rushGlow?.remove();
+    // Lo que quedó a medio preparar también se pierde.
+    for (const st of STATION_IDS) if (this.stations[st]) this.#addWaste(this.stations[st].ingredient);
+    for (const o of this.orders) {
+      if (o.status !== 'seated') continue;
+      o.recipe.components.forEach((c, i) => { if (o.filled[i]) this.#addWaste(c.ingredient); });
+    }
     const ov = document.createElement('div');
     ov.className = 'overlay';
-    ov.innerHTML = `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Contando las propinas…</p>`;
+    ov.innerHTML = `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
     this.el.root.appendChild(ov);
     sfx.count(true);
-    setTimeout(() => this.onFinish({ serves: this.serves, estimate: this.coins }), 1100);
+    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, estimate: this.coins }), 1100);
   }
 }
 

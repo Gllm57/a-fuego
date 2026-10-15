@@ -1,7 +1,7 @@
 // Service worker: la app funciona sin conexión.
 // Red primero (para recibir actualizaciones) y, si no hay red, lo guardado.
 
-const CACHE = 'a-fuego-v1';
+const CACHE = 'a-fuego-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (event) => {

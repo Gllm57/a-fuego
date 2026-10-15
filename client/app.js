@@ -1,6 +1,9 @@
 // Aplicación: pantallas, navegación y flujo de partidas.
 
-import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, UPGRADES, INGREDIENTS, PROCESSES, recipesOf, kitchenStats, upgradeLevel } from './shared/index.js';
+import {
+  RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
+  recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor
+} from './shared/index.js';
 import { createApi, ApiError } from './api.js';
 import { Kitchen } from './game.js';
 import { sfx, getPrefs, setPref } from './audio.js';
@@ -10,6 +13,8 @@ import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
 const app = {
   api: null,
   profile: null,
+  market: null,
+  cart: {},
   tab: 'home',
   restaurantId: localGet('afuego.restaurant') ?? 'taqueria',
   recipeTab: null,
@@ -52,13 +57,13 @@ function applyTheme(restaurantId) {
   r.setProperty('--brand-deep', t.deep);
   r.setProperty('--brand-soft', t.soft);
   r.setProperty('--ground', t.ground);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.ground);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
 }
 
 function setProfile(next) {
   const prevCoins = app.profile?.state.coins ?? 0;
   app.profile = next;
-  renderTopbar();
+  renderHeaderBar();
   if (next.state.coins !== prevCoins) {
     const pill = document.querySelector('.coin-pill');
     if (pill) { pill.classList.remove('is-bump'); void pill.offsetWidth; pill.classList.add('is-bump'); }
@@ -72,37 +77,68 @@ function errorToast(err) {
   toast(err instanceof ApiError ? err.message : 'Algo salió mal', 'bad');
 }
 
+// Cuántos platos del menú alcanzan con la despensa (aprox., atendiendo de forma pareja).
+function dishesPossible(state, restaurantId) {
+  const menu = menuFor(state, restaurantId).map((id) => recipeIngredients(RECIPE_BY_ID[id]));
+  const inv = { ...state.inventory };
+  let count = 0;
+  for (let guard = 0; guard < 200; guard++) {
+    const doable = menu.find((need) => Object.entries(need).every(([ing, n]) => (inv[ing] ?? 0) >= n));
+    if (!doable) break;
+    for (const [ing, n] of Object.entries(doable)) inv[ing] -= n;
+    count++;
+    menu.push(menu.shift());
+  }
+  return count;
+}
+
 // ── Estructura ──────────────────────────────────────────────
 const TABS = [
   { id: 'home', label: 'Inicio', icon: 'home' },
+  { id: 'market', label: 'Mercado', icon: 'market' },
   { id: 'recipes', label: 'Recetas', icon: 'book' },
-  { id: 'upgrades', label: 'Mejoras', icon: 'tools' },
-  { id: 'ranking', label: 'Ranking', icon: 'trophy' }
+  { id: 'upgrades', label: 'Mejoras', icon: 'tools' }
 ];
+const PAGES = {
+  home: { title: null },
+  market: { title: 'Mercado', sub: 'Precios de hoy · cambian cada día' },
+  recipes: { title: 'Recetario', sub: '40 recetas de 5 cocinas del mundo' },
+  upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
+  diary: { title: 'Diario de caja', sub: 'Ganancias y gastos de tus servicios', back: 'home' },
+  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' }
+};
 
 function renderShell() {
   applyTheme(app.restaurantId);
   root.innerHTML = `
-    <header class="topbar"></header>
+    <header class="awning awning--stripes"></header>
     <main class="screen" id="screen" tabindex="-1"></main>
     <nav class="nav" aria-label="Secciones">
-      ${TABS.map((t) => `<button class="nav__btn" data-tab="${t.id}">${icon(t.icon)}${t.label}<span class="nav__dot" hidden></span></button>`).join('')}
+      ${TABS.slice(0, 2).map(navBtn).join('')}
+      <button class="fire-btn" data-act="play" aria-label="Abrir servicio">${icon('fire')}</button>
+      ${TABS.slice(2).map(navBtn).join('')}
     </nav>`;
   root.querySelector('.nav').addEventListener('click', (e) => {
+    if (e.target.closest('[data-act="play"]')) return play(app.restaurantId, 'normal');
     const b = e.target.closest('[data-tab]');
     if (b && b.dataset.tab !== app.tab) { sfx.tap(); go(b.dataset.tab); }
   });
-  renderTopbar();
   go(app.tab);
+}
+
+function navBtn(t) {
+  return `<button class="nav__btn" data-tab="${t.id}">${icon(t.icon)}${t.label}<span class="nav__dot" hidden></span></button>`;
 }
 
 function go(tab) {
   app.tab = tab;
-  root.querySelectorAll('.nav__btn').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === tab ? 'page' : 'false'));
+  const navTab = PAGES[tab].back ?? tab;
+  root.querySelectorAll('.nav__btn').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === navTab ? 'page' : 'false'));
+  renderHeaderBar();
   const screen = document.getElementById('screen');
   screen.style.animation = 'none'; void screen.offsetWidth; screen.style.animation = '';
   screen.scrollTop = 0;
-  ({ home: renderHome, recipes: renderRecipes, upgrades: renderUpgrades, ranking: renderRanking })[tab]();
+  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking })[tab]();
   renderNavDots();
 }
 
@@ -110,25 +146,34 @@ function renderNavDots() {
   const s = st();
   const canLearn = RECIPES.some((r) => !s.recipes.includes(r.id) && s.restaurants.includes(r.restaurant) && level() >= r.reqLevel && s.coins >= r.learnCost);
   const canUpgrade = UPGRADES.some((u) => upgradeLevel(s.upgrades, u.id) < u.costs.length && s.coins >= u.costs[upgradeLevel(s.upgrades, u.id)]);
-  root.querySelector('[data-tab="recipes"] .nav__dot').hidden = !canLearn;
-  root.querySelector('[data-tab="upgrades"] .nav__dot').hidden = !canUpgrade;
+  const lowStock = dishesPossible(s, app.restaurantId) < 4 || s.basketClaimed !== app.profile.daily.day;
+  const set = (id, on) => { const d = root.querySelector(`[data-tab="${id}"] .nav__dot`); if (d) d.hidden = !on; };
+  set('recipes', canLearn);
+  set('upgrades', canUpgrade);
+  set('market', lowStock);
 }
 
-function renderTopbar() {
-  const bar = root.querySelector('.topbar');
+function renderHeaderBar() {
+  const bar = root.querySelector('.awning');
   if (!bar) return;
   const { level: lvl } = app.profile;
   const pct = Math.round((lvl.current / lvl.needed) * 100);
+  const page = PAGES[app.tab];
   bar.innerHTML = `
-    <button class="chef-btn" data-act="profile" aria-label="Perfil y ajustes">
-      <span class="lvl-ring" style="--p:${pct}"><span class="lvl-ring__inner">${lvl.level}</span></span>
-      <span style="min-width:0">
-        <span class="chef-btn__name" style="display:block">${escapeHtml(app.profile.player.displayName)}</span>
-        <span class="chef-btn__title">${app.profile.empire.title}</span>
-      </span>
-    </button>
-    <div class="coin-pill" aria-label="Monedas">${coinSvg()}<span class="coin-pill__num">${fmt(st().coins)}</span></div>`;
+    <div class="topbar">
+      ${page.back ? `<button class="back-btn" data-act="back" aria-label="Volver">${icon('back')}</button>` : ''}
+      <button class="chef-btn" data-act="profile" aria-label="Perfil y ajustes">
+        <span class="ring" style="--p:${pct}"><span class="ring__inner">${lvl.level}</span></span>
+        <span style="min-width:0">
+          <span class="chef-btn__name">${escapeHtml(app.profile.player.displayName)}</span>
+          <span class="chef-btn__title">${app.profile.empire.title}</span>
+        </span>
+      </button>
+      <div class="coin-pill" aria-label="Monedas">${coinSvg()}<span class="coin-pill__num">${fmt(st().coins)}</span></div>
+    </div>
+    ${page.title ? `<div class="page-head"><div><h1>${page.title}</h1><p>${page.sub}</p></div></div>` : ''}`;
   bar.querySelector('[data-act="profile"]').addEventListener('click', openProfile);
+  bar.querySelector('[data-act="back"]')?.addEventListener('click', () => go(page.back));
   if (root.querySelector('.nav')) renderNavDots();
 }
 
@@ -142,60 +187,80 @@ function renderHome() {
     ? `Requiere nivel ${goal.reqLevel} · ${fmt(goal.price)} monedas`
     : `${fmt(Math.min(s.coins, goal.price))} / ${fmt(goal.price)} monedas`;
   const dailyRest = RESTAURANT_BY_ID[daily.restaurantId];
+  const dishes = dishesPossible(s, app.restaurantId);
+  const used = inventoryCount(s.inventory);
+  const cap = storageCapacity(s.upgrades);
 
   const screen = document.getElementById('screen');
   screen.innerHTML = `
-    <div class="stagger" style="display:flex;flex-direction:column;gap:16px">
-      <section class="card empire" aria-label="Tu imperio">
-        <div class="empire__head">
-          <div>
-            <div class="empire__kicker">TU CADENA ¡A FUEGO!</div>
-            <h1 class="empire__title">${empire.title}</h1>
+    <div class="stagger" style="display:flex;flex-direction:column;gap:18px">
+      <section class="card blob empire" aria-label="Tu imperio">
+        <span class="ring empire__ring" style="--p:${empire.percent}"><span class="ring__inner"><b>${empire.percent}%</b><small>IMPERIO</small></span></span>
+        <div>
+          <div class="empire__kicker">TU CADENA ¡A FUEGO!</div>
+          <h1 class="empire__title">${empire.title}</h1>
+          <div class="empire__stats">
+            <span class="pill">${icon('store', 'style="width:14px;height:14px"')} ${empire.restaurants}/${empire.restaurantsTotal}</span>
+            <span class="pill">${icon('book', 'style="width:14px;height:14px"')} ${empire.recipes}/${empire.recipesTotal}</span>
+            <span class="pill">Nv. ${level()}</span>
           </div>
-          <div class="empire__pct">${empire.percent}%</div>
         </div>
-        <div class="progress"><div class="progress__fill" style="width:${empire.percent}%"></div></div>
-        <div class="empire__stats">
-          <div class="empire__stat"><b>${empire.restaurants}/${empire.restaurantsTotal}</b><span>restaurantes</span></div>
-          <div class="empire__stat"><b>${empire.recipes}/${empire.recipesTotal}</b><span>recetas</span></div>
-          <div class="empire__stat"><b>Nv. ${level()}</b><span>chef</span></div>
-        </div>
-        <button class="goal" data-act="goal" style="border:0;color:inherit;cursor:pointer;text-align:left;font:inherit">
-          <span class="goal__icon">${icon('flag', 'style="color:#24160E"')}</span>
+        <button class="goal" data-act="goal">
+          <span class="goal__icon">${icon('flag')}</span>
           <span class="goal__body">
-            <span class="goal__label">SIGUIENTE META</span>
-            <span class="goal__name">${escapeHtml(goal.name)}</span>
-            <span class="progress"><span class="progress__fill" style="display:block;width:${goalPct}%"></span></span>
+            <span class="goal__label">SIGUIENTE META · ${escapeHtml(goal.name)}</span>
+            <span class="progress"><span class="progress__fill" style="width:${goalPct}%"></span></span>
             <span class="goal__label" style="letter-spacing:0">${goalNote}</span>
           </span>
         </button>
       </section>
 
+      <button class="play-cta" data-act="play">
+        <span class="play-cta__text"><b>Abrir servicio</b><span>${escapeHtml(rest.name)} · alcanza para ~${dishes} platos</span></span>
+        <span class="play-cta__icon">${icon('play')}</span>
+      </button>
+      ${dishes < 4 ? `<button class="card basket" data-act="to-market" style="border:0;cursor:pointer;text-align:left;font:inherit;color:inherit">
+        <span class="basket__icon" style="background:var(--warn)">${icon('market')}</span>
+        <span class="basket__body"><b>Tu despensa está casi vacía</b><span>${used}/${cap} ingredientes. Compra en el mercado antes de abrir.</span></span>
+        ${icon('arrow', 'style="width:22px;height:22px;flex-shrink:0"')}
+      </button>` : ''}
+
       <div class="section-title"><h2>Tus restaurantes</h2><span>Desliza →</span></div>
-      <div class="rest-scroller" role="list">
-        ${RESTAURANTS.map((r) => restaurantCard(r)).join('')}
+      <div class="rest-scroller" role="list">${RESTAURANTS.map((r, i) => restaurantCard(r, i)).join('')}</div>
+
+      <div class="tiles">
+        <button class="tile tile--daily" data-act="daily" ${daily.claimed ? 'disabled' : ''}>
+          <span class="tile__icon">${icon('clock')}</span>
+          <b>Reto del día</b>
+          <span>2★ en ${escapeHtml(dailyRest.name)}</span>
+          ${daily.claimed ? `<span class="done-badge">✓ Completado</span>` : `<span class="recipe__price">${coinSvg()} +${fmt(daily.reward)}</span>`}
+        </button>
+        <button class="tile" data-act="to-market">
+          <span class="tile__icon">${icon('market')}</span>
+          <b>Mercado</b>
+          <span>Despensa ${used}/${cap}</span>
+          <span class="recipe__price">${s.basketClaimed === daily.day ? 'Ofertas del día' : 'Canasta gratis hoy'}</span>
+        </button>
+        <button class="tile" data-act="diary">
+          <span class="tile__icon">${icon('journal')}</span>
+          <b>Diario de caja</b>
+          <span>Ganancias por servicio</span>
+        </button>
+        <button class="tile" data-act="ranking">
+          <span class="tile__icon">${icon('trophy')}</span>
+          <b>Ranking</b>
+          <span>Top de la semana</span>
+        </button>
       </div>
-
-      <button class="btn btn--xl btn--shine" data-act="play">${icon('play', 'style="width:26px;height:26px;fill:#fff;stroke:none"')} Abrir servicio</button>
-      <p class="note" style="text-align:center;margin:-6px 0 0">En ${escapeHtml(rest.name)} · ${recipesOf(rest.id).filter((x) => s.recipes.includes(x.id)).length} platos en el menú</p>
-
-      <section class="card daily" aria-label="Reto del día">
-        <div class="daily__icon">${icon('clock', 'style="color:#fff"')}</div>
-        <div class="daily__body">
-          <div class="daily__kicker">RETO DEL DÍA</div>
-          <div class="daily__title">2 estrellas en ${escapeHtml(dailyRest.name)}</div>
-          <div class="daily__reward">Premio extra: ${coinSvg()} ${fmt(daily.reward)}</div>
-        </div>
-        ${daily.claimed
-          ? `<span class="done-badge">${icon('check', 'style="width:20px;height:20px"')} Hecho</span>`
-          : `<button class="btn btn--sm" data-act="daily">Jugar</button>`}
-      </section>
     </div>`;
 
   screen.querySelector('[data-act="play"]').addEventListener('click', () => play(app.restaurantId, 'normal'));
   screen.querySelector('[data-act="daily"]')?.addEventListener('click', () => play(daily.restaurantId, 'daily'));
+  screen.querySelectorAll('[data-act="to-market"]').forEach((b) => b.addEventListener('click', () => go('market')));
+  screen.querySelector('[data-act="diary"]').addEventListener('click', () => go('diary'));
+  screen.querySelector('[data-act="ranking"]').addEventListener('click', () => go('ranking'));
   screen.querySelector('[data-act="goal"]').addEventListener('click', () => {
-    if (goal.kind === 'recipe') { app.recipeTab = RECIPES.find((r) => r.id === goal.id).restaurant; go('recipes'); }
+    if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; go('recipes'); }
     else if (goal.kind === 'restaurant') openRestaurant(RESTAURANT_BY_ID[goal.id]);
   });
   screen.querySelectorAll('[data-rest]').forEach((b) => b.addEventListener('click', () => {
@@ -206,7 +271,6 @@ function renderHome() {
       localSet('afuego.restaurant', r.id);
       applyTheme(r.id);
       renderHome();
-      requestAnimationFrame(() => document.querySelector(`[data-rest="${r.id}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest', behavior: 'smooth' }));
     } else {
       openRestaurant(r);
     }
@@ -214,7 +278,7 @@ function renderHome() {
   requestAnimationFrame(() => screen.querySelector(`[data-rest="${app.restaurantId}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest' }));
 }
 
-function restaurantCard(r) {
+function restaurantCard(r, i) {
   const s = st();
   const owned = s.restaurants.includes(r.id);
   const recipes = recipesOf(r.id);
@@ -222,13 +286,13 @@ function restaurantCard(r) {
   return `
     <button class="rest ${owned ? '' : 'is-locked'}" role="listitem" data-rest="${r.id}" aria-pressed="${r.id === app.restaurantId}"
       style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">
-      <span class="rest__art">${storefrontSvg(r.theme)}
+      <span class="rest__art">${storefrontSvg(r.theme, i)}
         ${owned ? '' : `<span class="rest__lock">${icon('lock')}<span>${level() < r.reqLevel ? `Nivel ${r.reqLevel}` : 'Disponible'} · ${coinSvg()} ${fmt(r.cost)}</span></span>`}
       </span>
       <span class="rest__body">
         <span class="rest__cuisine">Cocina ${r.cuisine}</span>
         <span class="rest__name">${r.name}</span>
-        <span class="rest__meta"><span>${learned}/${recipes.length} recetas</span>${owned ? `<span>${r.id === app.restaurantId ? '● Seleccionado' : 'Toca para elegir'}</span>` : ''}</span>
+        <span class="rest__meta">${learned}/${recipes.length} recetas · gastos ${fmt(r.upkeep)}/servicio</span>
       </span>
     </button>`;
 }
@@ -240,21 +304,20 @@ function openRestaurant(r) {
   const recipes = recipesOf(r.id);
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
-    <div class="rest__art" style="height:140px;border-radius:20px;background:${r.theme.soft}">${storefrontSvg(r.theme)}</div>
-    <p class="note">Cocina ${r.cuisine}. Abre este local para servir ${recipes.length} recetas nuevas; ${recipes.filter((x) => x.learnCost === 0).length} vienen incluidas.</p>
+    <div class="sheet__art rest__art" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">${storefrontSvg(r.theme, RESTAURANTS.indexOf(r))}</div>
+    <p class="note">Cocina ${r.cuisine}: ${recipes.length} recetas, ${recipes.filter((x) => x.learnCost === 0).length} incluidas. Platos más caros, clientes más exigentes y gastos de ${fmt(r.upkeep)} por servicio.</p>
     <div class="comp-list">${recipes.map((x) => `<span class="comp">${ingredientSvg(x.components[0].ingredient)}${escapeHtml(x.name)}</span>`).join('')}</div>
     <p class="note"><strong>${reason}</strong></p>
     <button class="btn btn--xl btn--gold" data-buy ${can ? '' : 'disabled'}>${coinSvg()} Abrir por ${fmt(r.cost)}</button>
   `, (sheet, close) => {
     sheet.querySelector('[data-buy]').addEventListener('click', async () => {
-      const ok = await buy('restaurant', r.id);
-      if (ok) {
+      if (await buy('restaurant', r.id)) {
         close();
         app.restaurantId = r.id;
         localSet('afuego.restaurant', r.id);
         applyTheme(r.id);
         confetti(document.body, [r.theme.primary, '#FFC23D', '#fff', r.theme.deep]);
-        toast(`¡Abriste ${r.name}!`, 'good');
+        toast(`¡Abriste ${r.name}! Compra sus ingredientes en el mercado`, 'good');
         go('home');
       }
     });
@@ -277,27 +340,138 @@ async function buy(kind, id) {
   }
 }
 
+// ── Mercado ─────────────────────────────────────────────────
+async function renderMarket() {
+  const screen = document.getElementById('screen');
+  if (!app.market) screen.innerHTML = `<div class="empty">Abriendo puestos…</div>`;
+  try { app.market = await app.api.market(); } catch (err) { errorToast(err); return; }
+  if (app.tab !== 'market') return;
+  drawMarket();
+}
+
+function drawMarket() {
+  const m = app.market;
+  const screen = document.getElementById('screen');
+  const s = st();
+  const restIngs = new Set(menuFor(s, app.restaurantId).flatMap((id) => RECIPE_BY_ID[id].components.map((c) => c.ingredient)));
+  const items = [...m.items].sort((a, b) => (restIngs.has(b.id) - restIngs.has(a.id)) || (m.inventory[a.id] ?? 0) - (m.inventory[b.id] ?? 0));
+  const deals = m.items.filter((i) => i.deal);
+  const pct = Math.round((m.used / m.capacity) * 100);
+  const basketItems = Object.entries(m.basket.items);
+  screen.innerHTML = `
+    <section class="card market-hero">
+      <span class="ring storage-ring ${m.used >= m.capacity ? 'is-full' : ''}" style="--p:${pct}"><span class="ring__inner"><b>${m.used}</b><small>de ${m.capacity}</small></span></span>
+      <div>
+        <h2 style="font-size:19px">Tu despensa</h2>
+        <p class="note">Sólo cocinas lo que tienes. Comprando ${m.bulk.qty} o más de algo, ${Math.round(m.bulk.discount * 100)}% de descuento.</p>
+        <p class="note" style="margin-top:4px"><strong>Alcanza para ~${dishesPossible(s, app.restaurantId)} platos</strong> en ${escapeHtml(RESTAURANT_BY_ID[app.restaurantId].name)}.</p>
+      </div>
+    </section>
+
+    ${m.basket.claimed || !basketItems.length ? '' : `
+    <section class="card basket">
+      <span class="basket__icon">${icon('basket')}</span>
+      <span class="basket__body"><b>Canasta gratis del día</b><span>${basketItems.map(([ing, n]) => `${n} ${INGREDIENTS[ing].name}`).join(' · ')}</span></span>
+      <button class="btn btn--sm btn--good" data-act="basket">Recoger</button>
+    </section>`}
+
+    ${deals.length ? `<div class="section-title"><h2>Ofertas de hoy</h2><span>−40%</span></div>
+    <div class="deals">${deals.map((d) => `
+      <div class="deal"><span class="deal__bubble">${ingredientSvg(d.id)}<span class="deal__badge">−40%</span></span><b>${INGREDIENTS[d.id].name}</b><span>${coinSvg('coin" style="width:14px;height:14px;vertical-align:-2px')} ${d.price} c/u</span></div>`).join('')}
+    </div>` : ''}
+
+    <div class="section-title"><h2>Puestos</h2><span>${items.length} ingredientes</span></div>
+    <div class="stall stagger">
+      ${items.map((i) => {
+        const have = m.inventory[i.id] ?? 0;
+        const q = app.cart[i.id] ?? 0;
+        return `<div class="produce">
+          <span class="produce__icon">${ingredientSvg(i.id)}${have ? `<span class="produce__have">${have}</span>` : ''}</span>
+          <span style="min-width:0">
+            <span class="produce__name" style="display:block">${INGREDIENTS[i.id].name}${restIngs.has(i.id) ? '' : ' <small class="note">(otro local)</small>'}</span>
+            <span class="produce__price">${coinSvg()} ${i.price}
+              ${i.trend === 'up' ? icon('up', 'class="trend trend--up"') : i.trend === 'down' ? icon('down', 'class="trend trend--down"') : ''}
+              ${i.deal ? '<span class="tag tag--deal" style="padding:2px 8px;font-size:11px">Oferta</span>' : ''}</span>
+          </span>
+          <span class="stepper">
+            <button class="round-btn" data-dec="${i.id}" aria-label="Quitar ${INGREDIENTS[i.id].name}" ${q ? '' : 'disabled'}>${icon('minus')}</button>
+            <output aria-live="polite">${q}</output>
+            <button class="round-btn" data-inc="${i.id}" aria-label="Agregar ${INGREDIENTS[i.id].name}">${icon('plus')}</button>
+          </span>
+        </div>`;
+      }).join('')}
+    </div>`;
+  drawCart();
+
+  screen.querySelector('[data-act="basket"]')?.addEventListener('click', async () => {
+    try {
+      const res = await app.api.claimBasket();
+      setProfile(res.profile);
+      app.market = res.market;
+      sfx.buy();
+      toast('¡Canasta guardada en tu despensa!', 'good');
+      drawMarket();
+    } catch (err) { errorToast(err); }
+  });
+  screen.querySelectorAll('[data-inc],[data-dec]').forEach((b) => b.addEventListener('click', () => {
+    const id = b.dataset.inc ?? b.dataset.dec;
+    const cartUnits = Object.values(app.cart).reduce((a, n) => a + n, 0);
+    if (b.dataset.inc && m.used + cartUnits >= m.capacity) { toast('Tu despensa está llena: mejora el refrigerador', 'bad'); sfx.error(); return; }
+    app.cart[id] = Math.max(0, (app.cart[id] ?? 0) + (b.dataset.inc ? 1 : -1));
+    if (!app.cart[id]) delete app.cart[id];
+    sfx.tap();
+    const row = b.closest('.produce');
+    row.querySelector('output').textContent = app.cart[id] ?? 0;
+    row.querySelector('[data-dec]').disabled = !app.cart[id];
+    drawCart();
+  }));
+}
+
+function drawCart() {
+  root.querySelector('.cart-bar')?.remove();
+  const entries = Object.entries(app.cart);
+  if (!entries.length || app.tab !== 'market') return;
+  const prices = Object.fromEntries(app.market.items.map((i) => [i.id, i.price]));
+  const total = entries.reduce((s, [id, q]) => s + lineTotal(prices[id], q), 0);
+  const units = entries.reduce((s, [, q]) => s + q, 0);
+  const bar = document.createElement('div');
+  bar.className = 'cart-bar';
+  bar.innerHTML = `
+    <span class="cart-bar__info">${units} ingredientes<small>Despensa quedará en ${app.market.used + units}/${app.market.capacity}</small></span>
+    <button class="btn btn--sm btn--gold" data-act="checkout" ${st().coins < total ? 'disabled' : ''}>${coinSvg()} Pagar ${fmt(total)}</button>`;
+  root.appendChild(bar);
+  bar.querySelector('[data-act="checkout"]').addEventListener('click', async () => {
+    if (app.busy) return;
+    app.busy = true;
+    try {
+      const res = await app.api.marketBuy(app.cart);
+      app.cart = {};
+      app.market = res.market;
+      setProfile(res.profile);
+      sfx.buy();
+      toast(`Compraste ${units} ingredientes por ${fmt(res.spent)}`, 'good');
+      drawMarket();
+    } catch (err) { errorToast(err); } finally { app.busy = false; }
+  });
+}
+
 // ── Recetas ─────────────────────────────────────────────────
 function renderRecipes() {
   const s = st();
   app.recipeTab ??= app.restaurantId;
   const rid = app.recipeTab;
   const rest = RESTAURANT_BY_ID[rid];
-  const list = recipesOf(rid);
   const screen = document.getElementById('screen');
   screen.innerHTML = `
-    <div class="section-title"><h2>Recetario</h2><span>${s.recipes.length}/${RECIPES.length} aprendidas</span></div>
     <div class="chips" role="group" aria-label="Restaurante">
       ${RESTAURANTS.map((r) => `<button class="chip" data-chip="${r.id}" aria-pressed="${r.id === rid}">${s.restaurants.includes(r.id) ? '' : icon('lock')}${r.cuisine}</button>`).join('')}
     </div>
-    ${s.restaurants.includes(rid) ? '' : `<div class="card" style="display:flex;gap:12px;align-items:center">${icon('lock', 'style="width:28px;height:28px;flex-shrink:0"')}<span class="note"><strong>${rest.name}</strong> está cerrado. Ábrelo desde Inicio para aprender estas recetas.</span></div>`}
-    <div class="stagger" style="display:flex;flex-direction:column;gap:10px">
-      ${list.map((r) => recipeCard(r)).join('')}
-    </div>
-    <p class="note" style="text-align:center">Cada receta nueva entra a tu menú y los clientes empezarán a pedirla. Los platos más elaborados pagan más.</p>`;
+    ${s.restaurants.includes(rid) ? '' : `<div class="card" style="display:flex;gap:12px;align-items:center;border-radius:999px">${icon('lock', 'style="width:28px;height:28px;flex-shrink:0"')}<span class="note"><strong>${rest.name}</strong> está cerrado. Ábrelo desde Inicio para aprender estas recetas.</span></div>`}
+    <div class="stagger" style="display:flex;flex-direction:column;gap:12px">${recipesOf(rid).map((r) => recipeCard(r)).join('')}</div>
+    <p class="note" style="text-align:center">El margen es lo que cobras menos lo que cuestan sus ingredientes en el mercado.</p>`;
   screen.querySelectorAll('[data-chip]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.recipeTab = b.dataset.chip; renderRecipes(); }));
   screen.querySelectorAll('[data-learn]').forEach((b) => b.addEventListener('click', async () => {
-    if (await buy('recipe', b.dataset.learn)) { toast('¡Receta aprendida! Ya está en tu menú', 'good'); renderRecipes(); }
+    if (await buy('recipe', b.dataset.learn)) { toast('¡Receta aprendida! Compra sus ingredientes en el mercado', 'good'); renderRecipes(); }
   }));
 }
 
@@ -305,6 +479,7 @@ function recipeCard(r) {
   const s = st();
   const owned = s.recipes.includes(r.id);
   const open = s.restaurants.includes(r.restaurant);
+  const cost = r.components.reduce((a, c) => a + INGREDIENTS[c.ingredient].cost, 0);
   let action;
   if (owned) action = `<span class="tag tag--ok">${icon('check')} En tu menú</span>`;
   else if (!open) action = `<span class="tag tag--lock">${icon('lock')} Local cerrado</span>`;
@@ -316,7 +491,7 @@ function recipeCard(r) {
       <div>
         <div class="recipe__name">${escapeHtml(r.name)}</div>
         <div class="comp-list">${r.components.map((c) => `<span class="comp" title="${INGREDIENTS[c.ingredient].name}: ${PROCESSES[c.process].verb}">${ingredientSvg(c.ingredient)}${processSvg(c.process)}</span>`).join('')}</div>
-        <div class="recipe__row"><span class="recipe__price">Paga ${coinSvg()} ${r.price}+ propina</span>${action}</div>
+        <div class="recipe__row"><span class="recipe__price">${coinSvg()} ${r.price} · margen ~${r.price - cost}</span>${action}</div>
       </div>
     </article>`;
 }
@@ -327,21 +502,20 @@ function renderUpgrades() {
   const now = kitchenStats(s.upgrades);
   const screen = document.getElementById('screen');
   screen.innerHTML = `
-    <div class="section-title"><h2>Mejoras de cocina</h2><span>Aplican a todos tus locales</span></div>
-    <div class="stagger" style="display:flex;flex-direction:column;gap:10px">
+    <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
       ${UPGRADES.map((u) => {
         const lvl = upgradeLevel(s.upgrades, u.id);
         const max = lvl >= u.costs.length;
         const price = max ? 0 : u.costs[lvl];
         return `
         <article class="card upgrade">
-          <div class="upgrade__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UPGRADE_ICONS[u.id]}</svg></div>
+          <div class="upgrade__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UPGRADE_ICONS[u.id] ?? ''}</svg></div>
           <div>
             <div class="upgrade__name">${u.name}</div>
             <div class="upgrade__desc">${u.desc}</div>
             <div class="pips" aria-label="Nivel ${lvl} de ${u.costs.length}">${u.costs.map((_, i) => `<span class="pip ${i < lvl ? 'is-on' : ''}" style="animation-delay:${i * 60}ms"></span>`).join('')}</div>
             <div class="upgrade__foot">
-              <span class="upgrade__effect">${upgradeEffect(u.id, now)}</span>
+              <span class="upgrade__effect">${upgradeEffect(u.id, now, s)}</span>
               ${max ? `<span class="tag tag--ok">${icon('check')} Máximo</span>` : `<button class="btn btn--sm" data-up="${u.id}" ${s.coins < price ? 'disabled' : ''}>${coinSvg()} ${fmt(price)}</button>`}
             </div>
           </div>
@@ -349,11 +523,11 @@ function renderUpgrades() {
       }).join('')}
     </div>`;
   screen.querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', async () => {
-    if (await buy('upgrade', b.dataset.up)) { toast('¡Mejora instalada!', 'good'); renderUpgrades(); }
+    if (await buy('upgrade', b.dataset.up)) { toast('¡Mejora instalada!', 'good'); app.market = null; renderUpgrades(); }
   }));
 }
 
-function upgradeEffect(id, k) {
+function upgradeEffect(id, k, s) {
   switch (id) {
     case 'cuchillos': return `${k.taps.cortar} cortes por ingrediente`;
     case 'batidora': return `${k.taps.batir} toques para batir`;
@@ -363,8 +537,44 @@ function upgradeEffect(id, k) {
     case 'campana': return `Se quema tras ${k.burnSeconds.freir.toFixed(1)} s`;
     case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · propina +${Math.round(k.tipBonus * 100)}%`;
     case 'mesas': return `${k.slots} clientes a la vez`;
+    case 'refri': return `Despensa de ${storageCapacity(s.upgrades)} lugares`;
     default: return '';
   }
+}
+
+// ── Diario de caja ──────────────────────────────────────────
+async function renderDiary() {
+  const screen = document.getElementById('screen');
+  screen.innerHTML = `<div class="empty">Abriendo el libro…</div>`;
+  let entries = [];
+  try { entries = (await app.api.history()).entries; } catch (err) { errorToast(err); return; }
+  if (app.tab !== 'diary') return;
+  if (!entries.length) {
+    screen.innerHTML = `<div class="card empty">${icon('journal')}<span>Aún no hay servicios. Cada servicio que cierres aparecerá aquí con sus ganancias y gastos.</span></div>`;
+    return;
+  }
+  const net = entries.reduce((a, e) => a + e.net, 0);
+  const avg = entries.reduce((a, e) => a + e.stars, 0) / entries.length;
+  screen.innerHTML = `
+    <div class="summary">
+      <div><b>${fmt(net)}</b><span>ganancia</span></div>
+      <div><b>${entries.length}</b><span>servicios</span></div>
+      <div><b>${avg.toFixed(1)}★</b><span>promedio</span></div>
+    </div>
+    <div class="journal stagger">${entries.map((e) => {
+      const r = RESTAURANT_BY_ID[e.restaurantId];
+      return `<article class="ticket journal-entry">
+        <div class="ticket__head">
+          <div><h3>${escapeHtml(r.name)}${e.mode === 'daily' ? ' · reto' : ''}</h3><small>${new Date(e.finishedAt).toLocaleString('es', { dateStyle: 'medium', timeStyle: 'short' })}</small></div>
+          <span class="mini-stars">${[0, 1, 2].map((i) => i < e.stars ? starSvg('') : '').join('')}</span>
+        </div>
+        <div class="ticket__row"><span>Clientes atendidos</span><b>${e.served}/${e.totalOrders}${e.vipServed ? ` · ${e.vipServed} VIP` : ''}</b></div>
+        <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(e.gross)}</b></div>
+        <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(e.upkeep)}</b></div>
+        <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(e.net)}</b></div>
+        <div class="ticket__row"><span class="note">Ingredientes usados (pagados en el mercado)</span><b class="note">~${fmt(e.ingredientCost)}</b></div>
+      </article>`;
+    }).join('')}</div>`;
 }
 
 // ── Ranking ─────────────────────────────────────────────────
@@ -373,7 +583,6 @@ async function renderRanking() {
   app.boardTab = s.restaurants.includes(app.boardTab) ? app.boardTab : app.restaurantId;
   const screen = document.getElementById('screen');
   screen.innerHTML = `
-    <div class="section-title"><h2>Ranking semanal</h2><span>Mejor servicio</span></div>
     <div class="chips" role="group" aria-label="Restaurante">
       ${RESTAURANTS.filter((r) => s.restaurants.includes(r.id)).map((r) => `<button class="chip" data-chip="${r.id}" aria-pressed="${r.id === app.boardTab}">${r.cuisine}</button>`).join('')}
     </div>
@@ -387,14 +596,14 @@ async function renderRanking() {
       box.innerHTML = `<div class="empty">${icon('trophy')}<span>Nadie ha jugado aquí esta semana. ¡Sé el primero!</span></div>`;
       return;
     }
-    box.innerHTML = `${data.local ? '<p class="note" style="margin:0 0 8px">Sin conexión al servidor: se muestra tu mejor marca en este dispositivo.</p>' : ''}
+    box.innerHTML = `${data.local ? '<p class="note" style="margin:0 0 10px">Sin servidor: se muestra tu mejor marca en este dispositivo.</p>' : ''}
       <div class="stagger">${data.entries.map((e) => `
         <div class="board-row ${e.me ? 'is-me' : ''}">
           <div class="board-rank">${e.rank <= 3 ? `<span class="medal medal--${e.rank}">${e.rank}</span>` : e.rank}</div>
           <div class="board-name">${escapeHtml(e.name)}${e.me ? ' (tú)' : ''}</div>
           <div class="board-score">${fmt(e.score)}</div>
         </div>`).join('')}</div>`;
-  } catch (err) {
+  } catch {
     box.innerHTML = `<div class="empty">No se pudo cargar el ranking.</div>`;
   }
 }
@@ -406,8 +615,8 @@ function openProfile() {
   const online = app.api.mode === 'online';
   openSheet(`
     <div class="sheet__head"><h2>Tu chef</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
-    <div class="card" style="display:flex;gap:14px;align-items:center">
-      ${customerSvg(1, 'happy', 'customer__face" style="width:64px;height:64px;flex-shrink:0')}
+    <div class="card" style="display:flex;gap:14px;align-items:center;border-radius:999px 30px 30px 999px">
+      <span class="review__face" style="width:68px;height:68px">${customerSvg(1, 'happy', '')}</span>
       <div style="flex:1;min-width:0">
         <div style="font-weight:800;font-size:17px">${escapeHtml(p.player.displayName)}</div>
         <div class="note">${p.empire.title} · Nivel ${p.level.level}</div>
@@ -420,7 +629,7 @@ function openProfile() {
       <div class="switch-row"><span>Vibración</span><button class="switch" role="switch" data-pref="haptics" aria-checked="${prefs.haptics}" aria-label="Vibración"></button></div>
     </div>
     <button class="btn btn--ghost btn--wide" data-act="ledger">${icon('refresh')} Historial de monedas</button>
-    ${online ? accountSection(p) : `<div class="card"><p class="note" style="margin:0 0 10px">Jugando sin servidor: tu progreso se guarda sólo en este dispositivo.</p><button class="btn btn--ghost btn--wide" data-act="reset">Borrar progreso</button></div>`}
+    ${online ? accountSection(p) : `<div class="card"><p class="note" style="margin:0 0 10px">Tu progreso se guarda en este celular.</p><button class="btn btn--ghost btn--wide" data-act="reset">Borrar progreso</button></div>`}
   `, (sheet, close) => {
     sheet.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => {
       const v = b.getAttribute('aria-checked') !== 'true';
@@ -439,6 +648,8 @@ function openProfile() {
       }
       setProfile(await app.api.reset());
       app.restaurantId = 'taqueria';
+      app.market = null;
+      app.cart = {};
       close(); renderShell();
     });
     const form = sheet.querySelector('form');
@@ -467,7 +678,7 @@ function accountSection(p) {
     return `<div class="card"><p class="note" style="margin:0 0 10px">Tu progreso está guardado en el servidor. Puedes entrar desde cualquier celular.</p><button class="btn btn--ghost btn--wide" data-act="logout">Cerrar sesión</button></div>`;
   }
   return `<form class="card" style="display:flex;flex-direction:column;gap:12px">
-      <p class="note" style="margin:0">Guarda tu progreso con un usuario para no perderlo y jugar en otros dispositivos.</p>
+      <p class="note">Guarda tu progreso con un usuario para no perderlo y jugar en otros dispositivos.</p>
       <div class="field"><label for="u">Usuario</label><input id="u" name="username" autocomplete="username" required minlength="3" maxlength="24" pattern="[A-Za-z0-9_.\\-]+"></div>
       <div class="field"><label for="pw">Contraseña</label><input id="pw" name="password" type="password" autocomplete="current-password" required minlength="8"></div>
       <button class="btn btn--wide" type="submit" value="register">Guardar mi cuenta</button>
@@ -476,7 +687,7 @@ function accountSection(p) {
 }
 
 const REASONS = {
-  bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio', reto_diario: 'Reto del día',
+  bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', reto_diario: 'Reto del día', mercado: 'Mercado',
   compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina'
 };
 
@@ -485,8 +696,8 @@ async function openLedger() {
   try { entries = (await app.api.ledger()).entries; } catch (err) { errorToast(err); return; }
   openSheet(`
     <div class="sheet__head"><h2>Historial de monedas</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
-    <div class="card">${entries.length ? entries.map((e) => `
-      <div class="ledger-row"><span>${REASONS[e.reason] ?? e.reason}<br><small class="note">${new Date(e.createdAt).toLocaleString('es')}</small></span>
+    <div class="ticket">${entries.length ? entries.map((e) => `
+      <div class="ticket__row"><span>${REASONS[e.reason] ?? e.reason}<br><small class="note">${new Date(e.createdAt).toLocaleString('es')}</small></span>
       <b class="${e.delta >= 0 ? 'pos' : 'neg'}">${e.delta >= 0 ? '+' : ''}${fmt(e.delta)}</b></div>`).join('') : '<div class="empty">Sin movimientos</div>'}
     </div>`);
 }
@@ -502,13 +713,15 @@ async function play(restaurantId, mode) {
   } catch (err) {
     app.busy = false;
     errorToast(err);
+    if (err.code === 'despensa_vacia') go('market');
     return;
   }
   app.busy = false;
+  root.querySelector('.cart-bar')?.remove();
   applyTheme(run.config.restaurantId);
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const firstTime = !localGet('afuego.tutorial');
+  const firstTime = localGet('afuego.tutorial') !== '2';
   const kitchen = new Kitchen(host, {
     config: run.config,
     restaurant: RESTAURANT_BY_ID[run.config.restaurantId],
@@ -519,7 +732,7 @@ async function play(restaurantId, mode) {
       applyTheme(app.restaurantId);
     },
     onFinish: (outcome) => {
-      localSet('afuego.tutorial', '1');
+      localSet('afuego.tutorial', '2');
       submitRun(host, kitchen, run, outcome);
     }
   });
@@ -528,8 +741,9 @@ async function play(restaurantId, mode) {
 
 async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   try {
-    const res = await app.api.completeRun(run.runId, outcome.serves);
+    const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste);
     kitchen.destroy();
+    app.market = null;
     showResults(host, run, res);
     setProfile(res.profile);
   } catch (err) {
@@ -555,26 +769,36 @@ function showResults(host, run, res) {
   const rest = RESTAURANT_BY_ID[run.config.restaurantId];
   const quote = REVIEWS[result.stars][Math.floor(Math.random() * 2)];
   const goal = profile.nextGoal;
+  const wasted = Object.values(result.waste ?? {}).reduce((a, n) => a + n, 0);
   host.innerHTML = `
-    <div class="game"><div class="game__inner" style="padding:0;display:flex">
+    <div class="game"><div class="game__inner" style="display:flex">
       <div class="results">
         <div class="results__kicker">${rest.name.toUpperCase()}${run.config.mode === 'daily' ? ' · RETO DEL DÍA' : ''}</div>
         <h1>${HEADLINES[result.stars]}</h1>
         <div class="stars">${[0, 1, 2].map((i) => starSvg(`star ${i < result.stars ? 'is-on' : ''}`)).join('')}</div>
         <div class="results__coins">${coinSvg()}<span data-count>0</span></div>
-        ${rewards.dailyBonus ? `<div class="bonus-line">${icon('sparkle', 'style="width:20px;height:20px"')} Reto del día: +${fmt(rewards.dailyBonus)}</div>` : ''}
-        <div class="results__grid">
-          <div class="stat"><b>${result.served}/${result.totalOrders}</b><span>clientes</span></div>
-          <div class="stat"><b>x${result.bestCombo}</b><span>combo máx.</span></div>
-          <div class="stat"><b>${result.perfects}</b><span>perfectos</span></div>
+        <div class="results__label">GANANCIA NETA</div>
+        ${rewards.dailyBonus ? `<div class="bonus-line">${icon('sparkle')} Reto del día: +${fmt(rewards.dailyBonus)}</div>` : ''}
+        <div class="bubbles">
+          <div><b>${result.served}/${result.totalOrders}</b><span>clientes</span></div>
+          <div><b>${result.vipServed}/${result.vipTotal}</b><span>críticos</span></div>
+          <div><b>×${result.bestCombo}</b><span>combo</span></div>
+          <div><b>${result.perfects}</b><span>perfectos</span></div>
         </div>
-        ${levelUp ? `<div class="levelup">${starSvg('coin')} ¡Subiste a nivel ${levelUp}! Nuevas recetas y locales disponibles.</div>` : ''}
-        <div class="review">${customerSvg(Math.floor(Math.random() * 6), result.stars >= 2 ? 'happy' : result.stars === 1 ? 'worried' : 'angry')}
+        <div class="ticket">
+          <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(result.gross)}</b></div>
+          <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(result.upkeep)}</b></div>
+          ${rewards.dailyBonus ? `<div class="ticket__row"><span>Bono reto del día</span><b class="pos">+${fmt(rewards.dailyBonus)}</b></div>` : ''}
+          <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(result.coins + rewards.dailyBonus)}</b></div>
+          <div class="ticket__row"><span class="note">Ingredientes usados${wasted ? `, ${wasted} desperdiciados` : ''} (ya pagados en el mercado)</span><b class="note">~${fmt(result.ingredientCost)}</b></div>
+        </div>
+        ${levelUp ? `<div class="levelup">${starSvg('')} ¡Subiste a nivel ${levelUp}! Hay recetas y locales nuevos.</div>` : ''}
+        <div class="review"><span class="review__face">${customerSvg(Math.floor(Math.random() * 6), result.stars >= 2 ? 'happy' : result.stars === 1 ? 'worried' : 'angry', '')}</span>
           <div><small>Reseña de un cliente</small><p>“${quote}”</p></div></div>
         <div class="results__actions">
           <button class="btn btn--xl" data-act="again">Otro servicio</button>
-          <button class="btn btn--gold btn--wide" data-act="invest">${icon('arrow')} Invertir: ${escapeHtml(goal.name)}</button>
-          <button class="btn btn--ghost btn--wide" data-act="home">Volver al inicio</button>
+          <button class="btn btn--gold btn--wide" data-act="market">${icon('market')} Ir al mercado</button>
+          <button class="btn btn--ghost btn--wide" data-act="invest">${icon('arrow')} Meta: ${escapeHtml(goal.name)}</button>
         </div>
       </div>
     </div></div>`;
@@ -583,9 +807,9 @@ function showResults(host, run, res) {
   if (result.stars === 3 || levelUp) confetti(host.querySelector('.results'), [rest.theme.primary, '#FFC23D', '#fff']);
   const close = (tab) => { host.remove(); applyTheme(app.restaurantId); go(tab); };
   host.querySelector('[data-act="again"]').addEventListener('click', () => { host.remove(); play(run.config.restaurantId, 'normal'); });
-  host.querySelector('[data-act="home"]').addEventListener('click', () => close('home'));
+  host.querySelector('[data-act="market"]').addEventListener('click', () => close('market'));
   host.querySelector('[data-act="invest"]').addEventListener('click', () => {
-    if (goal.kind === 'recipe') { app.recipeTab = RECIPES.find((r) => r.id === goal.id).restaurant; close('recipes'); }
+    if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; close('recipes'); }
     else if (goal.kind === 'restaurant') { close('home'); openRestaurant(RESTAURANT_BY_ID[goal.id]); }
     else close('upgrades');
   });

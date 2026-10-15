@@ -3,7 +3,9 @@
 
 import {
   newPlayerState, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
-  dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError
+  dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
+  marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
+  BULK_QTY, BULK_DISCOUNT
 } from './shared/index.js';
 
 export class ApiError extends Error {
@@ -84,7 +86,14 @@ class HttpApi {
   }
   startRun(restaurantId, mode) { return this.#req('POST', '/runs', { restaurantId, mode }); }
   // Reintenta el envío: el servidor es idempotente para la misma partida.
-  completeRun(runId, serves) { return this.#req('POST', `/runs/${runId}/complete`, { serves }); }
+  completeRun(runId, serves, waste = {}) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste }); }
+  market() { return this.#req('GET', '/market'); }
+  marketBuy(items) {
+    const key = `mercado:${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
+    return this.#req('POST', '/market/buy', { items }, { 'idempotency-key': key });
+  }
+  claimBasket() { return this.#req('POST', '/market/basket'); }
+  history() { return this.#req('GET', '/me/runs'); }
   abandonRun(runId) { return this.#req('POST', `/runs/${runId}/abandon`).catch(() => null); }
   leaderboard(restaurantId) { return this.#req('GET', `/leaderboard/${restaurantId}`); }
   ledger() { return this.#req('GET', '/me/ledger?limit=40'); }
@@ -102,9 +111,17 @@ class LocalApi {
   #load() {
     try {
       const raw = store.get(LOCAL_KEY);
-      if (raw) return JSON.parse(raw);
+      if (raw) {
+        const data = JSON.parse(raw);
+        // Partidas guardadas antes del mercado: se completan los campos nuevos.
+        const base = newPlayerState();
+        data.state = { ...base, ...data.state, inventory: data.state.inventory ?? base.inventory };
+        data.history ??= [];
+        return data;
+      }
     } catch { /* datos corruptos: empezar de nuevo */ }
-    return { state: newPlayerState(), name: 'Chef Invitado', bests: {}, ledger: [{ delta: 150, reason: 'bono_bienvenida', t: Date.now() }] };
+    const state = newPlayerState();
+    return { state, name: 'Chef Invitado', bests: {}, history: [], ledger: [{ delta: state.coins, reason: 'bono_bienvenida', t: Date.now() }] };
   }
   #save() { store.set(LOCAL_KEY, JSON.stringify(this.data)); }
   #log(delta, reason) {
@@ -146,16 +163,19 @@ class LocalApi {
     }
   }
 
-  async completeRun(runId, serves) {
+  async completeRun(runId, serves, waste = {}) {
     const run = this.runs.get(runId);
     if (!run) throw new ApiError(404, 'no_encontrado', 'Partida no encontrada');
     if (run.response) return run.response;
     let result;
-    try { result = scoreRun(run.config, { serves }); }
+    try { result = scoreRun(run.config, { serves, waste }); }
     catch (err) {
       if (err instanceof RunValidationError) throw new ApiError(422, 'partida_rechazada', 'La partida no pasó la validación', { reason: err.reason });
       throw err;
     }
+    const consumed = { ...result.used };
+    for (const [ing, n] of Object.entries(result.waste)) consumed[ing] = (consumed[ing] ?? 0) + n;
+    this.data.state = applyInventory(this.data.state, Object.fromEntries(Object.entries(consumed).map(([k, n]) => [k, -n])));
     const s = this.data.state;
     const levelBefore = levelFromXp(s.xp);
     s.coins += result.coins; s.xp += result.xp;
@@ -170,6 +190,12 @@ class LocalApi {
     }
     const rid = run.config.restaurantId;
     this.data.bests[rid] = Math.max(this.data.bests[rid] ?? 0, result.score);
+    this.data.history.unshift({
+      id: runId, restaurantId: rid, mode: run.config.mode, finishedAt: Date.now(), stars: result.stars,
+      gross: result.gross, upkeep: result.upkeep, net: result.coins, served: result.served, totalOrders: result.totalOrders,
+      ingredientCost: result.ingredientCost, vipServed: result.vipServed
+    });
+    this.data.history = this.data.history.slice(0, 30);
     this.#save();
     const profile = this.#profile();
     run.response = { result, rewards: { coins: result.coins, dailyBonus, xp: result.xp }, levelUp: profile.level.level > levelBefore ? profile.level.level : null, profile };
@@ -177,6 +203,43 @@ class LocalApi {
   }
 
   async abandonRun(runId) { this.runs.delete(runId); return { abandoned: true }; }
+
+  #market() {
+    const s = this.data.state;
+    const day = todayUTC();
+    const prices = marketPrices(day);
+    return {
+      day,
+      items: marketIngredients(s).map((id) => ({ id, ...prices[id] })),
+      inventory: { ...s.inventory },
+      used: inventoryCount(s.inventory),
+      capacity: storageCapacity(s.upgrades),
+      bulk: { qty: BULK_QTY, discount: BULK_DISCOUNT },
+      basket: dailyBasket(day, s)
+    };
+  }
+  async market() { return this.#market(); }
+
+  async marketBuy(items) {
+    const d = evaluateMarketBuy(this.data.state, items, todayUTC());
+    if (!d.ok) throw new ApiError(409, d.reason, PURCHASE_MSG[d.reason] ?? 'Compra inválida', d);
+    this.data.state = applyInventory(this.data.state, d.delta, d.price);
+    this.#log(-d.price, 'mercado');
+    this.#save();
+    return { spent: d.price, profile: this.#profile(), market: this.#market() };
+  }
+
+  async claimBasket() {
+    const b = dailyBasket(todayUTC(), this.data.state);
+    if (b.claimed) throw new ApiError(409, 'ya_reclamada', 'Ya recogiste la canasta de hoy');
+    if (Object.keys(b.items).length === 0) throw new ApiError(409, 'despensa_llena', 'No cabe nada más en tu despensa');
+    this.data.state = applyInventory(this.data.state, b.items);
+    this.data.state.basketClaimed = b.day;
+    this.#save();
+    return { items: b.items, profile: this.#profile(), market: this.#market() };
+  }
+
+  async history() { return { entries: this.data.history }; }
 
   async leaderboard(restaurantId) {
     const best = this.data.bests[restaurantId];
@@ -192,5 +255,7 @@ class LocalApi {
 
 const PURCHASE_MSG = {
   no_existe: 'Ese artículo no existe', ya_comprado: 'Ya lo tienes', nivel_insuficiente: 'Necesitas más nivel de chef',
-  sin_dinero: 'No tienes suficientes monedas', restaurante_cerrado: 'Primero abre ese restaurante', nivel_maximo: 'Ya está al nivel máximo'
+  sin_dinero: 'No tienes suficientes monedas', restaurante_cerrado: 'Primero abre ese restaurante', nivel_maximo: 'Ya está al nivel máximo',
+  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', carrito_vacio: 'El carrito está vacío',
+  no_disponible: 'Ese ingrediente no se vende para tus recetas', cantidad_invalida: 'Cantidad inválida'
 };

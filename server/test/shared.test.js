@@ -2,11 +2,13 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
-  evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders
+  evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
+  evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
-const cfgFor = (state = newPlayerState(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'taqueria', randomSeed: seed });
+const stocked = () => ({ ...newPlayerState(), inventory: { tortilla: 40, carne_res: 40, cebolla: 40, queso: 40 } });
+const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'taqueria', randomSeed: seed });
 
 test('el catálogo tiene 40 recetas, 8 por restaurante', () => {
   assert.equal(RECIPES.length, 40);
@@ -16,7 +18,7 @@ test('el catálogo tiene 40 recetas, 8 por restaurante', () => {
 test('la generación de pedidos es determinista', () => {
   const c = cfgFor();
   assert.deepEqual(ordersForConfig(c), ordersForConfig(c));
-  assert.notDeepEqual(ordersForConfig(c), ordersForConfig(cfgFor(newPlayerState(), 'otra')));
+  assert.notDeepEqual(ordersForConfig(c), ordersForConfig(cfgFor(stocked(), 'otra')));
 });
 
 test('un jugador honesto obtiene monedas y estrellas', () => {
@@ -93,7 +95,7 @@ test('el imperio llega al 100 % con todo comprado', () => {
   const s = newPlayerState();
   s.restaurants = RESTAURANTS.map((r) => r.id);
   s.recipes = RECIPES.map((r) => r.id);
-  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, mesas: 2 };
+  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, mesas: 2, refri: 3 };
   const e = empireProgress(s);
   assert.equal(e.percent, 100);
   assert.equal(e.title, 'Chef Leyenda');
@@ -107,4 +109,61 @@ test('niveles de chef', () => {
 
 test('generateOrders exige menú', () => {
   assert.throws(() => generateOrders({ seed: 'x', menu: [], durationMs: 1000, stats: kitchenStats() }));
+});
+
+test('no se puede cocinar sin ingredientes en la despensa', () => {
+  const st = { ...newPlayerState(), inventory: { tortilla: 1, carne_res: 1, cebolla: 1, queso: 1 } };
+  const c = cfgFor(st);
+  const all = honestServes({ ...c, stock: undefined });
+  assert.ok(all.length > 2);
+  assert.throws(() => scoreRun(c, { serves: all }), (e) => e.reason === 'sin_ingredientes');
+});
+
+test('los gastos del local se descuentan y el resultado nunca es negativo', () => {
+  const c = cfgFor();
+  const res = scoreRun(c, { serves: honestServes(c) });
+  assert.equal(res.upkeep, 60);
+  assert.equal(res.coins, Math.max(0, res.gross - 60));
+  assert.equal(scoreRun(c, { serves: [] }).coins, 0);
+});
+
+test('el desperdicio declarado se limita a lo que quedaba', () => {
+  const c = cfgFor();
+  const res = scoreRun(c, { serves: [], waste: { carne_res: 999 } });
+  assert.equal(res.waste.carne_res, 40);
+});
+
+test('mercado: precios del día, ofertas, mayoreo y capacidad', () => {
+  const p = marketPrices('2026-10-15');
+  assert.deepEqual(p, marketPrices('2026-10-15'));
+  assert.equal(Object.values(p).filter((x) => x.deal).length, 3);
+  assert.equal(lineTotal(10, 10), 90);
+  const s = { ...newPlayerState(), coins: 1000 };
+  assert.equal(evaluateMarketBuy(s, { salmon: 1 }, '2026-10-15').reason, 'no_disponible');
+  assert.equal(evaluateMarketBuy(s, { tortilla: 30 }, '2026-10-15').reason, 'despensa_llena');
+  const ok = evaluateMarketBuy(s, { tortilla: 5 }, '2026-10-15');
+  assert.ok(ok.ok);
+  const after = applyInventory(s, ok.delta, ok.price);
+  assert.equal(after.inventory.tortilla, 13);
+  assert.equal(after.coins, 1000 - ok.price);
+  assert.equal(evaluateMarketBuy({ ...s, coins: 0 }, { tortilla: 5 }, '2026-10-15').reason, 'sin_dinero');
+});
+
+test('canasta diaria respeta la capacidad', () => {
+  const s = newPlayerState();
+  const b = dailyBasket('2026-10-15', s);
+  assert.ok(Object.values(b.items).reduce((a, n) => a + n, 0) <= 8);
+  const full = { ...s, inventory: { tortilla: 40 } };
+  assert.deepEqual(dailyBasket('2026-10-15', full).items, {});
+});
+
+test('los críticos VIP pagan más y hay eventos de fuego', () => {
+  const c = cfgFor();
+  const orders = ordersForConfig(c);
+  const vip = orders.find((o) => o.vip);
+  if (vip) {
+    const normal = orders.find((o) => !o.vip && o.recipeId === vip.recipeId);
+    if (normal) assert.ok(vip.patienceMs < normal.patienceMs);
+  }
+  assert.ok(generateEvents({ seed: 'x', durationMs: 120000 }).length >= 1);
 });

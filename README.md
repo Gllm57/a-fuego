@@ -5,28 +5,44 @@ usa las propinas para construir tu cadena de restaurantes.
 
 ## El juego
 
-- **Servicio de 2 minutos.** Llegan clientes con pedidos. Tocas un cliente, tocas los
-  ingredientes resaltados y tocas las estaciones: **cortar** y **batir** se hacen con
-  toques; **freír**, **hornear** y **hervir** se cocinan solos y hay que recogerlos a
-  tiempo (el sartén y el horno queman). Recoger justo a tiempo da **¡Perfecto!**.
-- **Combos:** servir seguido sin que nadie se vaya multiplica las ganancias (hasta ×2).
-- **40 recetas** en 5 restaurantes (8 cada uno): mexicana, americana, italiana,
-  japonesa y peruana.
-- **Reto del día** con premio extra y **ranking semanal** por restaurante.
+- **Servicio de 2 minutos** en un local ilustrado: clientes frente a la barra con su
+  pedido en un globo y un anillo de paciencia, la comanda de papel, fogones redondos y
+  una repisa de frascos con la despensa.
+- Toca un cliente → toca los frascos resaltados → toca los fogones: **cortar** y **batir**
+  con toques; **freír**, **hornear** y **hervir** se cocinan solos y hay que recogerlos a
+  tiempo (la sartén y el horno queman). Recoger justo a tiempo da **¡Perfecto!**.
+- **Eventos dentro del servicio:** ¡fuego en la sartén o el horno! (tócalo rápido para
+  apagarlo; lo que había se pierde), **hora pico** (llegan clientes sin parar) y
+  **críticos gastronómicos** con boina: pagan el doble y tienen poca paciencia.
+- **Combos** hasta ×1.5 si nadie se va enojado.
+- **40 recetas** en 5 restaurantes (mexicana, americana, italiana, japonesa y peruana).
+
+### Economía (difícil a propósito)
+
+- **Mercado:** sólo cocinas con lo que compraste. Precios que cambian cada día (±25 %),
+  3 ofertas diarias al −40 %, −10 % comprando 10 o más, y una **canasta gratis** al día.
+- **Despensa limitada** (40 lugares; el refrigerador la amplía). Lo quemado, lo que queda
+  en el plato de un cliente que se fue y lo que sobra a medio preparar se desperdicia.
+- **Gastos del local** por servicio (60 → 280 según el restaurante).
+- Propinas y combos moderados; el servidor recalcula todo y rechaza servir más platos
+  de los que alcanzan con la despensa.
 
 ### Para qué sirve el dinero
 
-La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 % del
-imperio). Las monedas se invierten en:
+La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 % del imperio):
 
 | Inversión | Efecto |
 |---|---|
-| Abrir restaurantes (2.500 → 22.000) | Nueva cocina del mundo con 8 recetas |
-| Aprender recetas (250 → 7.500) | El plato entra al menú; los más elaborados pagan más |
-| Mejoras de cocina | Cocina más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, más mesas |
+| Ingredientes del mercado | Sin ellos no hay servicio |
+| Abrir restaurantes (2.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros |
+| Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
+| Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, más mesas, despensa más grande |
 
-El progreso del imperio pondera restaurantes (40 %), recetas (40 %) y mejoras (20 %).
-La pantalla de inicio siempre muestra la **siguiente meta** concreta y cuánto falta.
+### Pantallas
+
+Inicio (imperio, siguiente meta, restaurantes en arco, reto del día) · **Mercado** ·
+Recetario · Mejoras · **Diario de caja** (ganancias y gastos de cada servicio) · Ranking
+semanal · Cocina · Cierre de caja.
 
 ## Arquitectura
 
@@ -69,10 +85,14 @@ client/   Juego web para celular (HTML/CSS/JS sin framework ni build)
 | POST | `/auth/login` | Inicia sesión |
 | GET | `/me` | Perfil, progreso del imperio, siguiente meta, reto diario |
 | GET | `/me/ledger` | Historial de monedas |
+| GET | `/me/runs` | Diario de caja (servicios con ganancias y gastos) |
+| GET | `/market` | Precios del día, despensa, capacidad y canasta |
+| POST | `/market/buy` | Compra ingredientes `{items: {tomate: 5}}` |
+| POST | `/market/basket` | Recoge la canasta gratis del día |
 | GET | `/catalog` | Catálogo completo |
 | POST | `/shop/purchase` | Compra `{kind: restaurant\|recipe\|upgrade, id}` |
 | POST | `/runs` | Empieza un servicio `{restaurantId, mode: normal\|daily}` |
-| POST | `/runs/:id/complete` | Envía los platos servidos y cobra |
+| POST | `/runs/:id/complete` | Envía platos servidos y desperdicio; descuenta la despensa y cobra |
 | POST | `/runs/:id/abandon` | Abandona el servicio |
 | GET | `/leaderboard/:restaurantId` | Ranking semanal |
 | GET | `/health` | Estado del servicio |

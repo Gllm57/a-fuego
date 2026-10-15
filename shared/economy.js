@@ -1,17 +1,19 @@
 // Economía y progresión. Funciones puras: reciben un estado de jugador y
 // devuelven decisiones. El servidor las aplica dentro de una transacción.
 //
-// Meta del dinero: construir la cadena «¡A Fuego!». Las propinas se invierten en
-//   1. Abrir restaurantes nuevos (5 cocinas del mundo),
-//   2. Aprender recetas (más caras = platos que pagan más),
-//   3. Mejorar la cocina (más rápida, clientes más pacientes, más mesas).
+// Meta del dinero: construir la cadena «¡A Fuego!». Las ganancias se invierten en
+//   1. Ingredientes del mercado (sin ellos no se cocina; precios cambian cada día),
+//   2. Abrir restaurantes nuevos (5 cocinas del mundo),
+//   3. Aprender recetas (más caras = platos que pagan más),
+//   4. Mejorar la cocina (más rápida, más mesas, más despensa…).
 // Al completar el 100 % del imperio se obtiene el título «Chef Leyenda».
 
 import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, recipesOf } from './data/catalog.js';
+import { INGREDIENTS } from './data/ingredients.js';
 import { hashString } from './rng.js';
-import { upgradeLevel } from './rules.js';
+import { upgradeLevel, storageCapacity } from './rules.js';
 
-export const STARTING_COINS = 150;
+export const STARTING_COINS = 200;
 
 export function xpForLevel(level) {
   return 150 * (level - 1) * level / 2;
@@ -37,7 +39,9 @@ export function newPlayerState() {
     restaurants: ['taqueria'],
     recipes: recipesOf('taqueria').filter((x) => x.learnCost === 0).map((x) => x.id),
     upgrades: {},
-    dailyClaimed: null
+    inventory: { tortilla: 8, carne_res: 4, cebolla: 4, queso: 4 },
+    dailyClaimed: null,
+    basketClaimed: null
   };
 }
 
@@ -89,6 +93,86 @@ export function applyGrants(state, price, grants) {
     if (g.kind === 'upgrade') next.upgrades[g.id] = g.level;
   }
   return next;
+}
+
+// ── Mercado ─────────────────────────────────────────────────
+export const BULK_QTY = 10;
+export const BULK_DISCOUNT = 0.1;
+export const DEALS_PER_DAY = 3;
+
+export function inventoryCount(inventory = {}) {
+  return Object.values(inventory).reduce((s, n) => s + n, 0);
+}
+
+// Lo que se vende: ingredientes de las recetas que el jugador ya sabe preparar.
+export function marketIngredients(state) {
+  const set = new Set();
+  for (const id of state.recipes) for (const c of RECIPE_BY_ID[id].components) set.add(c.ingredient);
+  return [...set];
+}
+
+// Precios del día: ±25 % sobre el costo base y 3 ofertas al 40 % de descuento.
+export function marketPrices(day) {
+  const ids = Object.keys(INGREDIENTS);
+  const deals = new Set([...ids].sort((a, b) => hashString(`deal:${day}:${a}`) - hashString(`deal:${day}:${b}`)).slice(0, DEALS_PER_DAY));
+  const prices = {};
+  for (const id of ids) {
+    const f = 0.75 + 0.5 * (hashString(`price:${day}:${id}`) / 4294967296);
+    const price = Math.max(1, Math.round(INGREDIENTS[id].cost * f * (deals.has(id) ? 0.6 : 1)));
+    prices[id] = { price, deal: deals.has(id), trend: price > INGREDIENTS[id].cost ? 'up' : price < INGREDIENTS[id].cost ? 'down' : 'flat' };
+  }
+  return prices;
+}
+
+export function lineTotal(unitPrice, qty) {
+  const total = unitPrice * qty;
+  return qty >= BULK_QTY ? Math.round(total * (1 - BULK_DISCOUNT)) : total;
+}
+
+export function evaluateMarketBuy(state, items, day) {
+  const no = (reason, extra = {}) => ({ ok: false, reason, ...extra });
+  const entries = Object.entries(items ?? {}).filter(([, q]) => q !== 0);
+  if (entries.length === 0) return no('carrito_vacio');
+  const sellable = new Set(marketIngredients(state));
+  const prices = marketPrices(day);
+  let price = 0;
+  let units = 0;
+  for (const [ing, qty] of entries) {
+    if (!sellable.has(ing)) return no('no_disponible', { ingredient: ing });
+    if (!Number.isInteger(qty) || qty < 1 || qty > 99) return no('cantidad_invalida', { ingredient: ing });
+    price += lineTotal(prices[ing].price, qty);
+    units += qty;
+  }
+  const capacity = storageCapacity(state.upgrades);
+  if (inventoryCount(state.inventory) + units > capacity) return no('despensa_llena', { capacity });
+  if (state.coins < price) return no('sin_dinero', { price });
+  return { ok: true, price, delta: Object.fromEntries(entries) };
+}
+
+export function applyInventory(state, delta, price = 0) {
+  const next = structuredClone(state);
+  next.coins -= price;
+  next.inventory ??= {};
+  for (const [ing, n] of Object.entries(delta)) {
+    const v = (next.inventory[ing] ?? 0) + n;
+    if (v > 0) next.inventory[ing] = v; else delete next.inventory[ing];
+  }
+  return next;
+}
+
+// Canasta gratuita una vez al día: evita quedarse sin poder cocinar.
+export function dailyBasket(day, state) {
+  const pool = marketIngredients(state).sort((a, b) => hashString(`basket:${day}:${a}`) - hashString(`basket:${day}:${b}`));
+  const free = Math.max(0, storageCapacity(state.upgrades) - inventoryCount(state.inventory));
+  const items = {};
+  let left = Math.min(8, free);
+  for (const ing of pool) {
+    if (left <= 0) break;
+    const n = Math.min(2, left);
+    items[ing] = n;
+    left -= n;
+  }
+  return { day, items, claimed: state.basketClaimed === day };
 }
 
 export function menuFor(state, restaurantId) {
