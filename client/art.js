@@ -43,7 +43,7 @@ const STROKE = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-line
 
 export const PROCESS_ICONS = {
   crudo: `<path d="M12 3v10M8 9l4 4 4-4"/><path d="M3 17c2 3 5 4 9 4s7-1 9-4z"/>`,
-  cortar: `<g transform="rotate(-38 12 12.5)"><g stroke-width="1.5"><rect x="1" y="11.2" width="6.6" height="3.8" rx="1.9"/><rect x="7.6" y="9.9" width="1.7" height="6.4" rx=".7"/><path d="M9.3 9.6H17c3 0 5.2 1.6 6 3.9-4.7 1.7-9.8 2.3-13.7 2.1z"/><path d="M11.2 14h8.3" opacity=".5"/></g><circle cx="3.2" cy="13.1" r=".75" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13.1" r=".75" fill="currentColor" stroke="none"/></g>`,
+  cortar: `<path d="M3 20.5L14.5 9c2-2 5-3 7-2-1 3-3 6-5 8L5 21.5c-.8.6-2.4.1-2-1z"/><path d="M14.5 9l2.5 2.5"/><path d="M7.5 17.5l1 1"/>`,
   batir: `<path d="M12 2.5v6"/><path d="M12 8.5c-3.5 0-5.5 4.5-5.5 8a5.5 5.5 0 0 0 11 0c0-3.5-2-8-5.5-8z"/><path d="M12 8.5c-1.6 0-2.6 4.5-2.6 8s1.2 5 2.6 5 2.6-1.5 2.6-5-1-8-2.6-8z"/><path d="M6.6 16.5h10.8"/>`,
   freir: `<circle cx="10" cy="13" r="7"/><path d="M17 13h6"/><path d="M8 4c0 1.5 1 2 1 3.5M12 3c0 1.5 1 2 1 3.5"/>`,
   hornear: `<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="10" width="12" height="7" rx="1"/><path d="M7 7h1M11 7h1"/>`,
@@ -96,11 +96,11 @@ export function icon(name, extra = '') {
 
 export const UPGRADE_ICONS = {
   // Par de cuchillos cruzados
-  cuchillos: `<g transform="rotate(-42 12 12.5)"><g stroke-width="1.5"><rect x="1" y="11.2" width="6.6" height="3.8" rx="1.9"/><rect x="7.6" y="9.9" width="1.7" height="6.4" rx=".7"/><path d="M9.3 9.6H17c3 0 5.2 1.6 6 3.9-4.7 1.7-9.8 2.3-13.7 2.1z"/><path d="M11.2 14h8.3" opacity=".5"/></g><circle cx="3.2" cy="13.1" r=".75" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13.1" r=".75" fill="currentColor" stroke="none"/></g><g transform="translate(24 0) scale(-1 1) rotate(-42 12 12.5)"><g stroke-width="1.5"><rect x="1" y="11.2" width="6.6" height="3.8" rx="1.9"/><rect x="7.6" y="9.9" width="1.7" height="6.4" rx=".7"/><path d="M9.3 9.6H17c3 0 5.2 1.6 6 3.9-4.7 1.7-9.8 2.3-13.7 2.1z"/><path d="M11.2 14h8.3" opacity=".5"/></g><circle cx="3.2" cy="13.1" r=".75" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13.1" r=".75" fill="currentColor" stroke="none"/></g>`,
+  cuchillos: `<path d="M4 20.5L13 8.5c1.5-2 4-3.5 6-3-.5 2.6-2.3 5-4.3 6.5L5.5 21.5c-.7.5-2-.2-1.5-1z"/><path d="M20 20.5L11 8.5C9.5 6.5 7 5 5 5.5c.5 2.6 2.3 5 4.3 6.5l9.2 9.5c.7.5 2-.2 1.5-1z"/>`,
   // Batidora de mano eléctrica con sus dos varillas
   batidora: `<path d="M5 9.5c0-2.5 2-4.5 4.5-4.5H18a2 2 0 0 1 0 4h-3.5l-2 3H8a3 3 0 0 1-3-2.5z"/><path d="M9.5 12v3.5M12.5 12v3.5"/><path d="M8 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5M11 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5"/><path d="M15.5 7h1"/>`,
   // Tabla de picar con asa y cuchillo
-  extra_tabla: `<rect x="2" y="9" width="14" height="12" rx="3"/><circle cx="12.8" cy="12" r="1.1"/><path d="M5 18h5"/><g transform="translate(5.5 -3.5) scale(.72) rotate(-45 12 12.5)"><g stroke-width="1.5"><rect x="1" y="11.2" width="6.6" height="3.8" rx="1.9"/><rect x="7.6" y="9.9" width="1.7" height="6.4" rx=".7"/><path d="M9.3 9.6H17c3 0 5.2 1.6 6 3.9-4.7 1.7-9.8 2.3-13.7 2.1z"/><path d="M11.2 14h8.3" opacity=".5"/></g><circle cx="3.2" cy="13.1" r=".75" fill="currentColor" stroke="none"/><circle cx="5.5" cy="13.1" r=".75" fill="currentColor" stroke="none"/></g>`,
+  extra_tabla: `<rect x="3" y="7" width="15" height="13" rx="3"/><circle cx="14.5" cy="10.5" r="1.3"/><path d="M18 7.5l3-3"/><path d="M14 16l7-7"/><path d="M6 17h5"/>`, sarten: PROCESS_ICONS.freir,
   horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table,
   extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
   extra_olla: PROCESS_ICONS.hervir, extra_horno: PROCESS_ICONS.hornear,
