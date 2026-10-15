@@ -424,8 +424,14 @@ function openProfile() {
       if (v) sfx.tap();
     }));
     sheet.querySelector('[data-act="ledger"]').addEventListener('click', () => { close(); openLedger(); });
-    sheet.querySelector('[data-act="reset"]')?.addEventListener('click', async () => {
-      if (!confirm('¿Seguro? Perderás todo tu progreso.')) return;
+    sheet.querySelector('[data-act="reset"]')?.addEventListener('click', async (e) => {
+      const b = e.currentTarget;
+      if (b.dataset.armed !== '1') {
+        b.dataset.armed = '1';
+        b.textContent = 'Toca otra vez para borrar todo';
+        b.classList.replace('btn--ghost', 'btn--dark');
+        return;
+      }
       setProfile(await app.api.reset());
       app.restaurantId = 'taqueria';
       close(); renderShell();
