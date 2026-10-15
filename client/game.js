@@ -55,7 +55,7 @@ export class Kitchen {
   mount() {
     this.host.innerHTML = `
       <div class="game" role="application" aria-label="Cocina">
-        <div class="game__inner">
+        <div class="game__inner" data-station-rows="${this.#stationRows().length}">
           <div class="wall">
             <div class="hud">
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
@@ -72,7 +72,7 @@ export class Kitchen {
             <div class="customers" style="--slots:${this.stats.slots}"></div>
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
-          <div class="counter ${this.stationKeys.length > 5 ? 'is-compact' : ''}">${STATION_IDS.map((type) => this.#stationGroup(type)).join('')}</div>
+          <div class="counter" data-rows="${this.#stationRows().length}" style="--ring:${this.#ringSize()}">${this.#stationRows().map((row) => `<div class="counter__row">${row.map((type) => this.#stationGroup(type)).join('')}</div>`).join('')}</div>
           <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 84 : this.pantryIds.length <= 10 ? 64 : 54}px">
             <div class="shelf__head"><span class="shelf__count"></span><span class="shelf__urgent"></span></div>
             <div class="shelf__grid">${this.pantryIds.map((id) => `
@@ -638,6 +638,38 @@ export class Kitchen {
 
   // ── Fogones ─────────────────────────────────────────────
   #type(key) { return key.split('#')[0]; }
+
+  // Reparte los tipos de fogón en filas equilibradas de hasta 5 fogones,
+  // sin separar nunca un par (p. ej. "Olla ×2") ni cambiar el orden.
+  #stationRows() {
+    if (this._rows) return this._rows;
+    const groups = STATION_IDS.map((type) => ({ type, n: this.stationKeys.filter((k) => this.#type(k) === type).length }));
+    const total = groups.reduce((a, g) => a + g.n, 0);
+    const rowsNeeded = Math.ceil(total / 5);
+    const target = Math.ceil(total / rowsNeeded);
+    const rows = [[]];
+    let used = 0;
+    for (const g of groups) {
+      if (used + g.n > target && rows[rows.length - 1].length && rows.length < rowsNeeded) { rows.push([]); used = 0; }
+      rows[rows.length - 1].push(g.type);
+      used += g.n;
+    }
+    this._rows = rows;
+    return rows;
+  }
+
+  // Un solo tamaño para todos los fogones: el que permita que quepa la fila más llena.
+  // Un par ocupa 2 fogones + 16 px (separación y borde); entre grupos hay 6 px.
+  #ringSize() {
+    const count = (type) => this.stationKeys.filter((k) => this.#type(k) === type).length;
+    const fits = this.#stationRows().map((row) => {
+      const n = row.reduce((a, t) => a + count(t), 0);
+      const pairs = row.filter((t) => count(t) > 1).length;
+      const overhead = 16 * pairs + 6 * (row.length - 1) + 6;
+      return `calc((100cqi - ${overhead}px) / ${n})`;
+    });
+    return `min(var(--ring-max), ${fits.join(', ')})`;
+  }
 
   #stationGroup(type) {
     const keys = this.stationKeys.filter((k) => this.#type(k) === type);
