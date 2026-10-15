@@ -6,7 +6,7 @@
 import { RECIPE_BY_ID, PROCESSES } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { generateOrders } from './levelgen.js';
-import { minPrepMs, stationLoadMs, recipeIngredients, VIP_PRICE_MULT } from './rules.js';
+import { minPrepMs, stationLoadMs, recipeIngredients, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS } from './rules.js';
 
 export const MAX_COMBO_STEPS = 5;
 export const TIP_RATE = 0.3;
@@ -77,14 +77,29 @@ export function scoreRun(config, submission) {
     for (const [ing, n] of Object.entries(recipeIngredients(RECIPE_BY_ID[s.recipeId]))) used[ing] = (used[ing] ?? 0) + n;
   }
   const waste = {};
+  // Pedido urgente: unidades extra compradas durante el servicio al doble de precio.
+  const emergency = {};
+  let emergencyCost = 0;
+  let emergencyUnits = 0;
+  for (const [ing, n] of Object.entries(submission.emergency ?? {})) {
+    if (!Number.isInteger(n) || n < 0) fail('urgente_invalido', { ing, n });
+    if (n === 0) continue;
+    const price = config.emergencyPrices?.[ing];
+    if (!price) fail('urgente_invalido', { ing });
+    emergency[ing] = n;
+    emergencyUnits += n;
+    emergencyCost += price * n;
+  }
+  if (emergencyUnits > EMERGENCY_MAX_UNITS) fail('urgente_excedido', { units: emergencyUnits });
   if (stock) {
+    const avail = (ing) => (stock[ing] ?? 0) + (emergency[ing] ?? 0);
     for (const [ing, n] of Object.entries(used)) {
-      if (n > (stock[ing] ?? 0)) fail('sin_ingredientes', { ingredient: ing, used: n, stock: stock[ing] ?? 0 });
+      if (n > avail(ing)) fail('sin_ingredientes', { ingredient: ing, used: n, stock: avail(ing) });
     }
     // Desperdicio declarado (quemados, clientes que se fueron): se limita a lo que quedaba.
     for (const [ing, n] of Object.entries(submission.waste ?? {})) {
       if (!INGREDIENTS[ing] || !Number.isInteger(n) || n < 0) fail('desperdicio_invalido', { ing, n });
-      const left = (stock[ing] ?? 0) - (used[ing] ?? 0);
+      const left = avail(ing) - (used[ing] ?? 0);
       if (n > 0 && left > 0) waste[ing] = Math.min(n, left);
     }
   }
@@ -144,7 +159,7 @@ export function scoreRun(config, submission) {
   }
 
   const upkeep = config.upkeep ?? 0;
-  const coins = Math.max(0, gross - upkeep);
+  const coins = Math.max(0, gross - upkeep - emergencyCost);
   const target = orders.reduce((sum, o) => sum + RECIPE_BY_ID[o.recipeId].price * (o.vip ? VIP_PRICE_MULT : 1), 0);
   const ratio = target > 0 ? gross / target : 0;
   const stars = STAR_THRESHOLDS.filter((th) => ratio >= th).length;
@@ -163,6 +178,8 @@ export function scoreRun(config, submission) {
     gross,
     tips,
     upkeep,
+    emergency,
+    emergencyCost,
     coins,
     score: gross,
     target,

@@ -2,6 +2,7 @@
 // clientes, estaciones y fachadas. Sin imágenes externas.
 
 import { INGREDIENTS } from './shared/index.js';
+import { FOOD } from './foodart.js';
 
 const hl = (x, y, rx, ry) => `<ellipse cx="${x}" cy="${y}" rx="${rx}" ry="${ry}" fill="#fff" opacity=".45"/>`;
 
@@ -33,9 +34,9 @@ const SHAPES = {
 export function ingredientSvg(id, { className = '', title } = {}) {
   const ing = INGREDIENTS[id];
   if (!ing) return '';
-  const draw = SHAPES[ing.shape] ?? SHAPES.round;
   const label = title ?? ing.name;
-  return `<svg class="${className}" viewBox="0 0 48 48" role="img" aria-label="${label}">${draw(ing.color, ing.accent)}</svg>`;
+  const body = FOOD[id] ?? (SHAPES[ing.shape] ?? SHAPES.round)(ing.color, ing.accent);
+  return `<svg class="${className}" viewBox="0 0 48 48" ${label ? `role="img" aria-label="${label}"` : 'aria-hidden="true"'}>${body}</svg>`;
 }
 
 const STROKE = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"';

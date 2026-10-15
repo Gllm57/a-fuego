@@ -16,7 +16,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
   if (!Array.isArray(menu) || menu.length === 0) throw new Error('El menú está vacío');
   const rng = createRng(`${seed}:orders`);
   const rush = rushWindow(seed, durationMs);
-  const pace = (mode === 'daily' ? 0.85 : 1) * (1 - 0.05 * tier);
+  const pace = (mode === 'daily' ? 0.85 : 1) * (1 - 0.06 * tier);
   const orders = [];
   let t = 1500;
   let prev = null;
@@ -46,7 +46,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
 // Sólo hacen la partida más lenta, así que el servidor no necesita validarlos.
 export function generateEvents({ seed, durationMs, tier = 0 }) {
   const rng = createRng(`${seed}:events`);
-  const count = 1 + (tier >= 2 ? 1 : 0) + (rng() < 0.4 ? 1 : 0);
+  const count = 1 + (tier >= 2 ? 1 : 0) + (tier >= 4 ? 1 : 0) + (rng() < 0.4 ? 1 : 0);
   const events = [];
   for (let i = 0; i < count; i++) {
     const slice = (durationMs - 30_000) / count;

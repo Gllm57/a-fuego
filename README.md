@@ -20,8 +20,11 @@ usa las propinas para construir tu cadena de restaurantes.
 ### Economía (difícil a propósito)
 
 - **Mercado:** sólo cocinas con lo que compraste. Precios que cambian cada día (±25 %),
-  3 ofertas diarias al −40 %, −10 % comprando 10 o más, y una **canasta gratis** al día.
-- **Despensa limitada** (40 lugares; el refrigerador la amplía). Lo quemado, lo que queda
+  3 ofertas diarias al −40 %, −10 % comprando 10 o más, y una **canasta gratis** al día (12 ingredientes).
+- **Despensa limitada** (60 lugares; el refrigerador suma 25 por nivel). El botón **Surtir**
+  arma el carrito con lo que falta para un servicio completo.
+- **Pedido urgente:** si algo se agota en pleno servicio, toca su frasco: llegan 2 unidades
+  en 3 segundos al doble de precio (máximo 12 por servicio). Lo quemado, lo que queda
   en el plato de un cliente que se fue y lo que sobra a medio preparar se desperdicia.
 - **Gastos del local** por servicio (60 → 280 según el restaurante).
 - Propinas y combos moderados; el servidor recalcula todo y rechaza servir más platos
@@ -124,6 +127,9 @@ Variables de entorno:
 manifiesto, iconos y service worker. Se instala en la pantalla de inicio y funciona sin
 conexión. Ejecuta el mismo motor de `/shared` en el navegador y guarda el progreso en el
 dispositivo (sin ranking global ni protección anti-trampas del servidor).
+
+**Prueba del nivel máximo** (Cevichería sin mejoras, ritmo de reto diario):
+**https://gllm57.github.io/a-fuego/nivel-maximo/** — se genera con `npm run build:demo`.
 
 **Publicada con GitHub Pages** desde la raíz de `main`: **https://gllm57.github.io/a-fuego/**
 (Settings → Pages → Source: *Deploy from a branch* → `main` / `(root)`).

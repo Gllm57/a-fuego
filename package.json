@@ -12,7 +12,8 @@
     "dev": "node --no-warnings=ExperimentalWarning --watch server/src/server.js",
     "test": "node --no-warnings=ExperimentalWarning --test 'server/test/**/*.test.js'",
     "build:static": "node scripts/build-static.mjs",
-    "build:pages": "node scripts/build-static.mjs --out ."
+    "build:pages": "node scripts/build-static.mjs --out . && node scripts/build-static.mjs --entry demo.js --out nivel-maximo --title \"Nivel máximo · ¡A Fuego!\"",
+    "build:demo": "node scripts/build-static.mjs --entry demo.js --out dist-demo --title \"Nivel máximo · ¡A Fuego!\""
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.1",

@@ -3,7 +3,8 @@
 
 import { RESTAURANT_BY_ID, RESTAURANTS, RECIPE_BY_ID } from './data/catalog.js';
 import { kitchenStats, RUN_DURATION_MS } from './rules.js';
-import { menuFor, dailyChallenge } from './economy.js';
+import { menuFor, dailyChallenge, marketPrices } from './economy.js';
+import { EMERGENCY_PRICE_MULT } from './rules.js';
 
 export class RunStartError extends Error {
   constructor(reason) {
@@ -32,8 +33,12 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
   }
   if (Object.values(stock).every((n) => n === 0)) throw new RunStartError('despensa_vacia');
   const rest = RESTAURANT_BY_ID[restaurantId];
+  // Precios del pedido urgente (el doble del mercado de hoy), fijados al empezar.
+  const prices = marketPrices(day);
+  const emergencyPrices = Object.fromEntries(Object.keys(stock).map((ing) => [ing, prices[ing].price * EMERGENCY_PRICE_MULT]));
   return {
-    version: 2,
+    version: 3,
+    emergencyPrices,
     tier: RESTAURANTS.indexOf(rest),
     upkeep: rest.upkeep,
     stock,

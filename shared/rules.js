@@ -5,7 +5,11 @@ import { PROCESSES, RECIPE_BY_ID, UPGRADE_BY_ID, STATIONS } from './data/catalog
 
 export const RUN_DURATION_MS = 120_000;
 export const BASE_SLOTS = 3;
-export const BASE_STORAGE = 40;
+export const BASE_STORAGE = 60;
+// Pedido urgente durante el servicio: llega en unos segundos y cuesta el doble.
+export const EMERGENCY_MAX_UNITS = 12;
+export const EMERGENCY_PRICE_MULT = 2;
+export const EMERGENCY_DELAY_MS = 3000;
 // Un humano no puede tocar más rápido que esto de forma sostenida.
 export const MIN_TAP_MS = 90;
 // Ventana tras terminar un proceso para recogerlo con calificación "perfecto".
@@ -23,7 +27,7 @@ export function upgradeLevel(upgrades, id) {
 }
 
 export function storageCapacity(upgrades = {}) {
-  return BASE_STORAGE + 20 * upgradeLevel(upgrades, 'refri');
+  return BASE_STORAGE + 25 * upgradeLevel(upgrades, 'refri');
 }
 
 export function kitchenStats(upgrades = {}) {
@@ -77,7 +81,7 @@ export function minPrepMs(stats, recipeId) {
 
 export function patienceMs(stats, recipe, { vip = false, tier = 0 } = {}) {
   const timed = recipe.components.filter((c) => PROCESSES[c.process].kind !== 'raw').length;
-  const base = (18_000 + 5_500 * recipe.components.length + 2_000 * timed) * (1 - 0.04 * tier);
+  const base = (18_000 + 5_500 * recipe.components.length + 2_000 * timed) * (1 - 0.08 * tier);
   return Math.round(base * stats.patienceMult * (vip ? VIP_PATIENCE_MULT : 1));
 }
 

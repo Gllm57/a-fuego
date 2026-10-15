@@ -14,7 +14,7 @@ test('crear invitado devuelve perfil inicial con bono de bienvenida', async () =
   const { token, profile } = await guest(call);
   assert.ok(token);
   assert.equal(profile.state.coins, 200);
-  assert.equal(profile.state.inventory.tortilla, 8);
+  assert.equal(profile.state.inventory.tortilla, 14);
   assert.deepEqual(profile.state.restaurants, ['taqueria']);
   const me = await call('GET', '/api/v1/me', { token });
   assert.equal(me.status, 200);
@@ -148,13 +148,13 @@ test('mercado: comprar, canasta diaria y despensa llena', async () => {
   const { token } = await guest(call);
   const m = await call('GET', '/api/v1/market', { token });
   assert.equal(m.status, 200);
-  assert.equal(m.body.capacity, 40);
-  assert.equal(m.body.used, 20);
+  assert.equal(m.body.capacity, 60);
+  assert.equal(m.body.used, 40);
   const price = m.body.items.find((i) => i.id === 'cebolla').price;
   const buy = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 3 } } });
   assert.equal(buy.status, 200, JSON.stringify(buy.body));
   assert.equal(buy.body.profile.state.coins, 200 - price * 3);
-  assert.equal(buy.body.profile.state.inventory.cebolla, 7);
+  assert.equal(buy.body.profile.state.inventory.cebolla, 12);
   const full = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 30 } } });
   assert.equal(full.body.error.code, 'despensa_llena');
   const notSold = await call('POST', '/api/v1/market/buy', { token, body: { items: { salmon: 1 } } });

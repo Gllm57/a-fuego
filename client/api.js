@@ -5,7 +5,7 @@ import {
   newPlayerState, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
-  BULK_QTY, BULK_DISCOUNT
+  BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from './shared/index.js';
 
 export class ApiError extends Error {
@@ -86,7 +86,7 @@ class HttpApi {
   }
   startRun(restaurantId, mode) { return this.#req('POST', '/runs', { restaurantId, mode }); }
   // Reintenta el envío: el servidor es idempotente para la misma partida.
-  completeRun(runId, serves, waste = {}) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste }); }
+  completeRun(runId, serves, waste = {}, emergency = {}) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste, emergency }); }
   market() { return this.#req('GET', '/market'); }
   marketBuy(items) {
     const key = `mercado:${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
@@ -163,19 +163,17 @@ class LocalApi {
     }
   }
 
-  async completeRun(runId, serves, waste = {}) {
+  async completeRun(runId, serves, waste = {}, emergency = {}) {
     const run = this.runs.get(runId);
     if (!run) throw new ApiError(404, 'no_encontrado', 'Partida no encontrada');
     if (run.response) return run.response;
     let result;
-    try { result = scoreRun(run.config, { serves, waste }); }
+    try { result = scoreRun(run.config, { serves, waste, emergency }); }
     catch (err) {
       if (err instanceof RunValidationError) throw new ApiError(422, 'partida_rechazada', 'La partida no pasó la validación', { reason: err.reason });
       throw err;
     }
-    const consumed = { ...result.used };
-    for (const [ing, n] of Object.entries(result.waste)) consumed[ing] = (consumed[ing] ?? 0) + n;
-    this.data.state = applyInventory(this.data.state, Object.fromEntries(Object.entries(consumed).map(([k, n]) => [k, -n])));
+    this.data.state = applyInventory(this.data.state, inventoryDelta(result));
     const s = this.data.state;
     const levelBefore = levelFromXp(s.xp);
     s.coins += result.coins; s.xp += result.xp;
@@ -192,7 +190,7 @@ class LocalApi {
     this.data.bests[rid] = Math.max(this.data.bests[rid] ?? 0, result.score);
     this.data.history.unshift({
       id: runId, restaurantId: rid, mode: run.config.mode, finishedAt: Date.now(), stars: result.stars,
-      gross: result.gross, upkeep: result.upkeep, net: result.coins, served: result.served, totalOrders: result.totalOrders,
+      gross: result.gross, upkeep: result.upkeep, net: result.coins, emergencyCost: result.emergencyCost, served: result.served, totalOrders: result.totalOrders,
       ingredientCost: result.ingredientCost, vipServed: result.vipServed
     });
     this.data.history = this.data.history.slice(0, 30);

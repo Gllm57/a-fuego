@@ -107,7 +107,7 @@ export const UPGRADES = Object.freeze([
   { id: 'campana',   name: 'Campana extractora', desc: 'Más tiempo antes de que algo se queme', station: null,     costs: [700, 2400] },
   { id: 'ambiente',  name: 'Ambiente y música',  desc: 'Clientes 10% más pacientes y +8% propina por nivel', station: null, costs: [600, 1600, 3500, 8000] },
   { id: 'mesas',     name: 'Mesas extra',        desc: '+1 cliente atendido a la vez',         station: null,     costs: [1500, 5000] },
-  { id: 'refri',     name: 'Refrigerador',       desc: '+20 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] }
+  { id: 'refri',     name: 'Refrigerador',       desc: '+25 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] }
 ]);
 
 export const RECIPE_BY_ID = Object.freeze(Object.fromEntries(RECIPES.map((x) => [x.id, x])));

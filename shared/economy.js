@@ -39,7 +39,7 @@ export function newPlayerState() {
     restaurants: ['taqueria'],
     recipes: recipesOf('taqueria').filter((x) => x.learnCost === 0).map((x) => x.id),
     upgrades: {},
-    inventory: { tortilla: 8, carne_res: 4, cebolla: 4, queso: 4 },
+    inventory: { tortilla: 14, carne_res: 9, cebolla: 9, queso: 8 },
     dailyClaimed: null,
     basketClaimed: null
   };
@@ -160,15 +160,44 @@ export function applyInventory(state, delta, price = 0) {
   return next;
 }
 
+// Plan de compra para surtir la despensa: lo que falta para ~N platos del menú
+// de un restaurante, repartido entre sus recetas y limitado por el espacio libre.
+export function restockPlan(state, restaurantId, dishes = 10) {
+  const menu = menuFor(state, restaurantId);
+  if (!menu.length) return {};
+  const need = {};
+  const per = Math.ceil(dishes / menu.length);
+  for (const id of menu) {
+    for (const c of RECIPE_BY_ID[id].components) need[c.ingredient] = (need[c.ingredient] ?? 0) + per;
+  }
+  let free = Math.max(0, storageCapacity(state.upgrades) - inventoryCount(state.inventory));
+  const plan = {};
+  // Primero lo que más falta, para no quedarse sin nada a mitad del servicio.
+  const missing = Object.entries(need)
+    .map(([ing, n]) => [ing, n - (state.inventory?.[ing] ?? 0)])
+    .filter(([, n]) => n > 0)
+    .sort((a, b) => b[1] - a[1]);
+  while (free > 0 && missing.some(([, n]) => n > 0)) {
+    for (const entry of missing) {
+      if (free <= 0) break;
+      if (entry[1] <= 0) continue;
+      plan[entry[0]] = (plan[entry[0]] ?? 0) + 1;
+      entry[1] -= 1;
+      free -= 1;
+    }
+  }
+  return plan;
+}
+
 // Canasta gratuita una vez al día: evita quedarse sin poder cocinar.
 export function dailyBasket(day, state) {
   const pool = marketIngredients(state).sort((a, b) => hashString(`basket:${day}:${a}`) - hashString(`basket:${day}:${b}`));
   const free = Math.max(0, storageCapacity(state.upgrades) - inventoryCount(state.inventory));
   const items = {};
-  let left = Math.min(8, free);
+  let left = Math.min(12, free);
   for (const ing of pool) {
     if (left <= 0) break;
-    const n = Math.min(2, left);
+    const n = Math.min(3, left);
     items[ing] = n;
     left -= n;
   }
@@ -244,4 +273,14 @@ export function dailyChallenge(day, state) {
 
 export function todayUTC(now = new Date()) {
   return now.toISOString().slice(0, 10);
+}
+
+// Cambio en la despensa tras un servicio: + urgente comprado, − usado y desperdiciado.
+export function inventoryDelta(result) {
+  const delta = {};
+  const add = (ing, n) => { delta[ing] = (delta[ing] ?? 0) + n; };
+  for (const [ing, n] of Object.entries(result.emergency ?? {})) add(ing, n);
+  for (const [ing, n] of Object.entries(result.used ?? {})) add(ing, -n);
+  for (const [ing, n] of Object.entries(result.waste ?? {})) add(ing, -n);
+  return delta;
 }

@@ -123,6 +123,11 @@ export default async function api(app, { service, config }) {
               }
             }
           },
+          emergency: {
+            type: 'object', maxProperties: 40,
+            propertyNames: { pattern: '^[a-z_]{2,20}$' },
+            additionalProperties: { type: 'integer', minimum: 0, maximum: 99 }
+          },
           waste: {
             type: 'object', maxProperties: 40,
             propertyNames: { pattern: '^[a-z_]{2,20}$' },

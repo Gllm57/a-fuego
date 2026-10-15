@@ -6,7 +6,7 @@ import {
   RESTAURANT_BY_ID, RESTAURANTS,
   newPlayerState, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
-  marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT
+  marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
 import { AppError, badRequest, conflict, forbidden, notFound, unauthorized } from './errors.js';
 import { hashPassword, verifyPassword, signToken } from './auth.js';
@@ -213,7 +213,7 @@ export class GameService {
       const res = JSON.parse(r.result_json).result;
       return {
         id: r.id, restaurantId: r.restaurantId, mode: r.mode, finishedAt: r.finishedAt, stars: r.stars,
-        gross: res.gross, upkeep: res.upkeep, net: res.coins, served: res.served, totalOrders: res.totalOrders,
+        gross: res.gross, upkeep: res.upkeep, net: res.coins, emergencyCost: res.emergencyCost ?? 0, served: res.served, totalOrders: res.totalOrders,
         ingredientCost: res.ingredientCost, vipServed: res.vipServed
       };
     });
@@ -274,9 +274,10 @@ export class GameService {
       const before = this.state(playerId);
       const levelBefore = levelFromXp(before.xp);
       // Se descuenta de la despensa lo usado y lo desperdiciado.
-      const consumed = { ...result.used };
-      for (const [ing, n] of Object.entries(result.waste)) consumed[ing] = (consumed[ing] ?? 0) + n;
-      this.#takeInventory(playerId, consumed);
+      // Lo comprado de urgencia y no usado queda en la despensa.
+      const delta = inventoryDelta(result);
+      this.#takeInventory(playerId, Object.fromEntries(Object.entries(delta).filter(([, n]) => n < 0).map(([k, n]) => [k, -n])));
+      this.#addInventory(playerId, Object.fromEntries(Object.entries(delta).filter(([, n]) => n > 0)));
       if (result.coins > 0) this.#credit(playerId, result.coins, 'servicio', runId);
       this.db.run('UPDATE players SET xp = xp + ?, updated_at = ? WHERE id = ?', result.xp, now, playerId);
 

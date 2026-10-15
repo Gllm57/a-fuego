@@ -3,12 +3,13 @@ import assert from 'node:assert/strict';
 import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
-  evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID
+  evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
 const stocked = () => ({ ...newPlayerState(), inventory: { tortilla: 40, carne_res: 40, cebolla: 40, queso: 40 } });
-const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'taqueria', randomSeed: seed });
+const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'taqueria', randomSeed: seed, day: '2026-10-15' });
 
 test('el catálogo tiene 40 recetas, 8 por restaurante', () => {
   assert.equal(RECIPES.length, 40);
@@ -144,7 +145,7 @@ test('mercado: precios del día, ofertas, mayoreo y capacidad', () => {
   const ok = evaluateMarketBuy(s, { tortilla: 5 }, '2026-10-15');
   assert.ok(ok.ok);
   const after = applyInventory(s, ok.delta, ok.price);
-  assert.equal(after.inventory.tortilla, 13);
+  assert.equal(after.inventory.tortilla, 19);
   assert.equal(after.coins, 1000 - ok.price);
   assert.equal(evaluateMarketBuy({ ...s, coins: 0 }, { tortilla: 5 }, '2026-10-15').reason, 'sin_dinero');
 });
@@ -152,8 +153,8 @@ test('mercado: precios del día, ofertas, mayoreo y capacidad', () => {
 test('canasta diaria respeta la capacidad', () => {
   const s = newPlayerState();
   const b = dailyBasket('2026-10-15', s);
-  assert.ok(Object.values(b.items).reduce((a, n) => a + n, 0) <= 8);
-  const full = { ...s, inventory: { tortilla: 40 } };
+  assert.ok(Object.values(b.items).reduce((a, n) => a + n, 0) <= 12);
+  const full = { ...s, inventory: { tortilla: 60 } };
   assert.deepEqual(dailyBasket('2026-10-15', full).items, {});
 });
 
@@ -166,4 +167,28 @@ test('los críticos VIP pagan más y hay eventos de fuego', () => {
     if (normal) assert.ok(vip.patienceMs < normal.patienceMs);
   }
   assert.ok(generateEvents({ seed: 'x', durationMs: 120000 }).length >= 1);
+});
+
+test('pedido urgente: amplía la despensa, cuesta el doble y tiene límite', () => {
+  const st = { ...newPlayerState(), inventory: { tortilla: 1, carne_res: 1, cebolla: 1, queso: 1 } };
+  const c = cfgFor(st);
+  const all = honestServes({ ...c, stock: { tortilla: 4, carne_res: 4, cebolla: 4, queso: 4 } });
+  const emergency = { tortilla: 3, carne_res: 3, cebolla: 3, queso: 3 };
+  const res = scoreRun(c, { serves: all, emergency });
+  const cost = Object.entries(emergency).reduce((a, [ing, n]) => a + c.emergencyPrices[ing] * n, 0);
+  assert.equal(res.emergencyCost, cost);
+  assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - cost));
+  assert.throws(() => scoreRun(c, { serves: [], emergency: { tortilla: 13 } }), (e) => e.reason === 'urgente_excedido');
+  assert.throws(() => scoreRun(c, { serves: [], emergency: { salmon: 1 } }), (e) => e.reason === 'urgente_invalido');
+  const delta = inventoryDelta(res);
+  for (const ing of Object.keys(emergency)) assert.ok(delta[ing] <= emergency[ing]);
+});
+
+test('surtir: el plan cubre el menú sin pasarse de la capacidad', () => {
+  const s = { ...newPlayerState(), inventory: {} };
+  const plan = restockPlan(s, 'taqueria', 10);
+  assert.ok(Object.keys(plan).length >= 4);
+  assert.ok(inventoryCount(plan) <= storageCapacity(s.upgrades));
+  const full = { ...s, inventory: { tortilla: 60 } };
+  assert.deepEqual(restockPlan(full, 'taqueria', 10), {});
 });

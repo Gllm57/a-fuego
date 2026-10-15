@@ -3,7 +3,8 @@
 
 import {
   RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig, plateEarnings,
-  rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS
+  rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS,
+  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS
 } from './shared/index.js';
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, coinSvg, icon } from './art.js';
 import { sfx } from './audio.js';
@@ -31,6 +32,9 @@ export class Kitchen {
     this.rushState = 'before';
     this.stock = { ...(config.stock ?? {}) };
     this.waste = {};
+    this.emergency = {};
+    this.emergencyUnits = 0;
+    this.deliveries = [];
     this.t = 0;
     this.running = false;
     this.paused = false;
@@ -67,10 +71,10 @@ export class Kitchen {
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
           <div class="counter">${STATION_IDS.map((s) => this.#stationShell(s)).join('')}</div>
-          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 70 : this.pantryIds.length <= 10 ? 60 : 52}px">
-            <div class="shelf__head"><span class="shelf__count"></span><span>Toca lo que pide el cliente</span></div>
+          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 76 : this.pantryIds.length <= 10 ? 62 : 54}px">
+            <div class="shelf__head"><span class="shelf__count"></span><span class="shelf__urgent"></span></div>
             <div class="shelf__grid">${this.pantryIds.map((id) => `
-              <button class="jar" data-ing="${id}" aria-label="${INGREDIENTS[id].name}">${ingredientSvg(id, { title: '' })}<span class="jar__qty"></span></button>`).join('')}
+              <button class="jar" data-ing="${id}" aria-label="${INGREDIENTS[id].name}"><span class="jar__glass">${ingredientSvg(id, { title: '' })}</span><span class="jar__qty"></span><span class="jar__eta" hidden></span></button>`).join('')}
             </div>
           </div>
         </div>
@@ -87,7 +91,8 @@ export class Kitchen {
       order: this.host.querySelector('.order'),
       stations: Object.fromEntries(STATION_IDS.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
       pantry: [...this.host.querySelectorAll('.jar')],
-      shelfCount: this.host.querySelector('.shelf__count')
+      shelfCount: this.host.querySelector('.shelf__count'),
+      urgent: this.host.querySelector('.shelf__urgent')
     };
     this.#bind();
     this.#renderCustomers();
@@ -142,7 +147,7 @@ export class Kitchen {
           <div><b>3</b>Toca los fogones para cortar, batir o recoger</div>
           <div><b>4</b>Si hay fuego, tócalo rápido para apagarlo</div>
         </div>
-        <p>Sólo cocinas con lo que compraste en el mercado (${units} ingredientes). Los críticos con boina pagan el doble.</p>
+        <p>Cocinas con lo que compraste en el mercado (${units} ingredientes). Si algo se agota, toca su frasco: pedido urgente al doble de precio. Los críticos con boina pagan el doble.</p>
         <button class="btn btn--gold btn--xl" data-act="go">¡A cocinar!</button>`;
       ov.querySelector('[data-act="go"]').addEventListener('click', () => { ov.remove(); this.#countdown(); });
       this.el.root.appendChild(ov);
@@ -256,6 +261,20 @@ export class Kitchen {
       this.sig.stations[st] = '';
       sfx.burn();
       this.#ribbon(`¡Fuego en ${st === 'sarten' ? 'la sartén' : 'el horno'}!`, 'Tócalo rápido para apagarlo', 'fire');
+    }
+    // Pedidos urgentes que llegan.
+    if (this.deliveries.length) {
+      const arrived = this.deliveries.filter((d) => d.at <= t);
+      if (arrived.length) {
+        this.deliveries = this.deliveries.filter((d) => d.at > t);
+        for (const d of arrived) {
+          this.stock[d.ing] = (this.stock[d.ing] ?? 0) + d.n;
+          const jar = this.el.pantry.find((b) => b.dataset.ing === d.ing);
+          if (jar) floatText(jar, `+${d.n} llegó`, 'good');
+        }
+        sfx.ready();
+        this.#renderStock();
+      }
     }
     // Hora pico.
     if (this.rushState === 'before' && t >= this.rush.from) {
@@ -468,15 +487,21 @@ export class Kitchen {
   #renderPantry() {
     const o = this.selected !== null ? this.orders[this.selected] : null;
     const needed = new Set();
-    if (o) o.recipe.components.forEach((c, i) => { if (!o.filled[i] && !o.busy[i] && (this.stock[c.ingredient] ?? 0) > 0) needed.add(c.ingredient); });
-    const sig = o ? [...needed].join() : '-';
+    const wanted = new Set();
+    if (o) o.recipe.components.forEach((c, i) => {
+      if (o.filled[i] || o.busy[i]) return;
+      if ((this.stock[c.ingredient] ?? 0) > 0) needed.add(c.ingredient); else wanted.add(c.ingredient);
+    });
+    const sig = o ? `${[...needed].join()}|${[...wanted].join()}` : '-';
     if (sig === this.sig.pantry) return;
     this.sig.pantry = sig;
     let first = null;
     for (const b of this.el.pantry) {
       const n = needed.has(b.dataset.ing);
+      const w = wanted.has(b.dataset.ing);
       b.classList.toggle('is-needed', n);
-      b.classList.toggle('is-dim', Boolean(o) && !n);
+      b.classList.toggle('is-want', w);
+      b.classList.toggle('is-dim', Boolean(o) && !n && !w);
       if (n && !first) first = b;
     }
     // En pantallas pequeñas la repisa se desplaza: muestra lo que hace falta.
@@ -486,15 +511,24 @@ export class Kitchen {
   #renderStock() {
     let total = 0;
     for (const b of this.el.pantry) {
-      const n = this.stock[b.dataset.ing] ?? 0;
+      const ing = b.dataset.ing;
+      const n = this.stock[ing] ?? 0;
+      const pending = this.deliveries.filter((d) => d.ing === ing).reduce((a, d) => a + d.n, 0);
       total += n;
-      const q = b.querySelector('.jar__qty');
-      q.textContent = n;
-      q.classList.toggle('is-low', n > 0 && n <= 2);
-      b.classList.toggle('is-out', n <= 0);
-      b.setAttribute('aria-label', `${INGREDIENTS[b.dataset.ing].name}: quedan ${n}`);
+      b.querySelector('.jar__qty').textContent = n;
+      // Anillo de nivel: lleno con 8 o más unidades.
+      b.style.setProperty('--lvl', Math.min(1, n / 8).toFixed(3));
+      b.dataset.level = n <= 0 ? 'out' : n <= 2 ? 'low' : n <= 4 ? 'mid' : 'ok';
+      b.classList.toggle('is-out', n <= 0 && !pending);
+      b.classList.toggle('is-coming', pending > 0);
+      const eta = b.querySelector('.jar__eta');
+      eta.hidden = !pending;
+      eta.textContent = pending ? `+${pending}` : '';
+      b.setAttribute('aria-label', `${INGREDIENTS[ing].name}: quedan ${n}${pending ? `, llegan ${pending}` : ''}${n <= 0 && !pending ? '. Toca para pedido urgente' : ''}`);
     }
-    this.el.shelfCount.textContent = `Despensa · ${total} ingredientes`;
+    const left = EMERGENCY_MAX_UNITS - this.emergencyUnits;
+    this.el.shelfCount.textContent = `Despensa · ${total}`;
+    this.el.urgent.textContent = left > 0 ? `¿Se agotó? Tócalo: urgente ×2 (${left})` : 'Sin pedidos urgentes';
     this.sig.pantry = '';
     this.sig.order = '';
   }
@@ -561,7 +595,7 @@ export class Kitchen {
   // ── Acciones del jugador ────────────────────────────────
   #onIngredient(ingId, btn) {
     if (!this.running || this.paused) return;
-    if ((this.stock[ingId] ?? 0) <= 0) { floatText(btn, 'Agotado', 'bad'); shake(btn); sfx.error(); return; }
+    if ((this.stock[ingId] ?? 0) <= 0) return this.#orderUrgent(ingId, btn);
     const o = this.selected !== null ? this.orders[this.selected] : null;
     if (!o) { floatText(btn, 'Elige un cliente', 'bad'); sfx.error(); return; }
     const idx = o.recipe.components.findIndex((c, i) => c.ingredient === ingId && !o.filled[i] && !o.busy[i]);
@@ -603,6 +637,22 @@ export class Kitchen {
     o.busy[idx] = true;
     sfx.place();
     flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
+  }
+
+  // Pedido urgente: 2 unidades al doble de precio; llegan en 3 segundos.
+  #orderUrgent(ingId, btn) {
+    if (this.deliveries.some((d) => d.ing === ingId)) { floatText(btn, 'Ya viene en camino', ''); return; }
+    const n = Math.min(2, EMERGENCY_MAX_UNITS - this.emergencyUnits);
+    const price = this.config.emergencyPrices?.[ingId];
+    if (n <= 0 || !price) { floatText(btn, 'Agotado', 'bad'); shake(btn); sfx.error(); return; }
+    this.emergency[ingId] = (this.emergency[ingId] ?? 0) + n;
+    this.emergencyUnits += n;
+    this.deliveries.push({ ing: ingId, n, at: this.t + EMERGENCY_DELAY_MS });
+    this.coins -= price * n;
+    this.el.coinNum.textContent = fmt(this.coins);
+    floatText(btn, `Urgente −${price * n}`, 'bad');
+    sfx.place();
+    this.#renderStock();
   }
 
   #take(ingId) {
@@ -712,7 +762,7 @@ export class Kitchen {
     ov.innerHTML = `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
     this.el.root.appendChild(ov);
     sfx.count(true);
-    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, estimate: this.coins }), 1100);
+    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, estimate: this.coins }), 1100);
   }
 }
 

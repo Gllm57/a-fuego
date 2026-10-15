@@ -2,7 +2,7 @@
 
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
-  recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor
+  recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan
 } from './shared/index.js';
 import { createApi, ApiError } from './api.js';
 import { Kitchen } from './game.js';
@@ -221,7 +221,7 @@ function renderHome() {
       </button>
       ${dishes < 4 ? `<button class="card basket" data-act="to-market" style="border:0;cursor:pointer;text-align:left;font:inherit;color:inherit">
         <span class="basket__icon" style="background:var(--warn)">${icon('market')}</span>
-        <span class="basket__body"><b>Tu despensa está casi vacía</b><span>${used}/${cap} ingredientes. Compra en el mercado antes de abrir.</span></span>
+        <span class="basket__body"><b>Tu despensa está casi vacía</b><span>${used}/${cap} ingredientes. Toca para surtir en el mercado.</span></span>
         ${icon('arrow', 'style="width:22px;height:22px;flex-shrink:0"')}
       </button>` : ''}
 
@@ -358,14 +358,22 @@ function drawMarket() {
   const deals = m.items.filter((i) => i.deal);
   const pct = Math.round((m.used / m.capacity) * 100);
   const basketItems = Object.entries(m.basket.items);
+  const dishes = dishesPossible(s, app.restaurantId);
+  const plan = restockPlan(s, app.restaurantId, 16);
+  const planUnits = inventoryCount(plan);
+  const planCost = Object.entries(plan).reduce((t, [id, q]) => t + lineTotal(m.items.find((i) => i.id === id)?.price ?? 0, q), 0);
   screen.innerHTML = `
     <section class="card market-hero">
-      <span class="ring storage-ring ${m.used >= m.capacity ? 'is-full' : ''}" style="--p:${pct}"><span class="ring__inner"><b>${m.used}</b><small>de ${m.capacity}</small></span></span>
+      ${pantryDonut(m, dishes)}
       <div>
         <h2 style="font-size:19px">Tu despensa</h2>
-        <p class="note">Sólo cocinas lo que tienes. Comprando ${m.bulk.qty} o más de algo, ${Math.round(m.bulk.discount * 100)}% de descuento.</p>
-        <p class="note" style="margin-top:4px"><strong>Alcanza para ~${dishesPossible(s, app.restaurantId)} platos</strong> en ${escapeHtml(RESTAURANT_BY_ID[app.restaurantId].name)}.</p>
+        <p class="note"><strong>Alcanza para ~${dishes} platos</strong> en ${escapeHtml(RESTAURANT_BY_ID[app.restaurantId].name)}. Un servicio suele pedir 12–18.</p>
+        <p class="note" style="margin-top:4px">10 o más de algo: −${Math.round(m.bulk.discount * 100)}%.</p>
       </div>
+      ${pantryLegend(m, restIngs)}
+      ${planUnits
+        ? `<button class="btn btn--good btn--wide restock" data-act="restock">${icon('basket')} Surtir para un servicio: ${planUnits} por ~${fmt(planCost)}</button>`
+        : `<p class="note restock" style="text-align:center"><strong>✓ Tu despensa ya alcanza para un servicio completo.</strong></p>`}
     </section>
 
     ${m.basket.claimed || !basketItems.length ? '' : `
@@ -403,6 +411,12 @@ function drawMarket() {
     </div>`;
   drawCart();
 
+  screen.querySelector('[data-act="restock"]')?.addEventListener('click', () => {
+    app.cart = { ...plan };
+    sfx.tap();
+    toast('Carrito listo: revisa y paga abajo', 'good');
+    drawMarket();
+  });
   screen.querySelector('[data-act="basket"]')?.addEventListener('click', async () => {
     try {
       const res = await app.api.claimBasket();
@@ -425,6 +439,31 @@ function drawMarket() {
     row.querySelector('[data-dec]').disabled = !app.cart[id];
     drawCart();
   }));
+}
+
+// Dona de la despensa: cada ingrediente es una porción de su color; lo gris es espacio libre.
+function pantryDonut(m, dishes) {
+  const entries = Object.entries(m.inventory).filter(([, n]) => n > 0).sort((a, b) => b[1] - a[1]);
+  let deg = 0;
+  const stops = entries.map(([ing, n]) => {
+    const from = deg;
+    deg += (n / m.capacity) * 360;
+    return `${INGREDIENTS[ing].color} ${from.toFixed(1)}deg ${(deg - 0.8).toFixed(1)}deg, #3B2416 ${(deg - 0.8).toFixed(1)}deg ${deg.toFixed(1)}deg`;
+  });
+  stops.push(`rgba(59,36,22,.1) ${deg.toFixed(1)}deg 360deg`);
+  const state = dishes === 0 ? 'is-empty' : dishes < 6 ? 'is-low' : '';
+  return `<div class="pantry-donut ${state}" style="--donut:conic-gradient(${stops.join(',')})" role="img" aria-label="Despensa ${m.used} de ${m.capacity}">
+    <span class="pantry-donut__center"><b>${m.used}</b><small>de ${m.capacity}</small><em>${dishes} platos</em></span>
+  </div>`;
+}
+
+function pantryLegend(m, restIngs) {
+  const ids = [...new Set([...restIngs, ...Object.keys(m.inventory)])];
+  ids.sort((a, b) => (m.inventory[b] ?? 0) - (m.inventory[a] ?? 0));
+  return `<div class="legend">${ids.map((id) => {
+    const n = m.inventory[id] ?? 0;
+    return `<span class="${n === 0 ? 'is-zero' : n <= 3 ? 'is-low' : ''}">${ingredientSvg(id)}${n}</span>`;
+  }).join('')}</div>`;
 }
 
 function drawCart() {
@@ -571,6 +610,7 @@ async function renderDiary() {
         <div class="ticket__row"><span>Clientes atendidos</span><b>${e.served}/${e.totalOrders}${e.vipServed ? ` · ${e.vipServed} VIP` : ''}</b></div>
         <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(e.gross)}</b></div>
         <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(e.upkeep)}</b></div>
+        ${e.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(e.emergencyCost)}</b></div>` : ''}
         <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(e.net)}</b></div>
         <div class="ticket__row"><span class="note">Ingredientes usados (pagados en el mercado)</span><b class="note">~${fmt(e.ingredientCost)}</b></div>
       </article>`;
@@ -741,7 +781,7 @@ async function play(restaurantId, mode) {
 
 async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   try {
-    const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste);
+    const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste, outcome.emergency);
     kitchen.destroy();
     app.market = null;
     showResults(host, run, res);
@@ -788,6 +828,7 @@ function showResults(host, run, res) {
         <div class="ticket">
           <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(result.gross)}</b></div>
           <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(result.upkeep)}</b></div>
+          ${result.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(result.emergencyCost)}</b></div>` : ''}
           ${rewards.dailyBonus ? `<div class="ticket__row"><span>Bono reto del día</span><b class="pos">+${fmt(rewards.dailyBonus)}</b></div>` : ''}
           <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(result.coins + rewards.dailyBonus)}</b></div>
           <div class="ticket__row"><span class="note">Ingredientes usados${wasted ? `, ${wasted} desperdiciados` : ''} (ya pagados en el mercado)</span><b class="note">~${fmt(result.ingredientCost)}</b></div>
