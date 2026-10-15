@@ -69,7 +69,7 @@ function intro() {
       </div>
       <div class="ticket">
         <div class="ticket__row"><span>Paciencia media del cliente</span><b class="neg">${avgPatience(orders).toFixed(0)} s <small class="note">(taquería: ${avgPatience(easyOrders).toFixed(0)} s)</small></b></div>
-        <div class="ticket__row"><span>Clientes en 2 minutos</span><b class="neg">${orders.length} <small class="note">(taquería: ${easyOrders.length})</small></b></div>
+        <div class="ticket__row"><span>Clientes en 1:30</span><b class="neg">${orders.length} <small class="note">(taquería: ${easyOrders.length})</small></b></div>
         <div class="ticket__row"><span>Ingredientes por plato</span><b>3 a 5</b></div>
         <div class="ticket__row"><span>Hora pico</span><b>${Math.round(rush.from / 1000)}–${Math.round(rush.to / 1000)} s</b></div>
         <div class="ticket__row"><span>Se quema en</span><b class="neg">${stats.burnSeconds.freir} s</b></div>

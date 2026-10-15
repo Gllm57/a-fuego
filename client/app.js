@@ -132,6 +132,10 @@ function navBtn(t) {
 
 function go(tab) {
   app.tab = tab;
+  if (tab !== 'market') {
+    root.querySelector('.cart-bar')?.remove();
+    document.getElementById('screen')?.classList.remove('has-cart');
+  }
   const navTab = PAGES[tab].back ?? tab;
   root.querySelectorAll('.nav__btn').forEach((b) => b.setAttribute('aria-current', b.dataset.tab === navTab ? 'page' : 'false'));
   renderHeaderBar();
@@ -371,7 +375,6 @@ function drawMarket() {
       <div>
         <h2 style="font-size:19px">Tu despensa</h2>
         <p class="note"><strong>Alcanza para ~${dishes} platos</strong> en ${escapeHtml(RESTAURANT_BY_ID[app.restaurantId].name)}. Un servicio suele pedir 12–18.</p>
-        <p class="note" style="margin-top:4px">10 o más de algo: −${Math.round(m.bulk.discount * 100)}%.</p>
       </div>
       ${pantryLegend(m, restIngs)}
       ${planUnits
@@ -471,6 +474,7 @@ function pantryLegend(m, restIngs) {
 
 function drawCart() {
   root.querySelector('.cart-bar')?.remove();
+  document.getElementById('screen')?.classList.remove('has-cart');
   const entries = Object.entries(app.cart);
   if (!entries.length || app.tab !== 'market') return;
   const prices = Object.fromEntries(app.market.items.map((i) => [i.id, i.price]));
@@ -482,6 +486,7 @@ function drawCart() {
     <span class="cart-bar__info">${units} ingredientes<small>Despensa quedará en ${app.market.used + units}/${app.market.capacity}</small></span>
     <button class="btn btn--sm btn--gold" data-act="checkout" ${st().coins < total ? 'disabled' : ''}>${coinSvg()} Pagar ${fmt(total)}</button>`;
   root.appendChild(bar);
+  document.getElementById('screen')?.classList.add('has-cart');
   bar.querySelector('[data-act="checkout"]').addEventListener('click', async () => {
     if (app.busy) return;
     app.busy = true;

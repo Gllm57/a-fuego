@@ -468,7 +468,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .bubble__name { font-size: 11px; font-weight: 800; text-align: center; line-height: 1.1; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .avatar { --p: 100; --fill: var(--good); position: relative; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--fill) calc(var(--p) * 1%), rgba(42,23,13,.12) 0); transition: transform .25s var(--ease-spring); }
 .avatar__face { width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #FFF8EE, var(--brand-soft)); display: grid; place-items: center; overflow: hidden; }
-.avatar__face svg { width: 60px; height: 60px; margin-top: 4px; }
+.avatar__face svg { width: 100%; height: 100%; margin: 0; }
 .customer.is-worried .avatar { --fill: var(--warn); }
 .customer.is-angry .avatar { --fill: var(--bad); }
 .customer.is-angry .avatar__face svg { animation: shake-soft .6s ease-in-out infinite; }
@@ -695,7 +695,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .levelup svg { width: 26px; height: 26px; flex-shrink: 0; }
 .review { width: 100%; background: var(--paper); color: var(--ink); border-radius: 999px 34px 34px 999px; padding: 10px 18px 10px 10px; display: flex; gap: 12px; align-items: center; }
 .review__face { width: 60px; height: 60px; border-radius: 50%; background: var(--brand-soft); display: grid; place-items: center; overflow: hidden; flex-shrink: 0; }
-.review__face svg { width: 58px; height: 58px; margin-top: 8px; }
+.review__face svg { width: 100%; height: 100%; margin: 0; }
 .review small { font-size: 11px; font-weight: 800; color: var(--ink-2); }
 .review p { margin: 2px 0 0; font-weight: 700; line-height: 1.35; font-size: 14px; }
 .results__actions { width: 100%; display: flex; flex-direction: column; gap: 12px; margin-top: auto; }
@@ -744,6 +744,53 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 @keyframes star-in { 0% { opacity: 0; transform: scale(0) rotate(-90deg); } 100% { opacity: 1; transform: scale(1) rotate(0); } }
 @keyframes confetti { to { transform: translateY(110vh) rotate(720deg); } }
 @keyframes ribbon { 0% { opacity: 0; transform: translate(-50%, -50%) rotate(-4deg) scale(.4); } 15% { opacity: 1; transform: translate(-50%, -50%) rotate(-4deg) scale(1.05); } 80% { opacity: 1; transform: translate(-50%, -50%) rotate(-4deg) scale(1); } 100% { opacity: 0; transform: translate(-50%, -80%) rotate(-4deg) scale(.95); } }
+
+
+/* Carrito abierto: deja espacio para tocar el último puesto */
+.screen.has-cart { padding-bottom: 200px; }
+
+/* Volteo en la sartén */
+.station.is-flip { --fill: var(--gold); }
+.station.is-flip .station__ring { animation: ready-bounce .5s var(--ease-spring) infinite; box-shadow: 0 0 0 4px color-mix(in srgb, var(--gold) 45%, transparent); }
+.station.is-flip .station__status { color: var(--gold-deep); animation: pulse .35s ease-in-out infinite alternate; }
+.station.is-flip .station__item { animation: wiggle .4s ease-in-out infinite; }
+.station.is-flipping .station__item { animation: flip-it .5s cubic-bezier(.3,.7,.4,1); }
+.station__item.is-flipped { filter: brightness(.82) saturate(1.15); }
+
+/* Herramientas animadas: cuchillo sobre la tabla, varillas sobre el bol */
+.station__tool { position: absolute; z-index: 4; width: 30px; height: 30px; right: -6px; top: -8px; pointer-events: none; transform-origin: 20% 90%; }
+.station__tool svg { width: 100%; height: 100%; }
+.station[data-type="tabla"].is-chop .station__tool { animation: knife .18s ease-in; }
+.station[data-type="bol"] .station__tool { right: 50%; margin-right: -15px; top: -14px; transform-origin: 50% 0; }
+.station[data-type="bol"].is-chop .station__tool { animation: whisk .25s ease-in-out; }
+.station[data-type="bol"].is-chop .station__item { animation: swirl .25s ease-in-out; }
+
+/* Cocción en marcha: la sartén se mueve, la olla burbujea, el horno irradia */
+.station[data-type="sarten"]:not([aria-label$="libre"]) .station__disc > svg.base { animation: pan-jiggle 1.6s ease-in-out infinite; }
+.fx-bubbles { position: absolute; inset: 18% 22%; pointer-events: none; z-index: 3; }
+.fx-bubbles i { position: absolute; bottom: 10%; width: 6px; height: 6px; border-radius: 50%; border: 1.5px solid rgba(255,255,255,.9); animation: bubble 1.2s ease-in infinite; opacity: 0; }
+.fx-bubbles i:nth-child(1) { left: 10%; } .fx-bubbles i:nth-child(2) { left: 35%; animation-delay: .25s; } .fx-bubbles i:nth-child(3) { left: 60%; animation-delay: .5s; width: 8px; height: 8px; } .fx-bubbles i:nth-child(4) { left: 80%; animation-delay: .75s; } .fx-bubbles i:nth-child(5) { left: 45%; animation-delay: 1s; width: 4px; height: 4px; }
+.fx-heat { position: absolute; left: 50%; top: -6px; width: 40px; margin-left: -20px; height: 20px; pointer-events: none; z-index: 3; display: flex; justify-content: space-around; }
+.fx-heat i { width: 4px; height: 16px; border-radius: 999px; background: linear-gradient(transparent, rgba(255,138,61,.7)); animation: heat 1s ease-in-out infinite; }
+.fx-heat i:nth-child(2) { animation-delay: .3s; } .fx-heat i:nth-child(3) { animation-delay: .6s; }
+.station[data-type="horno"]:not([aria-label$="libre"]) .station__disc { animation: oven-glow 1.4s ease-in-out infinite alternate; }
+
+/* Partículas: trocitos, gotas y agua de lavado */
+.burst { position: fixed; z-index: 62; width: 0; height: 0; pointer-events: none; }
+.burst i { position: absolute; left: -3px; top: -3px; width: 7px; height: 7px; border-radius: 2px; animation: burst .6s cubic-bezier(.2,.8,.3,1) forwards; }
+.burst--drops i { border-radius: 50%; width: 6px; height: 6px; }
+.burst--water i { border-radius: 50% 50% 50% 0; width: 8px; height: 8px; background: #7FC4F0; box-shadow: inset -1px -1px 0 #4A9BD3; }
+
+@keyframes wiggle { 0%, 100% { transform: rotate(-8deg); } 50% { transform: rotate(8deg); } }
+@keyframes flip-it { 0% { transform: translateY(0) rotateX(0); } 50% { transform: translateY(-22px) rotateX(180deg) scale(1.15); } 100% { transform: translateY(0) rotateX(360deg); } }
+@keyframes knife { 0% { transform: rotate(-25deg) translateY(-6px); } 60% { transform: rotate(10deg) translateY(4px); } 100% { transform: rotate(0); } }
+@keyframes whisk { 0% { transform: rotate(-20deg); } 50% { transform: rotate(20deg); } 100% { transform: rotate(0); } }
+@keyframes swirl { 0% { transform: rotate(0); } 100% { transform: rotate(360deg) scale(.95); } }
+@keyframes pan-jiggle { 0%, 100% { transform: rotate(0) translateX(0); } 25% { transform: rotate(-3deg) translateX(-1px); } 75% { transform: rotate(3deg) translateX(1px); } }
+@keyframes bubble { 0% { transform: translateY(0) scale(.6); opacity: 0; } 30% { opacity: 1; } 100% { transform: translateY(-26px) scale(1.1); opacity: 0; } }
+@keyframes heat { 0%, 100% { transform: translateY(0) scaleY(.7); opacity: .3; } 50% { transform: translateY(-6px) scaleY(1.1); opacity: .9; } }
+@keyframes oven-glow { from { box-shadow: inset 0 -4px 0 rgba(0,0,0,.06), 0 0 0 0 rgba(255,138,61,0); } to { box-shadow: inset 0 -4px 0 rgba(0,0,0,.06), 0 0 14px 2px rgba(255,138,61,.55); } }
+@keyframes burst { 0% { transform: translate(0, 0) scale(1); opacity: 1; } 100% { transform: translate(var(--dx), var(--dy)) scale(.4) rotate(160deg); opacity: 0; } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

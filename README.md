@@ -5,12 +5,14 @@ usa las propinas para construir tu cadena de restaurantes.
 
 ## El juego
 
-- **Servicio de 2 minutos** en un local ilustrado: clientes frente a la barra con su
+- **Servicio de minuto y medio** en un local ilustrado: clientes frente a la barra con su
   pedido en un globo y un anillo de paciencia, la comanda de papel, fogones redondos y
   una repisa de frascos con la despensa.
 - Toca un cliente → toca los frascos resaltados → toca los fogones: **cortar** y **batir**
   con toques; **freír**, **hornear** y **hervir** se cocinan solos y hay que recogerlos a
-  tiempo (la sartén y el horno queman). Recoger justo a tiempo da **¡Perfecto!**.
+  tiempo (la sartén y el horno queman). La carne, el pollo y el pescado hay que **voltearlos**
+  a mitad de cocción. Recoger justo a tiempo da **¡Perfecto!**. Cada fogón tiene su animación:
+  el cuchillo corta, las varillas baten, la sartén se mueve, la olla burbujea y el horno irradia calor.
 - **Eventos dentro del servicio:** ¡fuego en la sartén o el horno! (tócalo rápido para
   apagarlo; lo que había se pierde), **hora pico** (llegan clientes sin parar) y
   **críticos gastronómicos** con boina: pagan el doble y tienen poca paciencia.

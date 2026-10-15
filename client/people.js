@@ -82,7 +82,7 @@ export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vi
   const skinDark = shade(L.skin, -28);
   const hair = vip ? '#2A170D' : L.hair;
   const style = vip ? 'wavy' : L.style;
-  return `<svg class="${cls}" viewBox="0 0 64 64" aria-hidden="true">
+  return `<svg class="${cls}" viewBox="6 3 52 52" aria-hidden="true">
     ${HAIR_BACK[style]?.(hair) ?? ''}
     <path d="M8 64c0-11 10-18 24-18s24 7 24 18z" fill="${vip ? '#2A170D' : L.shirt}" ${K}/>
     <path d="M14 58c4-5 10-8 18-8" stroke="#fff" stroke-width="2" fill="none" opacity=".25" stroke-linecap="round"/>

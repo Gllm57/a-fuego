@@ -43,8 +43,8 @@ const STROKE = 'fill="none" stroke="currentColor" stroke-width="2.2" stroke-line
 
 export const PROCESS_ICONS = {
   crudo: `<path d="M12 3v10M8 9l4 4 4-4"/><path d="M3 17c2 3 5 4 9 4s7-1 9-4z"/>`,
-  cortar: `<path d="M4 20L15 9l3 3L7 23z"/><path d="M15 9l4-6 2 2-3 7"/>`,
-  batir: `<path d="M12 3v7"/><path d="M12 10c-4 0-6 4-6 7a6 6 0 0 0 12 0c0-3-2-7-6-7z"/><path d="M9 14c1 2 1 4 0 6M15 14c-1 2-1 4 0 6"/>`,
+  cortar: `<path d="M3 20.5L14.5 9c2-2 5-3 7-2-1 3-3 6-5 8L5 21.5c-.8.6-2.4.1-2-1z"/><path d="M14.5 9l2.5 2.5"/><path d="M7.5 17.5l1 1"/>`,
+  batir: `<path d="M12 2.5v6"/><path d="M12 8.5c-3.5 0-5.5 4.5-5.5 8a5.5 5.5 0 0 0 11 0c0-3.5-2-8-5.5-8z"/><path d="M12 8.5c-1.6 0-2.6 4.5-2.6 8s1.2 5 2.6 5 2.6-1.5 2.6-5-1-8-2.6-8z"/><path d="M6.6 16.5h10.8"/>`,
   freir: `<circle cx="10" cy="13" r="7"/><path d="M17 13h6"/><path d="M8 4c0 1.5 1 2 1 3.5M12 3c0 1.5 1 2 1 3.5"/>`,
   hornear: `<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="10" width="12" height="7" rx="1"/><path d="M7 7h1M11 7h1"/>`,
   hervir: `<path d="M4 10h16v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M2 10h20"/><path d="M9 3c0 2 1 3 1 5M14 3c0 2 1 3 1 5"/>`
@@ -57,7 +57,7 @@ export function processSvg(proc, cls = 'proc') {
 export const ICONS = {
   home: `<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>`,
   book: `<path d="M4 4h11a4 4 0 0 1 4 4v13H8a4 4 0 0 1-4-4z"/><path d="M8 9h7M8 13h5"/>`,
-  tools: `<path d="M14 6a4 4 0 0 0 5 5l-9 9a2 2 0 0 1-3-3z"/><path d="M5 3l3 3-2 2-3-3"/>`,
+  tools: `<path d="M7 15.5c-2.8-.3-4.5-2.5-4-5 .5-2.4 3-3.8 5.2-3.1C9 5 10.4 4 12 4s3 1 3.8 3.4c2.2-.7 4.7.7 5.2 3.1.5 2.5-1.2 4.7-4 5V20H7z"/><path d="M7 17.5h10"/><path d="M12 8.5v3M10.5 10h3"/>`,
   trophy: `<path d="M7 4h10v5a5 5 0 0 1-10 0z"/><path d="M7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4M12 14v4M8 21h8M9 18h6"/>`,
   pause: `<path d="M8 5v14M16 5v14"/>`,
   play: `<path d="M7 4.5v15l12-7.5z"/>`,
@@ -95,9 +95,14 @@ export function icon(name, extra = '') {
 }
 
 export const UPGRADE_ICONS = {
-  cuchillos: PROCESS_ICONS.cortar, batidora: PROCESS_ICONS.batir, sarten: PROCESS_ICONS.freir,
+  // Par de cuchillos cruzados
+  cuchillos: `<path d="M4 20.5L13 8.5c1.5-2 4-3.5 6-3-.5 2.6-2.3 5-4.3 6.5L5.5 21.5c-.7.5-2-.2-1.5-1z"/><path d="M20 20.5L11 8.5C9.5 6.5 7 5 5 5.5c.5 2.6 2.3 5 4.3 6.5l9.2 9.5c.7.5 2-.2 1.5-1z"/>`,
+  // Batidora de mano eléctrica con sus dos varillas
+  batidora: `<path d="M5 9.5c0-2.5 2-4.5 4.5-4.5H18a2 2 0 0 1 0 4h-3.5l-2 3H8a3 3 0 0 1-3-2.5z"/><path d="M9.5 12v3.5M12.5 12v3.5"/><path d="M8 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5M11 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5"/><path d="M15.5 7h1"/>`,
+  // Tabla de picar con asa y cuchillo
+  extra_tabla: `<rect x="3" y="7" width="15" height="13" rx="3"/><circle cx="14.5" cy="10.5" r="1.3"/><path d="M18 7.5l3-3"/><path d="M14 16l7-7"/><path d="M6 17h5"/>`, sarten: PROCESS_ICONS.freir,
   horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table,
-  extra_tabla: PROCESS_ICONS.cortar, extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
+  extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
   extra_olla: PROCESS_ICONS.hervir, extra_horno: PROCESS_ICONS.hornear,
   refri: `<rect x="5" y="2" width="14" height="20" rx="4"/><path d="M5 10h14M9 5v2M9 13v3"/>`
 };
@@ -112,6 +117,12 @@ export function starSvg(cls = 'star') {
 
 // Clientes: ver people.js
 export { customerSvg } from './people.js';
+
+// Herramientas animadas que aparecen al trabajar en una estación.
+export const TOOL_ART = {
+  tabla: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M6 30L24 12c3-3 8-5 11-4-1 4-4 9-7 12L10 34c-1.5 1-4.5-.5-4-4z" fill="#E8EEF3" stroke="#3B2416" stroke-width="1.6" stroke-linejoin="round"/><path d="M24 12l4 4" stroke="#3B2416" stroke-width="1.6"/><path d="M10 34l-5 5" stroke="#5C3317" stroke-width="5" stroke-linecap="round"/><path d="M12 22l6-6" stroke="#fff" stroke-width="1.6" stroke-linecap="round" opacity=".8"/></svg>`,
+  bol: `<svg viewBox="0 0 40 40" aria-hidden="true"><path d="M20 2v13" stroke="#8C6A4A" stroke-width="4" stroke-linecap="round"/><path d="M20 15c-6 0-9 8-9 13a9 9 0 0 0 18 0c0-5-3-13-9-13z" fill="none" stroke="#9AA6B2" stroke-width="2"/><path d="M20 15c-3 0-4 8-4 13s2 8 4 8 4-3 4-8-1-13-4-13z" fill="none" stroke="#9AA6B2" stroke-width="2"/><path d="M11.5 27h17" stroke="#9AA6B2" stroke-width="2"/></svg>`
+};
 
 // Estaciones vistas desde arriba: van dentro de un fogón redondo.
 export const STATION_ART = {

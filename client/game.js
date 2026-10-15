@@ -6,7 +6,7 @@ import {
   rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS,
   EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS
 } from './shared/index.js';
-import { ingredientSvg, processSvg, customerSvg, STATION_ART, coinSvg, icon } from './art.js';
+import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon } from './art.js';
 import { sfx } from './audio.js';
 import { floatText, flyIcon, escapeHtml, fmt } from './ui.js';
 
@@ -60,7 +60,7 @@ export class Kitchen {
             <div class="hud">
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
               <div class="timer">
-                <span class="ring timer__ring"><span class="ring__inner timer__clock">2:00</span></span>
+                <span class="ring timer__ring"><span class="ring__inner timer__clock">${clockText(this.config.durationMs)}</span></span>
                 <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span><span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span></span>
               </div>
               <span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
@@ -72,8 +72,8 @@ export class Kitchen {
             <div class="customers" style="--slots:${this.stats.slots}"></div>
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
-          <div class="counter ${this.stationKeys.length > 6 ? 'is-compact' : ''}">${STATION_IDS.map((type) => this.#stationGroup(type)).join('')}</div>
-          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 76 : this.pantryIds.length <= 10 ? 62 : 54}px">
+          <div class="counter ${this.stationKeys.length > 5 ? 'is-compact' : ''}">${STATION_IDS.map((type) => this.#stationGroup(type)).join('')}</div>
+          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 84 : this.pantryIds.length <= 10 ? 64 : 54}px">
             <div class="shelf__head"><span class="shelf__count"></span><span class="shelf__urgent"></span></div>
             <div class="shelf__grid">${this.pantryIds.map((id) => `
               <button class="jar" data-ing="${id}" aria-label="${INGREDIENTS[id].name}"><span class="jar__glass">${ingredientSvg(id, { title: '' })}</span><span class="jar__qty"></span><span class="jar__eta" hidden></span></button>`).join('')}
@@ -169,7 +169,7 @@ export class Kitchen {
       },
       {
         title: 'Cocina en los fogones',
-        text: 'Cortar y batir: toca el fogón varias veces. Freír, hornear y hervir: se cocina solo; recógelo al verlo verde para un ¡Perfecto! Si tarda, se quema.',
+        text: 'Cortar y batir: toca el fogón varias veces. Freír, hornear y hervir se cocinan solos. La carne y el pollo hay que voltearlos a la mitad. Recoge al ver el anillo verde para un ¡Perfecto!',
         art: `<div class="tuto-art tuto-art--stations">
           <span class="station is-working" style="--p:.5"><span class="station__ring"><span class="station__disc">${STATION_ART.tabla}<span class="station__slot">${ingredientSvg(ing, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Corta!</span></span>
           <span class="station is-ready" style="--p:1"><span class="station__ring"><span class="station__disc">${STATION_ART[PROCESSES[timed.process].station ?? 'sarten']}<span class="station__slot">${ingredientSvg(timed.ingredient, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Listo!</span></span>
@@ -214,7 +214,7 @@ export class Kitchen {
     this.el.root.appendChild(ov);
   }
 
-  // Parte del día: qué trae este servicio, con una línea de tiempo de los 2 minutos.
+  // Parte del día: qué trae este servicio, con una línea de tiempo del servicio.
   #briefing() {
     const ov = document.createElement('div');
     ov.className = 'overlay overlay--brief';
@@ -237,7 +237,7 @@ export class Kitchen {
           <span class="timeline__rush" style="left:${pct(this.rush.from)};width:${pct(this.rush.to - this.rush.from)}"></span>
           ${this.events.map((e) => `<span class="timeline__mark timeline__mark--fire" style="left:${pct(e.at)}" title="Fuego">${icon('fire')}</span>`).join('')}
           ${vips.map((o) => `<span class="timeline__mark timeline__mark--vip" style="left:${pct(o.arriveAt)}" title="Crítico">${icon('crown')}</span>`).join('')}
-          <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">2:00</span>
+          <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">${clockText(dur)}</span>
         </div>
         <div class="brief__legend"><span><i class="lg-rush"></i>Hora pico</span><span><i class="lg-fire"></i>Fuego</span><span><i class="lg-vip"></i>Crítico</span></div>
         <p>${extras > 0 ? `Tienes ${extras} ${extras > 1 ? 'fogones extra' : 'fogón extra'} para cocinar en paralelo. ` : ''}Gastos del local: ${fmt(this.config.upkeep ?? 0)}.</p>
@@ -388,6 +388,12 @@ export class Kitchen {
       if (!item || item.kind !== 'timer') continue;
       const state = this.#timerState(item);
       if (state !== item.lastState) {
+        if (state === 'flip') { sfx.tap(); floatText(this.el.stations[st], '¡Voltéalo!', ''); }
+        if (state === 'ready' && item.flip && !item.flip.done) {
+          // Sin voltear: se pega de un lado y se quema el doble de rápido.
+          item.burnAt = item.readyAt + (item.burnAt - item.readyAt) / 2;
+          floatText(this.el.stations[st], 'Se pegó de un lado', 'bad');
+        }
         if (state === 'ready') sfx.ready();
         if (state === 'burnt') {
           sfx.burn();
@@ -424,6 +430,7 @@ export class Kitchen {
   }
 
   #timerState(item) {
+    if (item.flip && !item.flip.done && this.t >= item.flip.at && this.t < item.readyAt) return 'flip';
     if (this.t < item.readyAt) return 'cooking';
     if (item.burnAt === Infinity || this.t < item.burnAt) {
       if (item.burnAt !== Infinity && this.t > item.readyAt + (item.burnAt - item.readyAt) * 0.55) return 'burning';
@@ -436,7 +443,7 @@ export class Kitchen {
   #paint() {
     const left = Math.max(0, this.config.durationMs - this.t);
     const secs = Math.ceil(left / 1000);
-    const clock = `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+    const clock = clockText(left);
     if (this.el.clock.textContent !== clock) this.el.clock.textContent = clock;
     this.el.ring.style.setProperty('--p', ((left / this.config.durationMs) * 100).toFixed(1));
     this.el.timer.classList.toggle('is-low', secs <= 15);
@@ -464,7 +471,7 @@ export class Kitchen {
       } else if (item?.kind === 'timer') {
         const state = this.#timerState(item);
         let p;
-        if (state === 'cooking') p = (this.t - item.startedAt) / (item.readyAt - item.startedAt);
+        if (state === 'cooking' || state === 'flip') p = (this.t - item.startedAt) / (item.readyAt - item.startedAt);
         else if (state === 'burnt' || item.burnAt === Infinity) p = 1;
         else p = 1 - (this.t - item.readyAt) / (item.burnAt - item.readyAt);
         el.style.setProperty('--p', Math.min(1, Math.max(0, p)).toFixed(3));
@@ -653,7 +660,8 @@ export class Kitchen {
     const sig = fire ? `fire|${fire.taps}` : item ? `${item.id}|${state}|${item.taps ?? ''}` : 'idle';
     if (this.sig.stations[st] === sig) return;
     this.sig.stations[st] = sig;
-    el.classList.remove('is-working', 'is-ready', 'is-burning', 'is-burnt', 'is-fire');
+    el.classList.remove('is-working', 'is-ready', 'is-burning', 'is-burnt', 'is-fire', 'is-flip');
+    el.dataset.type = this.#type(st);
     const slot = el.querySelector('.station__slot');
     const status = el.querySelector('.station__status');
     if (fire) {
@@ -676,20 +684,25 @@ export class Kitchen {
       slot.dataset.item = item.id;
       slot.innerHTML = ingredientSvg(item.ingredient, { className: 'station__item', title: '' });
     }
-    slot.querySelectorAll('.fx-steam,.fx-sizzle,.fx-smoke,.station__taps').forEach((n) => n.remove());
+    slot.querySelectorAll('.fx-steam,.fx-sizzle,.fx-smoke,.fx-bubbles,.fx-heat,.station__taps').forEach((n) => n.remove());
     let label;
     if (item.kind === 'tap') {
       el.classList.add('is-working');
+      if (!slot.querySelector('.station__tool')) slot.insertAdjacentHTML('beforeend', `<span class="station__tool">${TOOL_ART[this.#type(st)] ?? ''}</span>`);
       status.textContent = this.#type(st) === 'tabla' ? '¡Corta!' : '¡Bate!';
       slot.insertAdjacentHTML('beforeend', `<span class="station__taps">${Array.from({ length: item.need }, (_, i) => `<i class="${i < item.taps ? 'is-on' : ''}"></i>`).join('')}</span>`);
       label = `${STATIONS[this.#type(st)].name}: toca ${item.need - item.taps} veces más`;
     } else {
-      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : this.#type(st) === 'sarten' ? 'sizzle' : 'steam';
-      slot.insertAdjacentHTML('beforeend', `<span class="fx-${fx}">${'<i></i>'.repeat(fx === 'sizzle' ? 4 : 3)}</span>`);
+      const type = this.#type(st);
+      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : type === 'sarten' ? 'sizzle' : type === 'olla' ? 'bubbles' : type === 'horno' ? 'heat' : 'steam';
+      slot.insertAdjacentHTML('beforeend', `<span class="fx-${fx}">${'<i></i>'.repeat(fx === 'sizzle' || fx === 'bubbles' ? 5 : 3)}</span>`);
       if (this.#type(st) === 'horno') el.style.setProperty('--glow', state === 'cooking' ? '.6' : '.3');
-      const text = { cooking: PROCESSES[item.process].verb + '…', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Tirar' }[state];
+      const text = { cooking: PROCESSES[item.process].verb + '…', flip: '¡Voltea!', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Tirar' }[state];
       status.textContent = text;
-      if (state !== 'cooking') el.classList.add(`is-${state}`);
+      el.classList.remove('is-flip');
+      if (state === 'flip') el.classList.add('is-flip');
+      else if (state !== 'cooking') el.classList.add(`is-${state}`);
+      if (item.flip?.done) slot.querySelector('.station__item')?.classList.add('is-flipped');
       label = `${STATIONS[this.#type(st)].name}: ${text}`;
     }
     el.setAttribute('aria-label', label);
@@ -711,6 +724,7 @@ export class Kitchen {
     }
     const comp = o.recipe.components[idx];
     const proc = PROCESSES[comp.process];
+    if (WASH_INGREDIENTS.has(ingId)) burst(btn, 'water');
     if (proc.kind === 'raw') {
       this.#take(ingId);
       o.filled[idx] = true;
@@ -736,7 +750,9 @@ export class Kitchen {
     } else {
       const readyAt = this.t + this.stats.seconds[comp.process] * 1000;
       const burnSec = this.stats.burnSeconds[comp.process];
-      this.stations[st] = { ...base, kind: 'timer', readyAt, burnAt: burnSec ? readyAt + burnSec * 1000 : Infinity, lastState: 'cooking' };
+      const flip = comp.process === 'freir' && FLIP_INGREDIENTS.has(ingId)
+        ? { at: this.t + (readyAt - this.t) * 0.45, done: false, good: false } : null;
+      this.stations[st] = { ...base, kind: 'timer', readyAt, burnAt: burnSec ? readyAt + burnSec * 1000 : Infinity, lastState: 'cooking', flip };
       if (proc.station === 'sarten') sfx.sizzle();
     }
     o.busy[idx] = true;
@@ -788,6 +804,7 @@ export class Kitchen {
       item.taps += 1;
       this.#type(st) === 'tabla' ? sfx.chop() : sfx.whisk();
       el.classList.remove('is-chop'); void el.offsetWidth; el.classList.add('is-chop');
+      burst(el, this.#type(st) === 'tabla' ? 'bits' : 'drops', INGREDIENTS[item.ingredient].color);
       if (item.taps >= item.need) {
         const perfect = this.t - item.startedAt <= item.need * TAP_PERFECT_MS_PER_TAP;
         this.#deliver(st, item, perfect);
@@ -795,7 +812,16 @@ export class Kitchen {
       return;
     }
     const state = this.#timerState(item);
-    if (state === 'cooking') { floatText(el, 'Aún no', ''); return; }
+    if (state === 'flip') {
+      item.flip.done = true;
+      item.flip.good = this.t - item.flip.at <= 1500;
+      sfx.sizzle();
+      el.classList.remove('is-flipping'); void el.offsetWidth; el.classList.add('is-flipping');
+      floatText(el, item.flip.good ? '¡Buen volteo!' : 'Volteado', item.flip.good ? 'good' : '');
+      this.sig.stations[st] = '';
+      return;
+    }
+    if (state === 'cooking') { floatText(el, item.flip && !item.flip.done ? 'Espera para voltear' : 'Aún no', ''); return; }
     if (state === 'burnt') {
       this.stations[st] = null;
       this.#addWaste(item.ingredient);
@@ -803,7 +829,8 @@ export class Kitchen {
       sfx.tap();
       return;
     }
-    this.#deliver(st, item, this.t - item.readyAt <= PERFECT_WINDOW_MS);
+    const flippedOk = !item.flip || item.flip.good;
+    this.#deliver(st, item, flippedOk && this.t - item.readyAt <= PERFECT_WINDOW_MS);
   }
 
   #deliver(st, item, perfect) {
@@ -869,6 +896,37 @@ export class Kitchen {
     sfx.count(true);
     setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, estimate: this.coins }), 1100);
   }
+}
+
+function clockText(ms) {
+  const secs = Math.ceil(ms / 1000);
+  return `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`;
+}
+
+// Ingredientes que hay que voltear en la sartén a mitad de cocción.
+const FLIP_INGREDIENTS = new Set(['carne_res', 'pollo', 'cerdo', 'pescado', 'salmon', 'atun', 'camaron', 'huevo', 'tortilla']);
+// Verduras y frutas que se lavan antes de usarse (salpicadura de agua).
+const WASH_INGREDIENTS = new Set(['lechuga', 'tomate', 'cilantro', 'albahaca', 'fresa', 'pepino', 'limon', 'aguacate', 'chile', 'aji', 'papa', 'camote', 'cebolla', 'champinon', 'pina']);
+
+// Partículas breves: trocitos al cortar, gotas al batir, agua al lavar.
+function burst(el, kind, color = '#7FC4F0') {
+  const r = el.getBoundingClientRect();
+  const box = document.createElement('div');
+  box.className = `burst burst--${kind}`;
+  box.style.left = `${r.left + r.width / 2}px`;
+  box.style.top = `${r.top + r.height * 0.4}px`;
+  const n = kind === 'water' ? 7 : 5;
+  for (let i = 0; i < n; i++) {
+    const p = document.createElement('i');
+    const ang = (Math.PI * 2 * i) / n + Math.random() * 0.6;
+    const dist = 18 + Math.random() * 16;
+    p.style.setProperty('--dx', `${Math.cos(ang) * dist}px`);
+    p.style.setProperty('--dy', `${Math.sin(ang) * dist - 10}px`);
+    if (kind !== 'water') p.style.background = color;
+    box.appendChild(p);
+  }
+  document.body.appendChild(box);
+  setTimeout(() => box.remove(), 650);
 }
 
 function shake(el) {

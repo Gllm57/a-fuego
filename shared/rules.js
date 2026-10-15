@@ -3,7 +3,7 @@
 
 import { PROCESSES, RECIPE_BY_ID, UPGRADE_BY_ID, STATIONS } from './data/catalog.js';
 
-export const RUN_DURATION_MS = 120_000;
+export const RUN_DURATION_MS = 90_000;
 export const BASE_SLOTS = 3;
 export const BASE_STORAGE = 60;
 // Pedido urgente durante el servicio: llega en unos segundos y cuesta el doble.

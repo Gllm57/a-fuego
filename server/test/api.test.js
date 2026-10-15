@@ -169,10 +169,13 @@ test('mercado: comprar, canasta diaria y despensa llena', async () => {
 test('no se puede servir más de lo que hay en la despensa', async () => {
   const { app, clock, call } = await makeApp();
   const { token } = await guest(call);
+  app.service.db.run('UPDATE inventory SET qty = 1');
   const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
   clock.t += body.config.durationMs + 2000;
   const greedy = honestServes({ ...body.config, stock: undefined });
+  assert.ok(greedy.length >= 2);
   const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: greedy } });
-  if (greedy.length > 8) assert.equal(res.body.error.details.reason, 'sin_ingredientes');
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.details.reason, 'sin_ingredientes');
   await app.close();
 });
