@@ -75,6 +75,8 @@ export function evaluatePurchase(state, kind, id) {
     if (!up) return no('no_existe');
     const current = upgradeLevel(state.upgrades, id);
     if (current >= up.costs.length) return no('nivel_maximo');
+    const reqLevel = up.reqLevels?.[current] ?? 1;
+    if (level < reqLevel) return no('nivel_insuficiente', { reqLevel });
     const price = up.costs[current];
     if (state.coins < price) return no('sin_dinero', { price });
     return { ok: true, price, grants: [{ kind: 'upgrade', id, level: current + 1 }] };

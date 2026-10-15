@@ -107,7 +107,14 @@ export const UPGRADES = Object.freeze([
   { id: 'campana',   name: 'Campana extractora', desc: 'Más tiempo antes de que algo se queme', station: null,     costs: [700, 2400] },
   { id: 'ambiente',  name: 'Ambiente y música',  desc: 'Clientes 10% más pacientes y +8% propina por nivel', station: null, costs: [600, 1600, 3500, 8000] },
   { id: 'mesas',     name: 'Mesas extra',        desc: '+1 cliente atendido a la vez',         station: null,     costs: [1500, 5000] },
-  { id: 'refri',     name: 'Refrigerador',       desc: '+25 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] }
+  { id: 'refri',     name: 'Refrigerador',       desc: '+25 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] },
+  // Equipo extra: un segundo fogón de cada tipo, para no colapsar en hora pico.
+  // `reqLevels[n]` es el nivel de chef necesario para comprar el nivel n+1.
+  { id: 'extra_tabla',  name: 'Segunda tabla',  desc: 'Corta dos ingredientes a la vez',  station: 'tabla',  extra: true, costs: [1200], reqLevels: [3] },
+  { id: 'extra_bol',    name: 'Segundo bol',    desc: 'Bate dos cosas a la vez',         station: 'bol',    extra: true, costs: [1500], reqLevels: [4] },
+  { id: 'extra_sarten', name: 'Segunda sartén', desc: 'Fríe dos ingredientes a la vez',  station: 'sarten', extra: true, costs: [2000], reqLevels: [5] },
+  { id: 'extra_olla',   name: 'Segunda olla',   desc: 'Hierve dos ingredientes a la vez', station: 'olla',  extra: true, costs: [2200], reqLevels: [6] },
+  { id: 'extra_horno',  name: 'Segundo horno',  desc: 'Hornea dos cosas a la vez',       station: 'horno',  extra: true, costs: [2600], reqLevels: [7] }
 ]);
 
 export const RECIPE_BY_ID = Object.freeze(Object.fromEntries(RECIPES.map((x) => [x.id, x])));

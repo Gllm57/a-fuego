@@ -40,10 +40,13 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Abrir restaurantes (2.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros |
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
 | Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, más mesas, despensa más grande |
+| Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
 
 ### Pantallas
 
-Inicio (imperio, siguiente meta, restaurantes en arco, reto del día) · **Mercado** ·
+Antes de cada servicio: tutorial ilustrado (la primera vez) y **parte del día** con una línea
+de tiempo de la hora pico, los incendios y los críticos. Inicio (imperio, siguiente meta,
+restaurantes en arco, reto del día) · **Mercado** ·
 Recetario · Mejoras · **Diario de caja** (ganancias y gastos de cada servicio) · Ranking
 semanal · Cocina · Cierre de caja.
 

@@ -145,7 +145,10 @@ function go(tab) {
 function renderNavDots() {
   const s = st();
   const canLearn = RECIPES.some((r) => !s.recipes.includes(r.id) && s.restaurants.includes(r.restaurant) && level() >= r.reqLevel && s.coins >= r.learnCost);
-  const canUpgrade = UPGRADES.some((u) => upgradeLevel(s.upgrades, u.id) < u.costs.length && s.coins >= u.costs[upgradeLevel(s.upgrades, u.id)]);
+  const canUpgrade = UPGRADES.some((u) => {
+    const l = upgradeLevel(s.upgrades, u.id);
+    return l < u.costs.length && s.coins >= u.costs[l] && level() >= (u.reqLevels?.[l] ?? 1);
+  });
   const lowStock = dishesPossible(s, app.restaurantId) < 4 || s.basketClaimed !== app.profile.daily.day;
   const set = (id, on) => { const d = root.querySelector(`[data-tab="${id}"] .nav__dot`); if (d) d.hidden = !on; };
   set('recipes', canLearn);
@@ -542,11 +545,14 @@ function renderUpgrades() {
   const screen = document.getElementById('screen');
   screen.innerHTML = `
     <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
-      ${UPGRADES.map((u) => {
+      ${UPGRADES.map((u, i) => {
         const lvl = upgradeLevel(s.upgrades, u.id);
         const max = lvl >= u.costs.length;
         const price = max ? 0 : u.costs[lvl];
-        return `
+        const req = max ? 1 : (u.reqLevels?.[lvl] ?? 1);
+        const header = u.extra && !UPGRADES[i - 1]?.extra
+          ? `<div class="section-title"><h2>Equipo extra</h2><span>Un segundo fogón de cada tipo</span></div>` : '';
+        return `${header}
         <article class="card upgrade">
           <div class="upgrade__icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${UPGRADE_ICONS[u.id] ?? ''}</svg></div>
           <div>
@@ -555,7 +561,9 @@ function renderUpgrades() {
             <div class="pips" aria-label="Nivel ${lvl} de ${u.costs.length}">${u.costs.map((_, i) => `<span class="pip ${i < lvl ? 'is-on' : ''}" style="animation-delay:${i * 60}ms"></span>`).join('')}</div>
             <div class="upgrade__foot">
               <span class="upgrade__effect">${upgradeEffect(u.id, now, s)}</span>
-              ${max ? `<span class="tag tag--ok">${icon('check')} Máximo</span>` : `<button class="btn btn--sm" data-up="${u.id}" ${s.coins < price ? 'disabled' : ''}>${coinSvg()} ${fmt(price)}</button>`}
+              ${max ? `<span class="tag tag--ok">${icon('check')} ${u.extra ? 'Instalado' : 'Máximo'}</span>`
+                : level() < req ? `<span class="tag tag--lock">${icon('lock')} Nivel ${req} · ${fmt(price)}</span>`
+                : `<button class="btn btn--sm" data-up="${u.id}" ${s.coins < price ? 'disabled' : ''}>${coinSvg()} ${fmt(price)}</button>`}
             </div>
           </div>
         </article>`;
@@ -577,6 +585,10 @@ function upgradeEffect(id, k, s) {
     case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · propina +${Math.round(k.tipBonus * 100)}%`;
     case 'mesas': return `${k.slots} clientes a la vez`;
     case 'refri': return `Despensa de ${storageCapacity(s.upgrades)} lugares`;
+    case 'extra_tabla': case 'extra_bol': case 'extra_sarten': case 'extra_olla': case 'extra_horno': {
+      const st = id.slice(6);
+      return `Tienes ${k.stations[st]} ${k.stations[st] > 1 ? 'en paralelo' : 'ahora'}`;
+    }
     default: return '';
   }
 }

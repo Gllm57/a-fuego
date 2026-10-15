@@ -50,7 +50,9 @@ export function kitchenStats(upgrades = {}) {
     },
     patienceMult: round2(1 + 0.1 * ambiente),
     tipBonus: round2(0.08 * ambiente),
-    slots: BASE_SLOTS + upgradeLevel(upgrades, 'mesas')
+    slots: BASE_SLOTS + upgradeLevel(upgrades, 'mesas'),
+    // Cuántos fogones hay de cada tipo (1 + equipo extra comprado).
+    stations: Object.fromEntries(Object.keys(STATIONS).map((st) => [st, 1 + upgradeLevel(upgrades, `extra_${st}`)]))
   };
 }
 
@@ -73,10 +75,19 @@ export function stationLoadMs(stats, recipe) {
   return load;
 }
 
-// Cada estación procesa una cosa a la vez; estaciones distintas trabajan en paralelo.
+export function stationCount(stats, station) {
+  return Math.max(1, stats.stations?.[station] ?? 1);
+}
+
+// Cada fogón procesa una cosa a la vez; fogones distintos (o repetidos) trabajan en paralelo.
+// Cota inferior: el componente más largo, o la carga de un tipo repartida entre sus fogones.
 export function minPrepMs(stats, recipeId) {
-  const load = stationLoadMs(stats, RECIPE_BY_ID[recipeId]);
-  return Object.values(load).reduce((m, v) => Math.max(m, v), 0);
+  const recipe = RECIPE_BY_ID[recipeId];
+  const load = stationLoadMs(stats, recipe);
+  let min = 0;
+  for (const c of recipe.components) min = Math.max(min, minComponentMs(stats, c.process));
+  for (const [st, ms] of Object.entries(load)) min = Math.max(min, Math.ceil(ms / stationCount(stats, st)));
+  return min;
 }
 
 export function patienceMs(stats, recipe, { vip = false, tier = 0 } = {}) {

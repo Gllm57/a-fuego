@@ -25,7 +25,9 @@ export class Kitchen {
       const recipe = RECIPE_BY_ID[o.recipeId];
       return { ...o, recipe, status: 'waiting', filled: recipe.components.map(() => false), busy: recipe.components.map(() => false), perfects: 0 };
     });
-    this.stations = Object.fromEntries(STATION_IDS.map((s) => [s, null]));
+    // Fogones: uno por tipo, más los extra comprados ("olla#2").
+    this.stationKeys = STATION_IDS.flatMap((st) => Array.from({ length: Math.max(1, this.stats.stations?.[st] ?? 1) }, (_, i) => (i ? `${st}#${i + 1}` : st)));
+    this.stations = Object.fromEntries(this.stationKeys.map((s) => [s, null]));
     this.fires = {};
     this.events = generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
     this.rush = rushWindow(config.seed, config.durationMs);
@@ -70,7 +72,7 @@ export class Kitchen {
             <div class="customers" style="--slots:${this.stats.slots}"></div>
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
-          <div class="counter">${STATION_IDS.map((s) => this.#stationShell(s)).join('')}</div>
+          <div class="counter ${this.stationKeys.length > 6 ? 'is-compact' : ''}">${STATION_IDS.map((type) => this.#stationGroup(type)).join('')}</div>
           <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 76 : this.pantryIds.length <= 10 ? 62 : 54}px">
             <div class="shelf__head"><span class="shelf__count"></span><span class="shelf__urgent"></span></div>
             <div class="shelf__grid">${this.pantryIds.map((id) => `
@@ -89,7 +91,7 @@ export class Kitchen {
       combo: this.host.querySelector('.combo'),
       customers: this.host.querySelector('.customers'),
       order: this.host.querySelector('.order'),
-      stations: Object.fromEntries(STATION_IDS.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
+      stations: Object.fromEntries(this.stationKeys.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
       pantry: [...this.host.querySelectorAll('.jar')],
       shelfCount: this.host.querySelector('.shelf__count'),
       urgent: this.host.querySelector('.shelf__urgent')
@@ -98,7 +100,7 @@ export class Kitchen {
     this.#renderCustomers();
     this.#renderOrder();
     this.#renderStock();
-    STATION_IDS.forEach((s) => this.#renderStation(s));
+    this.stationKeys.forEach((s) => this.#renderStation(s));
     this.#intro();
   }
 
@@ -134,26 +136,117 @@ export class Kitchen {
   }
 
   // ── Introducción y cuenta atrás ─────────────────────────
+  // Antes del servicio: tutorial ilustrado (la primera vez) y el parte del día.
   #intro() {
+    if (this.firstTime) this.#tutorial(() => this.#briefing());
+    else this.#briefing();
+  }
+
+  #tutorial(done) {
+    const recipe = this.orders[0]?.recipe ?? RECIPE_BY_ID[this.config.menu[0]];
+    const ing = recipe.components[0].ingredient;
+    const timed = recipe.components.find((c) => PROCESSES[c.process].kind !== 'raw') ?? recipe.components[0];
+    const slides = [
+      {
+        title: 'Elige a un cliente',
+        text: 'Toca a un cliente para ver su comanda. El anillo de color es su paciencia: si se vacía, se va y pierdes el combo.',
+        art: `<div class="tuto-art tuto-art--customer">
+          <div class="customer is-selected" style="animation:none">
+            <span class="bubble"><span class="bubble__dish">${recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span><span class="bubble__name">${escapeHtml(recipe.name)}</span></span>
+            <span class="avatar" style="--p:70"><span class="avatar__face">${customerSvg(1, 'happy', '')}</span></span>
+          </div>
+          <span class="tuto-hand" aria-hidden="true">${icon('hand')}</span>
+        </div>`
+      },
+      {
+        title: 'Saca de la despensa',
+        text: 'Los frascos que brillan son lo que pide. El número es cuánto te queda; si se agota, tócalo para un pedido urgente al doble de precio.',
+        art: `<div class="tuto-art tuto-art--jars">
+          <span class="jar is-needed" data-level="ok" style="--lvl:.8;--jar:70px"><span class="jar__glass">${ingredientSvg(ing, { title: '' })}</span><span class="jar__qty">7</span></span>
+          <span class="jar is-want" data-level="out" style="--lvl:0;--jar:56px"><span class="jar__glass">${ingredientSvg(recipe.components[1]?.ingredient ?? ing, { title: '' })}</span><span class="jar__qty">0</span></span>
+          <span class="tuto-hand" aria-hidden="true">${icon('hand')}</span>
+        </div>`
+      },
+      {
+        title: 'Cocina en los fogones',
+        text: 'Cortar y batir: toca el fogón varias veces. Freír, hornear y hervir: se cocina solo; recógelo al verlo verde para un ¡Perfecto! Si tarda, se quema.',
+        art: `<div class="tuto-art tuto-art--stations">
+          <span class="station is-working" style="--p:.5"><span class="station__ring"><span class="station__disc">${STATION_ART.tabla}<span class="station__slot">${ingredientSvg(ing, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Corta!</span></span>
+          <span class="station is-ready" style="--p:1"><span class="station__ring"><span class="station__disc">${STATION_ART[PROCESSES[timed.process].station ?? 'sarten']}<span class="station__slot">${ingredientSvg(timed.ingredient, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Listo!</span></span>
+          <span class="station is-fire" style="--p:.3"><span class="station__ring"><span class="station__disc">${STATION_ART.sarten}<span class="station__slot"><span class="flames"><i></i><i></i><i></i></span></span></span></span><span class="station__status">¡Apaga!</span></span>
+        </div>`
+      },
+      {
+        title: 'Sirve y cobra',
+        text: 'Cuando el plato está completo se sirve solo. Sirve seguido para subir el combo. Los críticos con boina pagan el doble.',
+        art: `<div class="tuto-art tuto-art--serve">
+          <div class="plate" style="width:96px;height:96px"><div class="plate__dish"></div><div class="plate__items">${recipe.components.map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</div></div>
+          <span class="tuto-coin">${coinSvg()}<b>+${recipe.price}</b></span>
+          <span class="combo is-on" style="position:static">Combo ×1.3</span>
+          <span class="avatar" style="--p:100;width:64px;height:64px"><span class="avatar__face" style="width:56px;height:56px">${customerSvg(2, 'happy', '', true)}</span></span>
+        </div>`
+      }
+    ];
+    let idx = 0;
     const ov = document.createElement('div');
-    ov.className = 'overlay';
-    const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
-    if (this.firstTime) {
+    ov.className = 'overlay overlay--tuto';
+    const draw = () => {
+      const s = slides[idx];
       ov.innerHTML = `
-        <h2>Cómo se juega</h2>
-        <div class="howto">
-          <div><b>1</b>Toca a un cliente para ver su comanda</div>
-          <div><b>2</b>Toca los frascos resaltados de la despensa</div>
-          <div><b>3</b>Toca los fogones para cortar, batir o recoger</div>
-          <div><b>4</b>Si hay fuego, tócalo rápido para apagarlo</div>
+        <div class="tuto" role="dialog" aria-label="Cómo se juega">
+          <div class="tuto__step">PASO ${idx + 1} DE ${slides.length}</div>
+          <div class="tuto__stage" key="${idx}">${s.art}</div>
+          <h2>${s.title}</h2>
+          <p>${s.text}</p>
+          <div class="tuto__dots">${slides.map((_, k) => `<i class="${k === idx ? 'is-on' : ''}"></i>`).join('')}</div>
+          <div class="tuto__actions">
+            <button class="btn btn--ghost btn--sm" data-act="skip">Saltar</button>
+            <button class="btn btn--gold" data-act="next">${idx === slides.length - 1 ? '¡Entendido!' : 'Siguiente'} ${icon('arrow')}</button>
+          </div>
+        </div>`;
+      ov.querySelector('[data-act="next"]').addEventListener('click', () => {
+        sfx.tap();
+        if (idx < slides.length - 1) { idx++; draw(); } else { ov.remove(); done(); }
+      });
+      ov.querySelector('[data-act="skip"]').addEventListener('click', () => { ov.remove(); done(); });
+    };
+    draw();
+    this.el.root.appendChild(ov);
+  }
+
+  // Parte del día: qué trae este servicio, con una línea de tiempo de los 2 minutos.
+  #briefing() {
+    const ov = document.createElement('div');
+    ov.className = 'overlay overlay--brief';
+    const dur = this.config.durationMs;
+    const pct = (ms) => `${((ms / dur) * 100).toFixed(1)}%`;
+    const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
+    const vips = this.orders.filter((o) => o.vip);
+    const extras = this.stationKeys.length - STATION_IDS.length;
+    ov.innerHTML = `
+      <div class="brief">
+        <div class="brief__kicker">PARTE DEL DÍA</div>
+        <h2>${escapeHtml(this.restaurant.name)}</h2>
+        <div class="bubbles">
+          <div><b>${this.orders.length}</b><span>clientes</span></div>
+          <div><b>${vips.length}</b><span>críticos</span></div>
+          <div><b>${this.events.length}</b><span>incendios</span></div>
+          <div><b>${units}</b><span>en despensa</span></div>
         </div>
-        <p>Cocinas con lo que compraste en el mercado (${units} ingredientes). Si algo se agota, toca su frasco: pedido urgente al doble de precio. Los críticos con boina pagan el doble.</p>
-        <button class="btn btn--gold btn--xl" data-act="go">¡A cocinar!</button>`;
-      ov.querySelector('[data-act="go"]').addEventListener('click', () => { ov.remove(); this.#countdown(); });
-      this.el.root.appendChild(ov);
-    } else {
-      this.#countdown();
-    }
+        <div class="timeline" aria-label="Línea de tiempo del servicio">
+          <span class="timeline__rush" style="left:${pct(this.rush.from)};width:${pct(this.rush.to - this.rush.from)}"></span>
+          ${this.events.map((e) => `<span class="timeline__mark timeline__mark--fire" style="left:${pct(e.at)}" title="Fuego">${icon('fire')}</span>`).join('')}
+          ${vips.map((o) => `<span class="timeline__mark timeline__mark--vip" style="left:${pct(o.arriveAt)}" title="Crítico">${icon('crown')}</span>`).join('')}
+          <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">2:00</span>
+        </div>
+        <div class="brief__legend"><span><i class="lg-rush"></i>Hora pico</span><span><i class="lg-fire"></i>Fuego</span><span><i class="lg-vip"></i>Crítico</span></div>
+        <p>${extras > 0 ? `Tienes ${extras} ${extras > 1 ? 'fogones extra' : 'fogón extra'} para cocinar en paralelo. ` : ''}Gastos del local: ${fmt(this.config.upkeep ?? 0)}.</p>
+        <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
+        <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
+      </div>`;
+    ov.querySelector('[data-act="go"]').addEventListener('click', () => { ov.remove(); this.#countdown(); });
+    ov.querySelector('[data-act="howto"]').addEventListener('click', () => { ov.remove(); this.#tutorial(() => this.#briefing()); });
+    this.el.root.appendChild(ov);
   }
 
   #countdown() {
@@ -191,11 +284,13 @@ export class Kitchen {
       <h2>Pausa</h2>
       <p>Los clientes esperan. Si sales, este servicio no cuenta, pero los ingredientes que ya usaste se quedan en tu despensa.</p>
       <button class="btn btn--gold btn--xl" data-act="resume">Continuar</button>
+      <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
       <button class="btn btn--ghost" data-act="quit">Salir del servicio</button>`;
     ov.querySelector('[data-act="resume"]').addEventListener('click', () => {
       ov.remove(); this.paused = false; this.last = performance.now();
     });
     ov.querySelector('[data-act="quit"]').addEventListener('click', () => { this.destroy(); this.onQuit(); });
+    ov.querySelector('[data-act="howto"]').addEventListener('click', () => { ov.style.display = 'none'; this.#tutorial(() => { ov.style.display = ''; }); });
     this.el.root.appendChild(ov);
   }
 
@@ -237,7 +332,7 @@ export class Kitchen {
         if (el) floatText(el, '¡Me voy!', 'bad');
       }
     }
-    for (const st of STATION_IDS) {
+    for (const st of this.stationKeys) {
       const item = this.stations[st];
       if (item && this.orders[item.orderId].status === 'left') {
         this.stations[st] = null;
@@ -249,7 +344,8 @@ export class Kitchen {
     for (const ev of this.events) {
       if (ev.done || t < ev.at) continue;
       ev.done = true;
-      const st = ev.station;
+      const keys = this.stationKeys.filter((k) => this.#type(k) === ev.station);
+      const st = keys.find((k) => this.stations[k]) ?? keys[0];
       const item = this.stations[st];
       if (item) {
         this.stations[st] = null;
@@ -260,7 +356,7 @@ export class Kitchen {
       this.fires[st] = { taps: FIRE_TAPS };
       this.sig.stations[st] = '';
       sfx.burn();
-      this.#ribbon(`¡Fuego en ${st === 'sarten' ? 'la sartén' : 'el horno'}!`, 'Tócalo rápido para apagarlo', 'fire');
+      this.#ribbon(`¡Fuego en ${ev.station === 'sarten' ? 'la sartén' : 'el horno'}!`, 'Tócalo rápido para apagarlo', 'fire');
     }
     // Pedidos urgentes que llegan.
     if (this.deliveries.length) {
@@ -287,7 +383,7 @@ export class Kitchen {
       this.rushState = 'after';
       this.rushGlow?.remove();
     }
-    for (const st of STATION_IDS) {
+    for (const st of this.stationKeys) {
       const item = this.stations[st];
       if (!item || item.kind !== 'timer') continue;
       const state = this.#timerState(item);
@@ -359,7 +455,7 @@ export class Kitchen {
       }
     }
 
-    for (const st of STATION_IDS) {
+    for (const st of this.stationKeys) {
       this.#renderStation(st);
       const item = this.stations[st];
       const el = this.el.stations[st];
@@ -534,12 +630,19 @@ export class Kitchen {
   }
 
   // ── Fogones ─────────────────────────────────────────────
-  #stationShell(st) {
-    return `<button class="station" data-station="${st}" aria-label="${STATIONS[st].name}">
-      <span class="station__ring"><span class="station__disc">${STATION_ART[st]}<span class="station__slot"></span></span></span>
-      <span class="station__name">${STATIONS[st].name}</span>
-      <span class="station__status">Libre</span>
-    </button>`;
+  #type(key) { return key.split('#')[0]; }
+
+  #stationGroup(type) {
+    const keys = this.stationKeys.filter((k) => this.#type(k) === type);
+    return `<div class="st-group" data-count="${keys.length}">
+      <div class="st-group__row">${keys.map((k, i) => `
+        <button class="station" data-station="${k}" aria-label="${STATIONS[type].name}${keys.length > 1 ? ` ${i + 1}` : ''}">
+          <span class="station__ring"><span class="station__disc">${STATION_ART[type]}<span class="station__slot"></span></span></span>
+          <span class="station__status">Libre</span>
+        </button>`).join('')}
+      </div>
+      <span class="station__name">${STATIONS[type].name}${keys.length > 1 ? ` ×${keys.length}` : ''}</span>
+    </div>`;
   }
 
   #renderStation(st) {
@@ -558,7 +661,7 @@ export class Kitchen {
       slot.dataset.item = '';
       slot.innerHTML = '<span class="flames"><i></i><i></i><i></i></span>';
       status.textContent = `¡Apaga! ×${fire.taps}`;
-      el.setAttribute('aria-label', `${STATIONS[st].name}: en llamas, toca ${fire.taps} veces`);
+      el.setAttribute('aria-label', `${STATIONS[this.#type(st)].name}: en llamas, toca ${fire.taps} veces`);
       return;
     }
     if (!item) {
@@ -566,7 +669,7 @@ export class Kitchen {
       slot.innerHTML = '';
       status.textContent = 'Libre';
       el.style.removeProperty('--glow');
-      el.setAttribute('aria-label', `${STATIONS[st].name}: libre`);
+      el.setAttribute('aria-label', `${STATIONS[this.#type(st)].name}: libre`);
       return;
     }
     if (slot.dataset.item !== String(item.id)) {
@@ -577,17 +680,17 @@ export class Kitchen {
     let label;
     if (item.kind === 'tap') {
       el.classList.add('is-working');
-      status.textContent = st === 'tabla' ? '¡Corta!' : '¡Bate!';
+      status.textContent = this.#type(st) === 'tabla' ? '¡Corta!' : '¡Bate!';
       slot.insertAdjacentHTML('beforeend', `<span class="station__taps">${Array.from({ length: item.need }, (_, i) => `<i class="${i < item.taps ? 'is-on' : ''}"></i>`).join('')}</span>`);
-      label = `${STATIONS[st].name}: toca ${item.need - item.taps} veces más`;
+      label = `${STATIONS[this.#type(st)].name}: toca ${item.need - item.taps} veces más`;
     } else {
-      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : st === 'sarten' ? 'sizzle' : 'steam';
+      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : this.#type(st) === 'sarten' ? 'sizzle' : 'steam';
       slot.insertAdjacentHTML('beforeend', `<span class="fx-${fx}">${'<i></i>'.repeat(fx === 'sizzle' ? 4 : 3)}</span>`);
-      if (st === 'horno') el.style.setProperty('--glow', state === 'cooking' ? '.6' : '.3');
+      if (this.#type(st) === 'horno') el.style.setProperty('--glow', state === 'cooking' ? '.6' : '.3');
       const text = { cooking: PROCESSES[item.process].verb + '…', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Tirar' }[state];
       status.textContent = text;
       if (state !== 'cooking') el.classList.add(`is-${state}`);
-      label = `${STATIONS[st].name}: ${text}`;
+      label = `${STATIONS[this.#type(st)].name}: ${text}`;
     }
     el.setAttribute('aria-label', label);
   }
@@ -616,11 +719,13 @@ export class Kitchen {
       this.#checkComplete(o);
       return;
     }
-    const st = proc.station;
-    if (this.fires[st]) { shake(this.el.stations[st]); floatText(this.el.stations[st], '¡Hay fuego!', 'bad'); sfx.error(); return; }
-    if (this.stations[st]) {
-      shake(this.el.stations[st]);
-      floatText(this.el.stations[st], 'Ocupado', 'bad');
+    const keys = this.stationKeys.filter((k) => this.#type(k) === proc.station);
+    const st = keys.find((k) => !this.stations[k] && !this.fires[k]);
+    if (!st) {
+      const first = this.el.stations[keys[0]];
+      const allFire = keys.every((k) => this.fires[k]);
+      keys.forEach((k) => shake(this.el.stations[k]));
+      floatText(first, allFire ? '¡Hay fuego!' : keys.length > 1 ? 'Todas ocupadas' : 'Ocupado', 'bad');
       sfx.error();
       return;
     }
@@ -632,7 +737,7 @@ export class Kitchen {
       const readyAt = this.t + this.stats.seconds[comp.process] * 1000;
       const burnSec = this.stats.burnSeconds[comp.process];
       this.stations[st] = { ...base, kind: 'timer', readyAt, burnAt: burnSec ? readyAt + burnSec * 1000 : Infinity, lastState: 'cooking' };
-      if (st === 'sarten') sfx.sizzle();
+      if (proc.station === 'sarten') sfx.sizzle();
     }
     o.busy[idx] = true;
     sfx.place();
@@ -675,13 +780,13 @@ export class Kitchen {
       return;
     }
     const item = this.stations[st];
-    if (!item) { floatText(el, STATIONS[st].hint, ''); return; }
+    if (!item) { floatText(el, STATIONS[this.#type(st)].hint, ''); return; }
     if (item.kind === 'tap') {
       // Toques más rápidos que un humano no cuentan (igual que valida el servidor).
       if (this.t - item.lastTapAt < MIN_TAP_MS) return;
       item.lastTapAt = this.t;
       item.taps += 1;
-      st === 'tabla' ? sfx.chop() : sfx.whisk();
+      this.#type(st) === 'tabla' ? sfx.chop() : sfx.whisk();
       el.classList.remove('is-chop'); void el.offsetWidth; el.classList.add('is-chop');
       if (item.taps >= item.need) {
         const perfect = this.t - item.startedAt <= item.need * TAP_PERFECT_MS_PER_TAP;
@@ -752,7 +857,7 @@ export class Kitchen {
     cancelAnimationFrame(this.raf);
     this.rushGlow?.remove();
     // Lo que quedó a medio preparar también se pierde.
-    for (const st of STATION_IDS) if (this.stations[st]) this.#addWaste(this.stations[st].ingredient);
+    for (const st of this.stationKeys) if (this.stations[st]) this.#addWaste(this.stations[st].ingredient);
     for (const o of this.orders) {
       if (o.status !== 'seated') continue;
       o.recipe.components.forEach((c, i) => { if (o.filled[i]) this.#addWaste(c.ingredient); });

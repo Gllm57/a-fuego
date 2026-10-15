@@ -6,7 +6,7 @@
 import { RECIPE_BY_ID, PROCESSES } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { generateOrders } from './levelgen.js';
-import { minPrepMs, stationLoadMs, recipeIngredients, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS } from './rules.js';
+import { minPrepMs, stationLoadMs, recipeIngredients, stationCount, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS } from './rules.js';
 
 export const MAX_COMBO_STEPS = 5;
 export const TIP_RATE = 0.3;
@@ -112,7 +112,7 @@ export function scoreRun(config, submission) {
     }
   }
   for (const [st, ms] of Object.entries(totalLoad)) {
-    if (ms > durationMs + 1000) fail('estacion_sobrecargada', { station: st, ms });
+    if (ms > (durationMs + 1000) * stationCount(stats, st)) fail('estacion_sobrecargada', { station: st, ms });
   }
 
   // Sólo se puede servir a un cliente sentado (dentro de las mesas disponibles).

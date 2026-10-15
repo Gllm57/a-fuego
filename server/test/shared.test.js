@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -96,7 +96,7 @@ test('el imperio llega al 100 % con todo comprado', () => {
   const s = newPlayerState();
   s.restaurants = RESTAURANTS.map((r) => r.id);
   s.recipes = RECIPES.map((r) => r.id);
-  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, mesas: 2, refri: 3 };
+  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, mesas: 2, refri: 3, extra_tabla: 1, extra_bol: 1, extra_sarten: 1, extra_olla: 1, extra_horno: 1 };
   const e = empireProgress(s);
   assert.equal(e.percent, 100);
   assert.equal(e.title, 'Chef Leyenda');
@@ -191,4 +191,20 @@ test('surtir: el plan cubre el menú sin pasarse de la capacidad', () => {
   assert.ok(inventoryCount(plan) <= storageCapacity(s.upgrades));
   const full = { ...s, inventory: { tortilla: 60 } };
   assert.deepEqual(restockPlan(full, 'taqueria', 10), {});
+});
+
+test('equipo extra: exige nivel y permite cocinar en paralelo', () => {
+  const s = { ...newPlayerState(), coins: 10000 };
+  assert.equal(evaluatePurchase(s, 'upgrade', 'extra_olla').reason, 'nivel_insuficiente');
+  const lvl6 = { ...s, xp: xpForLevel(6) };
+  const d = evaluatePurchase(lvl6, 'upgrade', 'extra_olla');
+  assert.ok(d.ok);
+  const after = applyGrants(lvl6, d.price, d.grants);
+  assert.equal(evaluatePurchase(after, 'upgrade', 'extra_olla').reason, 'nivel_maximo');
+  const one = kitchenStats({});
+  const two = kitchenStats({ extra_olla: 1 });
+  assert.equal(one.stations.olla, 1);
+  assert.equal(two.stations.olla, 2);
+  // Ají de gallina lleva 3 cosas hervidas: con dos ollas el mínimo baja.
+  assert.ok(minPrepMs(two, 'aji_gallina') < minPrepMs(one, 'aji_gallina'));
 });

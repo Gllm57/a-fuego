@@ -86,6 +86,7 @@ export const ICONS = {
   down: `<path d="M12 5v14M6 13l6 6 6-6"/>`,
   chart: `<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`,
   minus: `<path d="M6 12h12"/>`,
+  hand: `<path d="M9 11V5a1.5 1.5 0 0 1 3 0v5M12 10V4a1.5 1.5 0 0 1 3 0v6M15 10V6a1.5 1.5 0 0 1 3 0v7c0 4-3 8-7 8-3 0-5-2-6-4l-2-4a1.5 1.5 0 0 1 2.5-1.5L9 13"/>`,
   plus: `<path d="M12 6v12M6 12h12"/>`
 };
 
@@ -96,6 +97,8 @@ export function icon(name, extra = '') {
 export const UPGRADE_ICONS = {
   cuchillos: PROCESS_ICONS.cortar, batidora: PROCESS_ICONS.batir, sarten: PROCESS_ICONS.freir,
   horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table,
+  extra_tabla: PROCESS_ICONS.cortar, extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
+  extra_olla: PROCESS_ICONS.hervir, extra_horno: PROCESS_ICONS.hornear,
   refri: `<rect x="5" y="2" width="14" height="20" rx="4"/><path d="M5 10h14M9 5v2M9 13v3"/>`
 };
 
@@ -107,40 +110,8 @@ export function starSvg(cls = 'star') {
   return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z" fill="#FFC23D" stroke="#B7791F" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 5.5l1.6 3.4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".7"/></svg>`;
 }
 
-// Clientes: 6 apariencias × 3 estados de ánimo.
-const SKIN = ['#F6C9A0', '#E3A877', '#B97A4E', '#8A5634', '#F2D2B6', '#D49A6A'];
-const HAIR = ['#2B1A12', '#6B3A1E', '#C77A2E', '#1A1A1A', '#8C8C8C', '#4A2A18'];
-const SHIRT = ['#2F5FD0', '#1E8A5F', '#B3264A', '#C77A00', '#6A3FC2', '#0F7C8A'];
-
-export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vip = false) {
-  const s = SKIN[look % 6], h = HAIR[look % 6], sh = SHIRT[look % 6];
-  const hair = [
-    `<path d="M10 22c0-10 8-15 14-15s14 5 14 15c-3-5-8-7-14-7s-11 2-14 7z" fill="${h}"/>`,
-    `<path d="M9 24c-1-12 7-17 15-17s16 5 15 17c-2-4-4-6-6-6 0-2-4-4-9-4s-9 2-9 4c-2 0-4 2-6 6z" fill="${h}"/><circle cx="24" cy="6" r="5" fill="${h}"/>`,
-    `<path d="M10 20c1-9 7-13 14-13s13 4 14 13l-4-3-3 3-3-4-4 4-4-4-3 4-3-3z" fill="${h}"/>`,
-    `<path d="M9 30c-2-14 5-23 15-23s17 9 15 23c-1-6-3-9-5-11-4 2-16 2-20 0-2 2-4 5-5 11z" fill="${h}"/>`,
-    `<path d="M12 18c2-7 7-10 12-10s10 3 12 10c-4-2-8-3-12-3s-8 1-12 3z" fill="${h}"/>`,
-    `<path d="M10 22c0-10 7-15 14-15s14 5 14 15H10z" fill="${h}"/><rect x="8" y="18" width="32" height="5" rx="2.5" fill="${sh}"/>`
-  ][look % 6];
-  const mouth = mood === 'happy'
-    ? `<path d="M19 30c2 3 8 3 10 0" stroke="#5A2A1A" stroke-width="2.2" fill="none" stroke-linecap="round"/>`
-    : mood === 'worried'
-      ? `<path d="M19 31h10" stroke="#5A2A1A" stroke-width="2.2" stroke-linecap="round"/>`
-      : `<path d="M19 32c2-3 8-3 10 0" stroke="#5A2A1A" stroke-width="2.2" fill="none" stroke-linecap="round"/>`;
-  const brows = mood === 'angry'
-    ? `<path d="M15 19l5 2M33 19l-5 2" stroke="#2B1A12" stroke-width="2" stroke-linecap="round"/>`
-    : '';
-  const cheeks = mood === 'happy' ? `<circle cx="15" cy="28" r="2.5" fill="#F28C8C" opacity=".5"/><circle cx="33" cy="28" r="2.5" fill="#F28C8C" opacity=".5"/>` : '';
-  return `<svg class="${cls}" viewBox="0 0 48 48" aria-hidden="true">
-    <path d="M8 48c0-8 7-12 16-12s16 4 16 12z" fill="${sh}"/>
-    <circle cx="24" cy="23" r="14" fill="${s}"/>
-    ${hair}${brows}
-    <ellipse cx="19" cy="24" rx="1.9" ry="2.4" fill="#24160E"/><ellipse cx="29" cy="24" rx="1.9" ry="2.4" fill="#24160E"/>
-    ${cheeks}${mouth}
-    ${vip ? `<path d="M9 15c0-6 7-10 15-10s15 3 15 8c-6-2-12-3-30 2z" fill="#2A170D"/><circle cx="24" cy="5" r="2.5" fill="#2A170D"/><circle cx="19" cy="24" r="4.2" fill="none" stroke="#B7791F" stroke-width="1.6"/><circle cx="29" cy="24" r="4.2" fill="none" stroke="#B7791F" stroke-width="1.6"/><path d="M23 24h2" stroke="#B7791F" stroke-width="1.6"/><path d="M18 36l6 4 6-4" fill="#FFC23D"/>` : ''}
-    ${mood === 'angry' ? `<path d="M37 9l3-4M40 12l4-2M38 5l1 4" stroke="#D2362A" stroke-width="2" stroke-linecap="round"/>` : ''}
-  </svg>`;
-}
+// Clientes: ver people.js
+export { customerSvg } from './people.js';
 
 // Estaciones vistas desde arriba: van dentro de un fogón redondo.
 export const STATION_ART = {

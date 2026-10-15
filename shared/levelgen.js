@@ -32,7 +32,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
       arriveAt: Math.round(t),
       patienceMs: patienceMs(stats, recipe, { vip, tier }),
       vip,
-      look: Math.floor(rng() * 6)
+      look: Math.floor(rng() * 8)
     });
     const progress = t / durationMs;
     const inRush = t >= rush.from && t < rush.to;
