@@ -10,9 +10,11 @@ import { fileURLToPath } from 'node:url';
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const client = path.join(root, 'client');
-const dist = path.join(root, 'dist');
+// Destino: dist/ por defecto; `--out .` lo escribe en la raíz del repo para GitHub Pages.
+const outArg = process.argv.indexOf('--out');
+const dist = path.resolve(root, outArg > -1 ? process.argv[outArg + 1] : 'dist');
 
-await rm(dist, { recursive: true, force: true });
+if (dist !== root) await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
 
 const js = await build({
@@ -53,4 +55,4 @@ for (const f of ['manifest.webmanifest', 'sw.js', 'icon.svg', 'icon-180.png', 'i
 await writeFile(path.join(dist, '.nojekyll'), '');
 
 const kb = (Buffer.byteLength(html) / 1024).toFixed(0);
-console.log(`Microapp lista en dist/ (index.html: ${kb} KB)`);
+console.log(`Microapp lista en ${path.relative(root, dist) || 'la raíz del repo'} (index.html: ${kb} KB)`);

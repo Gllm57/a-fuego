@@ -11,7 +11,8 @@
     "start": "node --no-warnings=ExperimentalWarning server/src/server.js",
     "dev": "node --no-warnings=ExperimentalWarning --watch server/src/server.js",
     "test": "node --no-warnings=ExperimentalWarning --test 'server/test/**/*.test.js'",
-    "build:static": "node scripts/build-static.mjs"
+    "build:static": "node scripts/build-static.mjs",
+    "build:pages": "node scripts/build-static.mjs --out ."
   },
   "dependencies": {
     "@fastify/helmet": "^13.0.1",

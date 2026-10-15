@@ -105,6 +105,12 @@ manifiesto, iconos y service worker. Se instala en la pantalla de inicio y funci
 conexión. Ejecuta el mismo motor de `/shared` en el navegador y guarda el progreso en el
 dispositivo (sin ranking global ni protección anti-trampas del servidor).
 
-Cada push a `main` la publica en GitHub Pages con `.github/workflows/pages.yml`
-(requiere **Settings → Pages → Source: GitHub Actions**):
-**https://gllm57.github.io/a-fuego/**
+**Publicada con GitHub Pages** desde la raíz de `main`: **https://gllm57.github.io/a-fuego/**
+(Settings → Pages → Source: *Deploy from a branch* → `main` / `(root)`).
+
+Para actualizarla después de cambiar el código:
+
+```bash
+npm run build:pages   # regenera index.html, manifiesto e iconos en la raíz
+git add -A && git commit -m "Actualizar microapp" && git push
+```
