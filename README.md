@@ -98,8 +98,13 @@ Variables de entorno:
 | `RATE_LIMIT_PER_MIN` | `120` | |
 | `MAX_CHEAT_STRIKES` | `5` | |
 
-### Modo sin servidor
+### Microapp para el celular (sin servidor)
 
-`npm run build:static` genera `dist/`, un sitio estático jugable sin backend: el cliente
-detecta que no hay API y ejecuta el mismo motor de `/shared` en el navegador, guardando el
-progreso en el dispositivo (sin ranking global ni protección anti-trampas).
+`npm run build:static` genera `dist/`: un `index.html` con todo el juego dentro, más
+manifiesto, iconos y service worker. Se instala en la pantalla de inicio y funciona sin
+conexión. Ejecuta el mismo motor de `/shared` en el navegador y guarda el progreso en el
+dispositivo (sin ranking global ni protección anti-trampas del servidor).
+
+Cada push a `main` la publica en GitHub Pages con `.github/workflows/pages.yml`
+(requiere **Settings → Pages → Source: GitHub Actions**):
+**https://gllm57.github.io/a-fuego/**

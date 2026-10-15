@@ -21,6 +21,11 @@ const root = document.getElementById('app');
 
 boot();
 
+// Instalable y jugable sin conexión (se ignora donde no hay service workers).
+if ('serviceWorker' in navigator && location.protocol === 'https:') {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
 async function boot() {
   root.innerHTML = `<div class="boot">${panLogoSvg()}<div class="boot__logo">¡A Fuego!</div><div class="boot__text">Encendiendo los fogones…</div></div>`;
   try {

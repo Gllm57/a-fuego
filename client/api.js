@@ -23,6 +23,8 @@ const store = {
 };
 
 export async function createApi() {
+  // La microapp estática (npm run build:static) no tiene servidor: modo local directo.
+  if (typeof __AFUEGO_STATIC__ !== 'undefined') return new LocalApi();
   try {
     const ctrl = new AbortController();
     const timer = setTimeout(() => ctrl.abort(), 2500);
