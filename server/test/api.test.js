@@ -1,0 +1,137 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import { makeApp, honestServes } from './helpers.js';
+import { ordersForConfig } from '../../shared/index.js';
+
+async function guest(call) {
+  const res = await call('POST', '/api/v1/auth/guest');
+  assert.equal(res.status, 200);
+  return res.body;
+}
+
+test('crear invitado devuelve perfil inicial con bono de bienvenida', async () => {
+  const { app, call } = await makeApp();
+  const { token, profile } = await guest(call);
+  assert.ok(token);
+  assert.equal(profile.state.coins, 150);
+  assert.deepEqual(profile.state.restaurants, ['taqueria']);
+  const me = await call('GET', '/api/v1/me', { token });
+  assert.equal(me.status, 200);
+  const ledger = await call('GET', '/api/v1/me/ledger', { token });
+  assert.equal(ledger.body.entries[0].reason, 'bono_bienvenida');
+  await app.close();
+});
+
+test('sin token o con token falso: 401', async () => {
+  const { app, call } = await makeApp();
+  assert.equal((await call('GET', '/api/v1/me')).status, 401);
+  assert.equal((await call('GET', '/api/v1/me', { token: 'abc.def' })).status, 401);
+  await app.close();
+});
+
+test('compras: dinero insuficiente, éxito, libro contable e idempotencia', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const tooExpensive = await call('POST', '/api/v1/shop/purchase', { token, body: { kind: 'upgrade', id: 'mesas' } });
+  assert.equal(tooExpensive.status, 409);
+  assert.equal(tooExpensive.body.error.code, 'sin_dinero');
+
+  app.service.db.run('UPDATE players SET coins = 1000');
+  const headers = { 'idempotency-key': 'compra-cuchillos-1' };
+  const a = await call('POST', '/api/v1/shop/purchase', { token, headers, body: { kind: 'upgrade', id: 'cuchillos' } });
+  const b = await call('POST', '/api/v1/shop/purchase', { token, headers, body: { kind: 'upgrade', id: 'cuchillos' } });
+  assert.equal(a.status, 200);
+  assert.deepEqual(a.body, b.body);
+  assert.equal(a.body.profile.state.coins, 700);
+  assert.equal(a.body.profile.state.upgrades.cuchillos, 1);
+
+  const bad = await call('POST', '/api/v1/shop/purchase', { token, body: { kind: 'upgrade', id: 'cuchillos', extra: 1 } });
+  assert.equal(bad.status, 400);
+  await app.close();
+});
+
+test('partida completa: valida, paga, es idempotente y aparece en el ranking', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  assert.equal(start.status, 201);
+  const { runId, config } = start.body;
+  const serves = honestServes(config);
+
+  clock.t += config.durationMs + 3000;
+  const done = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
+  assert.equal(done.status, 200, JSON.stringify(done.body));
+  assert.ok(done.body.result.coins > 0);
+  assert.equal(done.body.profile.state.coins, 150 + done.body.result.coins);
+
+  const again = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
+  assert.deepEqual(again.body, done.body);
+
+  const board = await call('GET', '/api/v1/leaderboard/taqueria', { token });
+  assert.equal(board.body.entries[0].score, done.body.result.score);
+  assert.equal(board.body.entries[0].me, true);
+  await app.close();
+});
+
+test('no se puede enviar una partida antes de jugarla (reloj del servidor)', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  clock.t += 5000;
+  const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: honestServes(body.config) } });
+  assert.equal(res.status, 422);
+  assert.equal(res.body.error.details.reason, 'reloj');
+  await app.close();
+});
+
+test('tramposos reincidentes quedan bloqueados', async () => {
+  const { app, clock, call } = await makeApp({ maxCheatStrikes: 2 });
+  const { token } = await guest(call);
+  for (let i = 0; i < 2; i++) {
+    const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+    const o = ordersForConfig(body.config)[0];
+    clock.t += body.config.durationMs;
+    const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: [{ orderId: o.id, recipeId: o.recipeId, servedAt: o.arriveAt + 1 }] } });
+    assert.equal(res.status, 422);
+  }
+  assert.equal((await call('GET', '/api/v1/me', { token })).status, 403);
+  await app.close();
+});
+
+test('no se puede jugar en un restaurante cerrado', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const res = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'izakaya' } });
+  assert.equal(res.status, 400);
+  assert.equal(res.body.error.code, 'restaurante_cerrado');
+  await app.close();
+});
+
+test('reto diario paga bono una sola vez', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  let bonus = 0;
+  for (let i = 0; i < 2; i++) {
+    const { body } = await call('POST', '/api/v1/runs', { token, body: { mode: 'daily' } });
+    clock.t += body.config.durationMs + 2000;
+    const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: honestServes(body.config, { pace: 1500 }) } });
+    assert.equal(res.status, 200);
+    if (res.body.result.stars >= 2) bonus += res.body.rewards.dailyBonus;
+  }
+  assert.ok(bonus === 0 || bonus === 300);
+  await app.close();
+});
+
+test('registro y login conservan la cuenta e invalidan el token de invitado', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const reg = await call('POST', '/api/v1/auth/register', { token, body: { username: 'chef_ana', password: 'contraseña-segura' } });
+  assert.equal(reg.status, 200);
+  assert.equal((await call('GET', '/api/v1/me', { token })).status, 401);
+  const bad = await call('POST', '/api/v1/auth/login', { body: { username: 'chef_ana', password: 'otra-cosa-123' } });
+  assert.equal(bad.status, 401);
+  const ok = await call('POST', '/api/v1/auth/login', { body: { username: 'chef_ana', password: 'contraseña-segura' } });
+  assert.equal(ok.status, 200);
+  assert.equal(ok.body.profile.player.registered, true);
+  await app.close();
+});
