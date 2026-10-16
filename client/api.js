@@ -246,8 +246,10 @@ class LocalApi {
     this.data.state = applyInventory(this.data.state, inventoryDelta(result));
     const s = this.data.state;
     const levelBefore = levelFromXp(s.xp);
-    s.coins += result.coins; s.xp += result.xp;
-    this.#log(result.coins, 'servicio');
+    // Pérdidas: se paga lo que alcance; la caja nunca queda en negativo.
+    const delta = result.coins >= 0 ? result.coins : -Math.min(-result.coins, s.coins);
+    s.coins += delta; s.xp += result.xp;
+    if (delta !== 0) this.#log(delta, delta > 0 ? 'servicio' : 'perdida');
     let dailyBonus = 0;
     if (run.config.mode === 'daily') {
       const ch = dailyChallenge(run.config.day, s);

@@ -32,10 +32,13 @@ test('un jugador honesto obtiene monedas y estrellas', () => {
   assert.ok(res.stars >= 1);
 });
 
-test('una partida vacía es válida y no paga', () => {
+test('una partida vacía es válida: no vende, paga los gastos y cierran la cocina', () => {
   const res = scoreRun(cfgFor(), { serves: [] });
-  assert.equal(res.coins, 0);
+  assert.equal(res.gross, 0);
+  assert.equal(res.coins, -50);
   assert.equal(res.stars, 0);
+  assert.equal(res.closed, true);
+  assert.equal(res.livesLost, 3);
 });
 
 const rejects = (c, serves, reason) => assert.throws(() => scoreRun(c, { serves }), (e) => e instanceof RunValidationError && e.reason === reason);
@@ -127,12 +130,26 @@ test('no se puede cocinar sin ingredientes en la despensa', () => {
   assert.throws(() => scoreRun(c, { serves: all }), (e) => e.reason === 'sin_ingredientes');
 });
 
-test('los gastos del local se descuentan y el resultado nunca es negativo', () => {
+test('los gastos del local se descuentan y un mal servicio da pérdidas', () => {
   const c = cfgFor();
   const res = scoreRun(c, { serves: honestServes(c) });
   assert.equal(res.upkeep, 50);
-  assert.equal(res.coins, Math.max(0, res.gross - 50));
-  assert.equal(scoreRun(c, { serves: [] }).coins, 0);
+  assert.equal(res.coins, res.gross - 50);
+  assert.equal(res.closed, false);
+  assert.ok(scoreRun(c, { serves: [] }).coins < 0);
+});
+
+test('vidas: tres clientes enojados cierran la cocina y lo servido después no cuenta', () => {
+  const c = cfgFor();
+  const empty = scoreRun(c, { serves: [] });
+  assert.equal(empty.closed, true);
+  const orders = ordersForConfig(c);
+  const later = orders.find((o) => o.arriveAt > empty.closedAt + 1000);
+  const servedAt = later.arriveAt + minPrepMs(c.stats, later.recipeId) + 200;
+  assert.throws(() => scoreRun(c, { serves: [{ orderId: later.id, recipeId: later.recipeId, servedAt, perfects: 0 }] }), (e) => e.reason === 'cocina_cerrada');
+  // Un buen servicio no pierde vidas.
+  const good = scoreRun(c, { serves: honestServes(c) });
+  assert.equal(good.closed, false);
 });
 
 test('el desperdicio declarado se limita a lo que quedaba', () => {
@@ -285,23 +302,23 @@ test('asistentes: nivel para contratar, sueldo por servicio y rangos', () => {
   const chain = { ...s, restaurants: ['arepera', 'taqueria', 'diner', 'trattoria', 'izakaya'] };
   assert.equal(evaluateHire(chain, 'luis').reason, 'nivel_insuficiente');
   assert.equal(evaluateHire({ ...chain, xp: xpForLevel(12) }, 'luis').reason, 'sin_dinero');
-  const lvl = { ...chain, xp: xpForLevel(12), coins: 20000 };
+  const lvl = { ...chain, xp: xpForLevel(12), coins: 30000 };
   const d = evaluateHire(lvl, 'luis');
-  assert.equal(d.price, 11000);
+  assert.equal(d.price, 18000);
   const hired = applyHire(lvl, 'luis', d.price);
-  assert.equal(hired.coins, 9000);
+  assert.equal(hired.coins, 12000);
   assert.equal(evaluateHire(hired, 'luis').reason, 'ya_comprado');
   // Volver a llamar a alguien que ya trabajó contigo es gratis.
   const swapped = applyHire(hired, null);
   assert.equal(evaluateHire(swapped, 'luis').price, 0);
   const base = cfgFor(lvl);
   const c = cfgFor(hired);
-  assert.equal(c.salary, 150);
+  assert.equal(c.salary, 320);
   assert.equal(c.staff.rank, 0);
   assert.ok(c.stats.patienceMult > base.stats.patienceMult);
   const res = scoreRun(c, { serves: honestServes(c) });
-  assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - 150));
-  assert.equal(res.salary, 150);
+  assert.equal(res.coins, res.gross - res.upkeep - 320);
+  assert.equal(res.salary, 320);
   assert.equal(staffRank(0), 0);
   assert.equal(staffRank(5), 1);
   assert.equal(staffRank(40), 2);

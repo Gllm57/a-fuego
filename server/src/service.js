@@ -341,6 +341,9 @@ export class GameService {
       this.#takeInventory(playerId, Object.fromEntries(Object.entries(delta).filter(([, n]) => n < 0).map(([k, n]) => [k, -n])));
       this.#addInventory(playerId, Object.fromEntries(Object.entries(delta).filter(([, n]) => n > 0)));
       if (result.coins > 0) this.#credit(playerId, result.coins, 'servicio', runId);
+      // Pérdidas: se paga lo que alcance; la caja nunca queda en negativo.
+      const loss = result.coins < 0 ? Math.min(-result.coins, this.#player(playerId).coins) : 0;
+      if (loss > 0) this.#debit(playerId, loss, 'perdida', runId);
       this.db.run('UPDATE players SET xp = xp + ?, updated_at = ? WHERE id = ?', result.xp, now, playerId);
 
       let dailyBonus = 0;

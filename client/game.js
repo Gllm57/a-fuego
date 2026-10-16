@@ -4,7 +4,7 @@
 import {
   RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig, plateEarnings,
   rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS,
-  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS, STAFF_BY_ID, STAFF_RANKS, rankName
+  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS, STAFF_BY_ID, STAFF_RANKS, rankName, SERVICE_LIVES
 } from './shared/index.js';
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
 import { sfx, music, vibrate, getPrefs, setPref } from './audio.js';
@@ -46,6 +46,9 @@ export class Kitchen {
     this.coins = 0;
     this.firesOut = 0;
     this.groupSeen = false;
+    // Vidas del servicio: sin vidas cierran la cocina antes de tiempo.
+    this.lives = SERVICE_LIVES;
+    this.closed = false;
     // Asistente contratado (si hay): trabaja solo en sus fogones.
     this.helper = config.staff ? { ...STAFF_BY_ID[config.staff.id], rank: config.staff.rank, paused: false, task: '' } : null;
     this.itemSeq = 0;
@@ -69,7 +72,8 @@ export class Kitchen {
                   ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
                   : `<span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span>`}</span>
               </div>
-              <span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
+              <span class="hud__right"><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
+                <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span></span>
             </div>
           </div>
           <div class="bar">
@@ -96,6 +100,7 @@ export class Kitchen {
       coinNum: this.host.querySelector('.hud__num'),
       combo: this.host.querySelector('.combo'),
       customers: this.host.querySelector('.customers'),
+      lives: [...this.host.querySelectorAll('.life')],
       order: this.host.querySelector('.order'),
       stations: Object.fromEntries(this.stationKeys.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
       pantry: [...this.host.querySelectorAll('.jar')],
@@ -138,7 +143,7 @@ export class Kitchen {
       this.helper.paused = !this.helper.paused;
       sfx.tap();
       for (const st of this.stationKeys) {
-        if (this.helper.stations.includes(this.#type(st))) this.el.stations[st].classList.toggle('is-helper-paused', this.helper.paused);
+        if (this.#helperAt(st)) this.el.stations[st].classList.toggle('is-helper-paused', this.helper.paused);
       }
       this.#helperUi(true);
     });
@@ -168,7 +173,7 @@ export class Kitchen {
     const slides = [
       {
         title: 'Elige a un cliente',
-        text: 'Toca a un cliente para ver su comanda. El anillo de color es su paciencia: si se vacía, se va y pierdes el combo.',
+        text: 'Toca a un cliente para ver su comanda. El anillo de color es su paciencia: si se vacía, se va enojado, pierdes el combo y una vida.',
         art: `<div class="tuto-art tuto-art--customer">
           <div class="customer is-selected" style="animation:none">
             <span class="bubble"><span class="bubble__dish">${recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span><span class="bubble__name">${escapeHtml(recipe.name)}</span></span>
@@ -243,7 +248,10 @@ export class Kitchen {
     const pct = (ms) => `${((ms / dur) * 100).toFixed(1)}%`;
     const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
     const vips = this.orders.filter((o) => o.vip);
-    const extras = this.stationKeys.length - STATION_IDS.length;
+    // Qué fogones tienes repetidos, y cuánto cuesta abrir hoy.
+    const doubled = STATION_IDS.filter((st) => this.stationKeys.includes(`${st}#2`)).map((st) => this.#stName(st));
+    const cost = (this.config.upkeep ?? 0) + (this.config.salary ?? 0);
+    const costText = this.helper ? `${fmt(this.config.upkeep ?? 0)} del local + ${fmt(this.config.salary ?? 0)} del sueldo de ${this.helper.name}` : 'gastos del local';
     ov.innerHTML = `
       <div class="brief">
         <button class="card-x" data-act="close" aria-label="Volver sin empezar">${icon('close')}</button>
@@ -262,8 +270,12 @@ export class Kitchen {
           <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">${clockText(dur)}</span>
         </div>
         <div class="brief__legend"><span><i class="lg-rush"></i>Hora pico</span><span><i class="lg-fire"></i>Fuego</span><span><i class="lg-vip"></i>Crítico</span></div>
-        ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy (${rankName(this.helper, this.helper.rank).toLowerCase()}) · sueldo ${fmt(this.config.salary ?? 0)}</span></div>` : ''}
-        <p>${extras > 0 ? `Tienes ${extras} ${extras > 1 ? 'fogones extra' : 'fogón extra'} para cocinar en paralelo. ` : ''}Gastos del local: ${fmt(this.config.upkeep ?? 0)}.</p>
+        ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy en ${this.helper.stations.length ? this.#stName(this.helper.stations[0]).toLowerCase() : 'la barra'} (${rankName(this.helper, this.helper.rank).toLowerCase()})</span></div>` : ''}
+        <ul class="brief__rules">
+          <li>${icon('heart')}<span><b>${SERVICE_LIVES} vidas.</b> Cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina.</span></li>
+          <li>${coinSvg()}<span><b>Al cerrar pagas ${fmt(cost)}</b> (${costText}). Si vendes menos, pierdes la diferencia.</span></li>
+          ${doubled.length ? `<li>${icon('fire')}<span><b>Fogones dobles:</b> ${doubled.join(', ')}. Puedes cocinar dos cosas iguales a la vez.</span></li>` : ''}
+        </ul>
         <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
         <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
       </div>`;
@@ -341,7 +353,7 @@ export class Kitchen {
       this.#update();
       this.#paint();
     }
-    if (this.t >= this.config.durationMs) return this.#finish();
+    if (this.closed || this.t >= this.config.durationMs) return this.#finish();
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -369,6 +381,7 @@ export class Kitchen {
         this.combo = 0;
         this.#comboUi();
         sfx.angry();
+        this.#loseLife(o.vip ? 2 : 1);
         // Lo que ya estaba en su plato se desperdicia.
         o.recipe.components.forEach((c, i) => { if (o.filled[i]) this.#addWaste(c.ingredient); });
         const el = this.custEls.get(o.id);
@@ -459,6 +472,11 @@ export class Kitchen {
     }
   }
 
+  // El ayudante ocupa un solo fogón: el primero de su tipo (no los extra).
+  #helperAt(st) {
+    return Boolean(this.helper?.stations.includes(st));
+  }
+
   #stName(type) {
     return this.restaurant.stationNames?.[type] ?? STATIONS[type].name;
   }
@@ -471,7 +489,7 @@ export class Kitchen {
     let task = '';
     if (!h.paused) {
       for (const st of this.stationKeys) {
-        if (!h.stations.includes(this.#type(st)) || this.fires[st]) continue;
+        if (!this.#helperAt(st) || this.fires[st]) continue;
         const item = this.stations[st];
         if (!item) continue;
         if (item.kind === 'tap' && lv.tapMs) {
@@ -786,7 +804,7 @@ export class Kitchen {
     return `<div class="st-group" data-count="${keys.length}">
       <div class="st-group__row">${keys.map((k, i) => `
         <button class="station" data-station="${k}" aria-label="${this.#stName(type)}${keys.length > 1 ? ` ${i + 1}` : ''}">
-          <span class="station__ring"><span class="station__disc">${STATION_ART[type]}<span class="station__slot"></span></span></span>${this.helper?.stations.includes(type) ? `<span class="helper-badge">${staffSvg(this.helper)}</span>` : ''}
+          <span class="station__ring"><span class="station__disc">${STATION_ART[type]}<span class="station__slot"></span></span></span>${this.helper?.stations.includes(k) ? `<span class="helper-badge">${staffSvg(this.helper)}</span>` : ''}
           <span class="station__status">Libre</span>
         </button>`).join('')}
       </div>
@@ -1062,6 +1080,19 @@ export class Kitchen {
     }
   }
 
+  #loseLife(n) {
+    if (this.closed) return;
+    this.lives = Math.max(0, this.lives - n);
+    this.el.lives.forEach((el, i) => {
+      const lost = i >= this.lives;
+      if (lost && !el.classList.contains('is-lost')) { el.classList.add('is-lost', 'is-breaking'); setTimeout(() => el.classList.remove('is-breaking'), 600); }
+    });
+    vibrate([60, 40, 60]);
+    this.host.querySelector('.lives')?.setAttribute('aria-label', `${this.lives} vidas`);
+    if (this.lives <= 0) this.closed = true;
+    else if (this.lives === 1) this.#ribbon('¡Última vida!', 'Si se va otro cliente, cierran la cocina', 'fire');
+  }
+
   #comboLost() {
     const c = this.el.combo;
     floatText(c, 'Combo perdido', 'bad');
@@ -1081,9 +1112,11 @@ export class Kitchen {
     }
     const ov = document.createElement('div');
     ov.className = 'overlay';
-    ov.innerHTML = `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
+    ov.innerHTML = this.closed
+      ? `<div class="countdown countdown--closed" style="font-size:52px">¡Cerraron la cocina!</div><p>Se fueron demasiados clientes enojados. Igual pagas los gastos del local.</p>`
+      : `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
     this.el.root.appendChild(ov);
-    sfx.count(true);
+    if (this.closed) sfx.burn(); else sfx.count(true);
     music.stop();
     this.el.root.classList.remove('is-hot');
     setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, firesOut: this.firesOut, estimate: this.coins }), 1100);

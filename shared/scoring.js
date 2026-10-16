@@ -6,7 +6,7 @@
 import { RECIPE_BY_ID, PROCESSES } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { generateOrders } from './levelgen.js';
-import { minPrepMs, stationLoadMs, recipeIngredients, stationCount, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS, GROUP_WINDOW_MS, GROUP_BONUS } from './rules.js';
+import { minPrepMs, stationLoadMs, recipeIngredients, stationCount, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS, GROUP_WINDOW_MS, GROUP_BONUS, SERVICE_LIVES, CLOSE_GRACE_MS } from './rules.js';
 import { generateEvents } from './levelgen.js';
 
 export const MAX_COMBO_STEPS = 5;
@@ -135,6 +135,23 @@ export function scoreRun(config, submission) {
 
   // Sólo se puede servir a un cliente sentado (dentro de las mesas disponibles).
   const servedAtById = new Map(serves.map((s) => [s.orderId, s.servedAt]));
+  // Clientes que se fueron sin comer rompen el combo y quitan vidas (un crítico, dos).
+  // Al quedarse sin vidas cierran la cocina: lo que se sirva después no cuenta.
+  const left = orders
+    .filter((o) => !servedAtById.has(o.id) && o.arriveAt + o.patienceMs <= durationMs)
+    .map((o) => ({ at: o.arriveAt + o.patienceMs, cost: o.vip ? 2 : 1 }))
+    .sort((a, b) => a.at - b.at);
+  let closedAt = null;
+  let livesLost = 0;
+  for (const x of left) {
+    livesLost += x.cost;
+    if (livesLost >= SERVICE_LIVES) { closedAt = x.at; break; }
+  }
+  livesLost = Math.min(livesLost, SERVICE_LIVES);
+  if (closedAt !== null) {
+    for (const s of serves) if (s.servedAt > closedAt + CLOSE_GRACE_MS) fail('cocina_cerrada', s);
+  }
+  const departures = left.filter((x) => closedAt === null || x.at <= closedAt).map((x) => x.at);
   for (const s of serves) {
     const t = s.servedAt;
     const seated = orders.filter((o) => {
@@ -148,11 +165,6 @@ export function scoreRun(config, submission) {
     if (pos < 0 || pos >= stats.slots) fail('cliente_no_sentado', s);
   }
 
-  // Clientes que se fueron sin comer rompen el combo.
-  const departures = orders
-    .filter((o) => !servedAtById.has(o.id) && o.arriveAt + o.patienceMs <= durationMs)
-    .map((o) => o.arriveAt + o.patienceMs)
-    .sort((a, b) => a - b);
 
   const groups = groupsTogether(orders, servedAtById);
   // Fuegos apagados (sólo cuentan para logros): no puede haber más que los que hubo.
@@ -185,10 +197,12 @@ export function scoreRun(config, submission) {
 
   const upkeep = config.upkeep ?? 0;
   const salary = config.salary ?? 0;
-  const coins = Math.max(0, gross - upkeep - salary - emergencyCost);
+  // El resultado puede ser negativo: si vendes menos de lo que cuesta abrir, pierdes dinero.
+  const coins = gross - upkeep - salary - emergencyCost;
+  const closed = closedAt !== null;
   const target = orders.reduce((sum, o) => sum + RECIPE_BY_ID[o.recipeId].price * (o.vip ? VIP_PRICE_MULT : 1), 0);
   const ratio = target > 0 ? gross / target : 0;
-  const stars = STAR_THRESHOLDS.filter((th) => ratio >= th).length;
+  const stars = closed ? 0 : STAR_THRESHOLDS.filter((th) => ratio >= th).length;
   const xp = serves.length * 10 + perfectsTotal * 2 + vipServed * 15 + stars * 25;
   const ingredientCost = Object.entries(used).reduce((s, [ing, n]) => s + INGREDIENTS[ing].cost * n, 0)
     + Object.entries(waste).reduce((s, [ing, n]) => s + INGREDIENTS[ing].cost * n, 0);
@@ -196,6 +210,9 @@ export function scoreRun(config, submission) {
   return {
     served: serves.length,
     missed: departures.length,
+    livesLost,
+    closed,
+    closedAt,
     totalOrders: orders.length,
     vipServed,
     vipTotal: orders.filter((o) => o.vip).length,

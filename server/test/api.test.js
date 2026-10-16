@@ -195,15 +195,15 @@ test('personal: contratar por la API y sumar experiencia tras un servicio', asyn
   app.service.db.run('UPDATE players SET xp = 100000');
   const poor = await call('POST', '/api/v1/staff/hire', { token, body: { id: 'pepe' } });
   assert.equal(poor.body.error.code, 'sin_dinero');
-  app.service.db.run('UPDATE players SET coins = 5000');
+  app.service.db.run('UPDATE players SET coins = 8000');
   const ok = await call('POST', '/api/v1/staff/hire', { token, body: { id: 'pepe' } });
   assert.equal(ok.status, 200, JSON.stringify(ok.body));
   assert.equal(ok.body.profile.state.staff.hired, 'pepe');
-  assert.equal(ok.body.profile.state.coins, 2000);
+  assert.equal(ok.body.profile.state.coins, 2500);
   const ledger = await call('GET', '/api/v1/me/ledger', { token });
-  assert.ok(ledger.body.entries.some((e) => e.reason === 'contrato' && e.delta === -3000));
+  assert.ok(ledger.body.entries.some((e) => e.reason === 'contrato' && e.delta === -5500));
   const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
-  assert.equal(start.body.config.salary, 60);
+  assert.equal(start.body.config.salary, 130);
   clock.t += start.body.config.durationMs + 3000;
   const done = await call('POST', `/api/v1/runs/${start.body.runId}/complete`, { token, body: { serves: [] } });
   assert.equal(done.status, 200);
@@ -223,5 +223,23 @@ test('jugadores anteriores reciben la arepera gratis', async () => {
   const st = again.state(pid);
   assert.deepEqual(st.restaurants, ['arepera', 'taqueria']);
   assert.ok(st.recipes.includes('arepa_queso'));
+  await app.close();
+});
+
+test('un servicio vacío cobra los gastos y la caja no baja de 0', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
+  clock.t += start.body.config.durationMs + 3000;
+  const done = await call('POST', `/api/v1/runs/${start.body.runId}/complete`, { token, body: { serves: [] } });
+  assert.equal(done.status, 200);
+  assert.equal(done.body.result.closed, true);
+  assert.equal(done.body.result.coins, -50);
+  assert.equal(done.body.profile.state.coins, 200 - 50 + done.body.rewards.achievements.reduce((a, x) => a + x.reward, 0));
+  app.service.db.run('UPDATE players SET coins = 10');
+  const s2 = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
+  clock.t += s2.body.config.durationMs + 3000;
+  const d2 = await call('POST', `/api/v1/runs/${s2.body.runId}/complete`, { token, body: { serves: [] } });
+  assert.equal(d2.body.profile.state.coins, 0);
   await app.close();
 });

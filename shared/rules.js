@@ -23,6 +23,10 @@ export const FIRE_TAPS = 6;
 // clientes y ritmo de llegada. Cada local se nota más exigente que el anterior.
 export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.76, 0.68]);
 export const TIER_PACE = Object.freeze([1.04, 0.97, 0.91, 0.87, 0.82, 0.76]);
+// Vidas por servicio: cada cliente que se va enojado quita una (un crítico, dos).
+// Sin vidas cierran la cocina antes de tiempo. Margen para el último fotograma.
+export const SERVICE_LIVES = 3;
+export const CLOSE_GRACE_MS = 400;
 // Grupos: dos amigos que llegan juntos y quieren comer a la vez.
 export const GROUP_WINDOW_MS = 10_000;
 export const GROUP_BONUS = 0.25;

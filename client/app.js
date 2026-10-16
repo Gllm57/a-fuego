@@ -890,7 +890,7 @@ function accountSection(p) {
 }
 
 const REASONS = {
-  bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', reto_diario: 'Reto del día', mercado: 'Mercado',
+  bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', perdida: 'Servicio con pérdidas', reto_diario: 'Reto del día', mercado: 'Mercado',
   compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante'
 };
 
@@ -974,14 +974,19 @@ function showResults(host, run, res) {
   const goal = profile.nextGoal;
   const wasted = Object.values(result.waste ?? {}).reduce((a, n) => a + n, 0);
   const achievementCoins = (rewards.achievements ?? []).reduce((a, x) => a + x.reward, 0);
+  const net = result.coins + rewards.dailyBonus + achievementCoins;
+  // Una pérdida se paga hasta donde alcance la caja.
+  // (st() todavía tiene la caja de antes del servicio: el perfil nuevo se aplica después.)
+  const paidLoss = net < 0 ? Math.max(0, st().coins - profile.state.coins) : 0;
   host.innerHTML = `
     <div class="game"><div class="game__inner" style="display:flex">
       <div class="results">
         <div class="results__kicker">${rest.name.toUpperCase()}${run.config.mode === 'daily' ? ' · RETO DEL DÍA' : ''}</div>
-        <h1>${HEADLINES[result.stars]}</h1>
+        <h1>${result.closed ? '¡Te cerraron la cocina!' : result.coins < 0 ? 'Servicio con pérdidas' : HEADLINES[result.stars]}</h1>
         <div class="stars">${[0, 1, 2].map((i) => starSvg(`star ${i < result.stars ? 'is-on' : ''}`)).join('')}</div>
-        <div class="results__coins">${coinSvg()}<span data-count>0</span></div>
-        <div class="results__label">GANANCIA NETA</div>
+        <div class="results__coins ${net < 0 ? 'is-loss' : ''}">${coinSvg()}<span data-count>0</span></div>
+        <div class="results__label">${net < 0 ? `PÉRDIDA${paidLoss < -net ? ` · pagaste ${fmt(paidLoss)} (no alcanzó la caja)` : ''}` : 'GANANCIA NETA'}</div>
+        ${result.closed ? `<div class="bonus-line bonus-line--bad">${icon('heart')} Se fueron demasiados clientes enojados: el servicio terminó antes de tiempo.</div>` : ''}
         ${rewards.dailyBonus ? `<div class="bonus-line">${icon('sparkle')} Reto del día: +${fmt(rewards.dailyBonus)}</div>` : ''}
         ${(rewards.achievements ?? []).map((x, i) => `<div class="achievement-pop" style="animation-delay:${0.6 + i * 0.35}s">${icon('medal')}<span><small>¡Logro desbloqueado!</small>${escapeHtml(x.name)}</span><b>+${fmt(x.reward)}</b></div>`).join('')}
         <div class="bubbles">
@@ -998,7 +1003,7 @@ function showResults(host, run, res) {
           ${result.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(result.emergencyCost)}</b></div>` : ''}
           ${rewards.dailyBonus ? `<div class="ticket__row"><span>Bono reto del día</span><b class="pos">+${fmt(rewards.dailyBonus)}</b></div>` : ''}
           ${achievementCoins ? `<div class="ticket__row"><span>Premios por logros</span><b class="pos">+${fmt(achievementCoins)}</b></div>` : ''}
-          <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(result.coins + rewards.dailyBonus + achievementCoins)}</b></div>
+          <div class="ticket__row is-total"><span>${net < 0 ? 'Pérdida' : 'Ganancia'}</span><b class="${net < 0 ? 'neg' : ''}">${fmt(net)}</b></div>
           <div class="ticket__row"><span class="note">Ingredientes usados${wasted ? `, ${wasted} desperdiciados` : ''} (ya pagados en el mercado)</span><b class="note">~${fmt(result.ingredientCost)}</b></div>
         </div>
         ${levelUp ? `<div class="levelup">${starSvg('')} ¡Subiste a nivel ${levelUp}! Hay recetas y locales nuevos.</div>` : ''}
@@ -1011,10 +1016,10 @@ function showResults(host, run, res) {
         </div>
       </div>
     </div></div>`;
-  countUp(host.querySelector('[data-count]'), rewards.coins + rewards.dailyBonus + achievementCoins, { ms: 1400 });
+  countUp(host.querySelector('[data-count]'), net, { ms: 1400 });
   (rewards.achievements ?? []).forEach((_, i) => setTimeout(() => sfx.logro(), 600 + i * 350));
   for (let i = 0; i < result.stars; i++) setTimeout(() => sfx.star(i), 350 * i + 100);
-  if (result.stars === 3 || levelUp || achievementCoins) confetti(host.querySelector('.results'), [rest.theme.primary, '#FFC23D', '#fff']);
+  if (!result.closed && net >= 0 && (result.stars === 3 || levelUp || achievementCoins)) confetti(host.querySelector('.results'), [rest.theme.primary, '#FFC23D', '#fff']);
   const close = (tab) => { host.remove(); applyTheme(app.restaurantId); go(tab); };
   host.querySelector('[data-act="again"]').addEventListener('click', () => { host.remove(); play(run.config.restaurantId, 'normal'); });
   host.querySelector('[data-act="market"]').addEventListener('click', () => close('market'));

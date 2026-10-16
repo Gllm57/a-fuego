@@ -134,17 +134,17 @@ export const UPGRADES = Object.freeze([
 // Personal de cocina: un asistente a la vez. Contratarlo cuesta una vez (`hireCost`) y
 // cobra sueldo en cada servicio. Se desbloquean desde el tercer restaurante (`reqRestaurant`).
 // `ranks` según servicios trabajados; cada rango lo hace más rápido o mejor.
-//  - pepe: corta solo en la tabla (`tapMs` entre cortes).
-//  - rosa: voltea y recoge de la sartén y el horno (`reactMs` tras el aviso).
+//  - pepe: corta solo en UNA tabla (`tapMs` entre cortes).
+//  - rosa: voltea y recoge en UNA sartén (`reactMs` tras el aviso).
 //  - luis: los clientes esperan más (`patience`) y dejan más propina (`tip`).
 export const STAFF = Object.freeze([
-  { id: 'pepe', name: 'Pepe', role: 'El picador', stations: ['tabla'], salary: 60, hireCost: 3000, reqLevel: 6, reqRestaurant: 'diner',
-    desc: 'Corta solo lo que pongas en la tabla. Tú lo pones; él hace los cortes.',
+  { id: 'pepe', name: 'Pepe', role: 'El picador', stations: ['tabla'], salary: 130, hireCost: 5500, reqLevel: 6, reqRestaurant: 'diner',
+    desc: 'Se queda en una tabla y corta solo lo que pongas en ella. Tú lo pones; él hace los cortes.',
     look: { shirt: '#1C4E9C', skin: '#E9B98F', bg: '#FFE7B3' }, levels: [{ tapMs: 460 }, { tapMs: 360 }, { tapMs: 270 }] },
-  { id: 'rosa', name: 'Rosa', role: 'La del budare', fem: true, stations: ['sarten', 'horno'], salary: 110, hireCost: 6500, reqLevel: 9, reqRestaurant: 'trattoria',
-    desc: 'Voltea la carne a tiempo y saca del fuego lo que está listo antes de que se queme.',
+  { id: 'rosa', name: 'Rosa', role: 'La del budare', fem: true, stations: ['sarten'], salary: 220, hireCost: 11000, reqLevel: 9, reqRestaurant: 'trattoria',
+    desc: 'Se queda en una sartén: voltea la carne a tiempo y la saca antes de que se queme.',
     look: { shirt: '#C8102E', skin: '#C98E66', bg: '#FDE3D8' }, levels: [{ reactMs: 1150 }, { reactMs: 700 }, { reactMs: 350 }] },
-  { id: 'luis', name: 'Don Luis', role: 'El mesero', stations: [], salary: 150, hireCost: 11000, reqLevel: 12, reqRestaurant: 'izakaya',
+  { id: 'luis', name: 'Don Luis', role: 'El mesero', stations: [], salary: 320, hireCost: 18000, reqLevel: 12, reqRestaurant: 'izakaya',
     desc: 'Atiende la barra: los clientes esperan más y dejan mejor propina.',
     look: { shirt: '#2A170D', skin: '#8D5A3B', bg: '#DCE6FB' }, levels: [{ patience: 1.12, tip: 0.03 }, { patience: 1.15, tip: 0.05 }, { patience: 1.2, tip: 0.08 }] }
 ]);
