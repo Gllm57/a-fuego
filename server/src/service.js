@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, retiredDecorRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -37,7 +37,23 @@ export class GameService {
     this.config = config;
     this.now = now;
     this.#refundRetiredUpgrades();
+    this.#refundRetiredDecor();
     this.#grantStarterRestaurant();
+  }
+
+  #refundRetiredDecor() {
+    for (const p of this.db.all("SELECT id, progress_json FROM players WHERE progress_json IS NOT NULL")) {
+      let saved;
+      try { saved = JSON.parse(p.progress_json); } catch { continue; }
+      if (!saved?.decor) continue;
+      const clean = decorOf({ decor: saved.decor });
+      if (JSON.stringify(clean) === JSON.stringify(saved.decor)) continue;
+      this.db.tx(() => {
+        const amount = retiredDecorRefund(saved.decor);
+        if (amount > 0) this.#credit(p.id, amount, 'reembolso_decoracion', null);
+        this.db.run('UPDATE players SET progress_json = ? WHERE id = ?', JSON.stringify({ ...saved, decor: clean }), p.id);
+      });
+    }
   }
 
   // La arepera se agregó como primer local: quien ya jugaba la recibe gratis con sus recetas iniciales.

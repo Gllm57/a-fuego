@@ -1051,7 +1051,7 @@ function accountSection(p) {
 
 const REASONS = {
   bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', perdida: 'Servicio con pérdidas', reto_diario: 'Reto del día', mercado: 'Mercado',
-  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante', decoracion: 'Decoración del local'
+  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante', decoracion: 'Decoración del local', reembolso_decoracion: 'Reembolso: decoración retirada'
 };
 
 async function openLedger() {

@@ -63,7 +63,18 @@ export function newPlayerState() {
 export function decorOf(state) {
   const base = defaultDecor();
   const dec = state.decor ?? {};
-  return { owned: [...(dec.owned ?? [])], equipped: { ...base.equipped, ...(dec.equipped ?? {}), deco: [...(dec.equipped?.deco ?? [])] } };
+  const equipped = { ...base.equipped, deco: (dec.equipped?.deco ?? []).filter((id) => DECOR_BY_ID[id]?.slot === 'deco') };
+  for (const slot of Object.keys(base.equipped)) {
+    const id = dec.equipped?.[slot];
+    if (slot !== 'deco' && DECOR_BY_ID[id]?.slot === slot) equipped[slot] = id;
+  }
+  return { owned: (dec.owned ?? []).filter((id) => DECOR_BY_ID[id]), equipped };
+}
+
+// Decoraciones que se quitaron del juego: quien las compró recupera lo que pagó.
+export const RETIRED_DECOR = Object.freeze({ deco_cuadro: 350, deco_ventilador: 550, luces_disco: 0 });
+export function retiredDecorRefund(decor) {
+  return (decor?.owned ?? []).reduce((sum, id) => sum + (RETIRED_DECOR[id] ?? 0), 0);
 }
 
 // Gratis = cuesta 0 y no pide nada; un logro o el nivel lo desbloquean sin pagar.

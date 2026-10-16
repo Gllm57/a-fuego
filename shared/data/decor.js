@@ -42,7 +42,6 @@ export const DECOR = Object.freeze([
   d('luces_faroles', 'luces', 'Faroles', 700),
   d('luces_velas', 'luces', 'Velas', 450),
   d('luces_neon', 'luces', 'Neón', 1200, { reqLevel: 10 }),
-  d('luces_disco', 'luces', 'Bola disco', 1800, { reqLevel: 12 }),
 
   d('barra_roble', 'barra', 'Roble', 0),
   d('barra_nogal', 'barra', 'Nogal', 600),
@@ -53,12 +52,10 @@ export const DECOR = Object.freeze([
   d('barra_oro', 'barra', 'Oro', 0, { achievement: 'platos_300' }),
 
   d('deco_plantas', 'deco', 'Plantas', 200),
-  d('deco_cuadro', 'deco', 'Cuadro', 350),
   d('deco_reloj', 'deco', 'Reloj', 300),
   d('deco_gato', 'deco', 'Gato de la suerte', 500),
   d('deco_pecera', 'deco', 'Pecera', 650),
   d('deco_mariposas', 'deco', 'Mariposas', 400),
-  d('deco_ventilador', 'deco', 'Ventilador', 550),
   d('deco_rocola', 'deco', 'Rocola', 1200),
   d('deco_pinata', 'deco', 'Piñata', 700),
   d('deco_guacamaya', 'deco', 'Guacamaya', 0, { achievement: 'bombero' }),

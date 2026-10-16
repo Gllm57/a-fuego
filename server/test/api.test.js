@@ -2,6 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { makeApp, honestServes } from './helpers.js';
 import { ordersForConfig } from '../../shared/index.js';
+import { GameService } from '../src/service.js';
 
 async function guest(call) {
   const res = await call('POST', '/api/v1/auth/guest');
@@ -258,5 +259,21 @@ test('decoración por la API: comprar cobra y queda puesta; poner cambia la ranu
   assert.equal(back.body.profile.state.decor.equipped.barra, 'barra_roble');
   const nope = await call('POST', '/api/v1/decor/equip', { token, body: { id: 'pared_pizarra' } });
   assert.equal(nope.body.error.code, 'no_comprado');
+  await app.close();
+});
+
+test('al arrancar, las decoraciones retiradas se quitan y se reembolsan una vez', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const db = app.service.db;
+  const decor = { owned: ['deco_cuadro', 'deco_ventilador', 'deco_gato'], equipped: { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: ['deco_cuadro', 'deco_gato'] } };
+  db.run('UPDATE players SET progress_json = ?', JSON.stringify({ decor }));
+  new GameService({ db, config: app.service.config, now: app.service.now });
+  new GameService({ db, config: app.service.config, now: app.service.now });
+  const me = (await call('GET', '/api/v1/me', { token })).body;
+  const state = (me.profile ?? me).state;
+  assert.equal(state.coins, 200 + 900);
+  assert.deepEqual(state.decor.owned, ['deco_gato']);
+  assert.deepEqual(state.decor.equipped.deco, ['deco_gato']);
   await app.close();
 });

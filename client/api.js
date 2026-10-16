@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, DECOR, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, retiredDecorRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, DECOR, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta, UPGRADES, RESTAURANTS, RECIPES, STAFF, xpForLevel
@@ -170,6 +170,12 @@ class LocalApi {
         }
         // Un ayudante contratado antes de abrir su restaurante (versión anterior) deja de trabajar.
         data.state = sanitizeStaff(data.state);
+        const decorRefund = retiredDecorRefund(data.state.decor);
+        if (data.state.decor) data.state.decor = decorOf(data.state);
+        if (decorRefund > 0 && !SANDBOX) {
+          data.state.coins += decorRefund;
+          data.ledger.unshift({ delta: decorRefund, reason: 'reembolso_decoracion', t: Date.now(), balanceAfter: data.state.coins });
+        }
         for (const id of Object.keys(RETIRED_UPGRADES)) {
           const amount = retiredRefund(id, data.state.upgrades?.[id] ?? 0);
           if (data.state.upgrades) delete data.state.upgrades[id];

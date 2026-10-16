@@ -330,22 +330,13 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .candles span { width: 8px; height: 18px; border-radius: 2px; background: #FFF8EE; box-shadow: inset 0 0 0 1.5px #E3C8A6; position: relative; }
 .candles i { position: absolute; left: 50%; top: -11px; width: 8px; height: 12px; margin-left: -4px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 70%, #FFF1B8, #FFB020 60%, #E2394B); box-shadow: 0 0 12px 4px rgba(255,190,80,.5); animation: flicker .25s ease-in-out infinite alternate; animation-delay: var(--d); }
 @keyframes flicker { from { transform: scale(1) rotate(-3deg); } to { transform: scale(1.12, .92) rotate(3deg); } }
-.disco { position: absolute; top: 0; left: 50%; width: 0; pointer-events: none; z-index: 0; }
-.disco i { position: absolute; left: -16px; top: 6px; width: 32px; height: 32px; border-radius: 50%; background: conic-gradient(#fff, #9FD3F0, #fff, #F28CA8, #fff, #FFE08A, #fff); box-shadow: inset 0 0 0 2px rgba(0,0,0,.15), 0 0 18px rgba(255,255,255,.8); animation: spin 3s linear infinite; }
-.disco i::before { content: ''; position: absolute; left: 50%; top: -6px; width: 2px; height: 6px; background: #6B5444; }
-.disco b { position: absolute; top: 30px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.85), transparent 70%); animation: disco-dot 2.4s linear infinite; }
-.disco b:nth-child(2) { left: -90px; } .disco b:nth-child(3) { left: 60px; animation-delay: -.8s; } .disco b:nth-child(4) { left: -20px; animation-delay: -1.6s; }
-@keyframes disco-dot { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(40px, 70px); opacity: 0; } }
 .deco svg { display: block; width: 100%; height: 100%; overflow: visible; }
 .deco--reloj { left: 16px; top: 30px; width: 34px; height: 34px; }
 .clock-h, .clock-m { transform-origin: 20px 20px; }
 .clock-m { animation: spin 6s linear infinite; }
 .clock-h { animation: spin 72s linear infinite; }
-.deco--ventilador { left: 50%; top: -2px; width: 76px; height: 32px; margin-left: -38px; }
-.fan-blades { transform-origin: 35px 14px; animation: fan 0.6s linear infinite; }
-@keyframes fan { from { transform: scaleX(1); } 50% { transform: scaleX(-1); } to { transform: scaleX(1); } }
-.deco--guacamaya { left: 54px; top: 0; width: 34px; height: 50px; }
-.parrot { transform-origin: 22px 12px; animation: sway 2.6s ease-in-out infinite; }
+.deco--guacamaya { left: calc(33% - 18px); top: 0; width: 36px; height: 54px; }
+.parrot { transform-origin: 24px 0; animation: sway 2.6s ease-in-out infinite; }
 .deco--pinata { right: 74px; top: 0; width: 32px; height: 46px; transform-origin: top center; animation: sway 2.2s ease-in-out infinite; }
 .deco--mariposas { inset: 0; }
 .deco--mariposas i { position: absolute; left: -20px; top: var(--y); width: 16px; height: 12px; animation: flutter-path 7s linear infinite; animation-delay: var(--d); }
@@ -371,11 +362,9 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 @keyframes note { from { transform: translate(0, 0); opacity: 1; } to { transform: translate(10px, -26px); opacity: 0; } }
 /* Muestras de Mi local: cada adorno centrado en su recuadro. */
 .sw--deco .deco--reloj, .sw--deco .deco--gato, .sw--deco .deco--pecera, .sw--deco .deco--rocola, .sw--deco .deco--pinata, .sw--deco .deco--guacamaya { left: 50% !important; right: auto !important; top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) scale(.85); }
-.sw--deco .deco--ventilador { top: 6px; transform: scale(.8); }
 .sw--deco .deco--pinata { animation: none; }
 .sw--lights .lanterns b { width: 14px; height: 18px; }
 .sw--lights .candles { bottom: 4px; }
-.sw--lights .disco i { top: 4px; }
 .bar__counter { z-index: 2; height: 40px; }
 .decor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .decor-item { border: 0; border-radius: 22px; padding: 10px 6px 8px; min-height: 108px; background: var(--card); box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--line); display: flex; flex-direction: column; align-items: center; gap: 5px; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
@@ -394,8 +383,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .sw--lights .lamp b::after { display: none; }
 .sw--lights .garland { top: 4px; }
 .sw--lights .neon-sign { font-size: 13px; top: 12px; }
-.sw--deco .deco--frame { right: auto; left: 50%; top: 6px; transform: translateX(-50%) scale(.75); }
-.sw--deco .deco--plants { left: 50%; bottom: 0; transform: translateX(-50%) scale(.8); }
+.sw--deco .deco--plants { left: 50%; bottom: 2px; transform: translateX(-50%) scale(.85); }
+.sw--deco .deco--plants-r { display: none; }
 .sw--deco .deco--flags { top: 4px; }
 .decor-buy { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
 .decor-buy b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 16px; }
@@ -676,12 +665,10 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .deco { position: absolute; pointer-events: none; z-index: 0; }
 .deco--flags { top: 0; left: 0; right: 0; display: flex; justify-content: space-around; padding: 0 12px; }
 .deco--flags i { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 16px solid var(--c); filter: drop-shadow(0 2px 1px rgba(0,0,0,.15)); }
-.deco--frame { right: 16px; top: 34px; width: 50px; height: 38px; border: 4px solid #8E5A2C; border-radius: 5px; background: linear-gradient(#9FD3F0 0 55%, #4FA35B 55%); box-shadow: 0 5px 8px -5px rgba(0,0,0,.45); }
-.deco--frame i { position: absolute; left: 8px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #FFD36A; }
-.deco--plants { left: 4px; bottom: 22px; display: flex; flex-direction: column; align-items: center; }
-.deco--plants-r { left: auto; right: 4px; }
-.deco--plants i { width: 30px; height: 30px; border-radius: 50%; background: #3E8E4A; box-shadow: 10px -4px 0 -5px #4FA35B, -9px -3px 0 -6px #4FA35B; }
-.deco--plants b { width: 22px; height: 18px; margin-top: -4px; background: #C2683A; border-radius: 3px 3px 8px 8px; }
+.deco--plants { left: 2px; bottom: 22px; width: 38px; height: 48px; }
+.plant-leaves { transform-origin: 22px 34px; animation: sway 4.5s ease-in-out infinite; }
+.deco--plants-r .plant-leaves { animation-duration: 5.5s; animation-delay: -2s; }
+.deco--plants-r { left: auto; right: 2px; }
 .bar__counter { position: absolute; left: -10px; right: -10px; bottom: -6px; height: 34px; border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: linear-gradient(var(--wood), var(--wood-deep)); box-shadow: inset 0 4px 0 rgba(255,255,255,.25); }
 .customers { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(var(--slots, 3), minmax(0, 1fr)); gap: 6px; align-items: end; min-height: 128px; padding-bottom: 14px; }
 .customer { position: relative; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; animation: customer-in .55s var(--ease-spring) both; }

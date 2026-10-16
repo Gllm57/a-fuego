@@ -28,7 +28,7 @@ usa las propinas para construir tu cadena de restaurantes.
 - **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada restaurante avanzado. Pepe corta en una tabla (con el Diner, contrato 5.500), Rosa voltea y saca lo listo de una sartén (con la Trattoria, 11.000) y Don Luis hace más pacientes a los clientes (con la Izakaya, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
 
 - **Mi local** (Inicio → Mi local): decora el restaurante con toldo, pared, luces, barra y adornos.
-  46 piezas (gato de la suerte, pecera, rocola, piñata, guacamaya, bola disco, toldo arcoíris…).
+  43 piezas (gato de la suerte, pecera, rocola, piñata, guacamaya, plantas, toldo arcoíris…).
   Se ve sólo durante el servicio; el toldo de Inicio sigue mostrando el color de tu restaurante.
   Unos se compran, otros se ganan con logros o nivel; sólo cambian cómo se ve.
 

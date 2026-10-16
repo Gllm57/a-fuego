@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients, decorOwned, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients, decorOwned, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, retiredDecorRefund
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -390,4 +390,14 @@ test('decoración: comprar, poner y lo que piden logros o nivel', () => {
   assert.deepEqual(decorOf(applyDecorEquip(plants, 'deco_plantas')).equipped.deco, []);
   // Con el logro, el tricolor es gratis.
   assert.ok(decorOwned({ ...s, achievements: ['cadena'] }, 'toldo_tricolor'));
+});
+
+test('las decoraciones retiradas se quitan y se reembolsan', () => {
+  const old = { decor: { owned: ['deco_cuadro', 'deco_ventilador', 'luces_disco', 'deco_gato'], equipped: { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_disco', barra: 'barra_roble', deco: ['deco_cuadro', 'deco_gato'] } } };
+  assert.equal(retiredDecorRefund(old.decor), 900);
+  const clean = decorOf(old);
+  assert.deepEqual(clean.owned, ['deco_gato']);
+  assert.equal(clean.equipped.luces, 'luces_colgantes');
+  assert.deepEqual(clean.equipped.deco, ['deco_gato']);
+  assert.equal(retiredDecorRefund(clean), 0);
 });
