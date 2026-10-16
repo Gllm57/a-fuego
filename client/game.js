@@ -58,6 +58,7 @@ export class Kitchen {
     this.itemSeq = 0;
     this.custEls = new Map();
     this.leaving = new Map();
+    this.ticketHold = null;
     // Cuándo aterriza cada ingrediente en el plato o el fogón (para mostrarlo justo al llegar).
     this.landAt = new Map();
     this.onPlate = new Set();
@@ -813,9 +814,11 @@ export class Kitchen {
 
   // ── Comanda del pedido seleccionado ─────────────────────
   #renderOrder() {
-    const o = this.selected !== null ? this.orders[this.selected] : null;
+    // Un plato recién completado se queda en la comanda hasta que despega hacia su cliente.
+    const held = this.ticketHold != null ? this.orders[this.ticketHold] : null;
+    const o = held ?? (this.selected !== null ? this.orders[this.selected] : null);
     const stockSig = o ? o.recipe.components.map((c) => (this.stock[c.ingredient] ?? 0) > 0 ? 1 : 0).join('') : '';
-    const sig = o ? `${o.id}|${o.filled.join()}|${o.busy.join()}|${stockSig}` : `none|${this.t < 2000}`;
+    const sig = o ? `${held ? 'h' : ''}${o.id}|${o.filled.join()}|${o.busy.join()}|${stockSig}` : `none|${this.t < 2000}`;
     if (sig === this.sig.order) return;
     this.sig.order = sig;
     const el = this.el.order;
@@ -826,7 +829,7 @@ export class Kitchen {
     }
     el.className = 'ticket order';
     const next = o.recipe.components.findIndex((c, i) => !o.filled[i] && !o.busy[i]);
-    let hint = 'Recoge lo que está en los fogones';
+    let hint = o.filled.every(Boolean) ? '¡Listo! Va para la mesa' : 'Recoge lo que está en los fogones';
     if (next >= 0) {
       const c = o.recipe.components[next];
       hint = (this.stock[c.ingredient] ?? 0) <= 0
@@ -1146,6 +1149,8 @@ export class Kitchen {
   // El ingrediente vuela en arco al plato de la comanda (o al cliente, si no es el
   // pedido a la vista); al aterrizar, el plato rebota y el ingrediente cae encima.
   #toPlate(o, idx, from, ingId) {
+    // Si ya va otro ingrediente al plato siguiente, el plato terminado despega ya.
+    if (this.ticketHold != null && this.ticketHold !== o.id) this.orders[this.ticketHold].launchPlate?.();
     sfx.plate();
     const onTicket = o.id === this.selected;
     const target = onTicket ? this.el.order.querySelector('.order__plate') : this.custEls.get(o.id);
@@ -1178,9 +1183,21 @@ export class Kitchen {
     const el = this.custEls.get(o.id);
     const wait = Math.max(0, (o.landsAt ?? 0) - performance.now());
     // Si el último ingrediente fue directo al cliente, no hace falta que vuele el plato.
-    const plateFlight = o.lastFromTicket ? 470 : 0;
-    o.stayMs = wait + plateFlight + 380;
-    setTimeout(() => this.#serveFx(o, el, earned + partnerBonus, o.lastFromTicket), wait);
+    if (o.lastFromTicket) {
+      // El plato espera en la comanda a que aterrice el último ingrediente, rebota y despega.
+      this.ticketHold = o.id;
+      o.launchPlate = () => {
+        if (o.plateGone) return;
+        o.plateGone = true;
+        this.#serveFx(o, el, earned + partnerBonus, true);
+        if (this.ticketHold === o.id) { this.ticketHold = null; this.sig.order = ''; }
+      };
+      o.stayMs = wait + PLATE_PAUSE_MS + 470 + 380;
+      setTimeout(o.launchPlate, wait + PLATE_PAUSE_MS);
+    } else {
+      o.stayMs = wait + 380;
+      setTimeout(() => this.#serveFx(o, el, earned + partnerBonus, false), wait);
+    }
     if (together) {
       sfx.together();
       if (el) setTimeout(() => floatText(el, '¡Comieron juntos!', 'good'), 450);
@@ -1309,6 +1326,8 @@ function awningSvg(theme) {
   </svg>`;
 }
 
+// Pausa entre que el último ingrediente cae en el plato y el plato sale hacia el cliente.
+const PLATE_PAUSE_MS = 160;
 const THANKS = ['¡Delicioso!', '¡Gracias!', '¡Qué rico!', '¡10 de 10!', '¡Vuelvo mañana!', '¡Exquisito!'];
 
 const FLIP_INGREDIENTS = new Set(['carne_res', 'pollo', 'cerdo', 'pescado', 'salmon', 'atun', 'camaron', 'huevo', 'tortilla']);
