@@ -3,12 +3,13 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, DECOR, DECOR_BY_ID, DECOR_SLOTS, decorOf, decorOwned, decorAvailable, ACHIEVEMENT_BY_ID, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
 import { createApi, ApiError, SANDBOX } from './api.js';
 import { Kitchen } from './game.js';
 import { sfx } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
+import { lightsHtml, decoHtml } from './decor-art.js';
 import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
 import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
 
@@ -59,7 +60,13 @@ function applyTheme(restaurantId) {
   r.setProperty('--brand-deep', t.deep);
   r.setProperty('--brand-soft', t.soft);
   r.setProperty('--ground', t.ground);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
+  // Toldo elegido en «Mi local» (o el del restaurante).
+  const toldo = DECOR_BY_ID[app.profile ? decorOf(app.profile.state).equipped.toldo : 'toldo_local'];
+  const [a, b, deep] = toldo?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 78%, #fff)`, t.deep];
+  r.setProperty('--aw-a', a);
+  r.setProperty('--aw-b', b);
+  r.setProperty('--aw-deep', deep);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', toldo?.colors?.[0] ?? t.primary);
 }
 
 function setProfile(next) {
@@ -107,7 +114,8 @@ const PAGES = {
   recipes: { title: 'Recetario', sub: '48 recetas de 6 cocinas del mundo' },
   upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
   diary: { title: 'Diario de caja', sub: 'Logros, ganancias y gastos de tus servicios', back: 'home' },
-  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' }
+  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' },
+  decor: { title: 'Mi local', sub: 'Decora tu restaurante · sólo cambia cómo se ve', back: 'home' }
 };
 
 function renderShell() {
@@ -144,7 +152,7 @@ function go(tab) {
   const screen = document.getElementById('screen');
   screen.style.animation = 'none'; void screen.offsetWidth; screen.style.animation = '';
   screen.scrollTop = 0;
-  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking })[tab]();
+  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking, decor: renderDecor })[tab]();
   renderNavDots();
 }
 
@@ -261,6 +269,11 @@ function renderHome() {
           <b>Ranking</b>
           <span>Top de la semana</span>
         </button>
+        <button class="tile tile--wide tile--decor" data-act="decor">
+          <span class="tile__icon">${icon('sparkle')}</span>
+          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><b>Mi local</b><span>Toldo, pared, luces, barra y adornos</span></span>
+          ${icon('arrow')}
+        </button>
       </div>
     </div>`;
 
@@ -269,6 +282,7 @@ function renderHome() {
   screen.querySelectorAll('[data-act="to-market"]').forEach((b) => b.addEventListener('click', () => go('market')));
   screen.querySelector('[data-act="diary"]').addEventListener('click', () => go('diary'));
   screen.querySelector('[data-act="ranking"]').addEventListener('click', () => go('ranking'));
+  screen.querySelector('[data-act="decor"]').addEventListener('click', () => go('decor'));
   screen.querySelector('[data-act="goal"]').addEventListener('click', () => {
     if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; go('recipes'); }
     else if (goal.kind === 'restaurant') openRestaurant(RESTAURANT_BY_ID[goal.id]);
@@ -780,6 +794,103 @@ function bindAchievements(screen) {
   });
 }
 
+// ── Mi local (decoración) ───────────────────────────────────
+function awningVars(id) {
+  const t = RESTAURANT_BY_ID[app.restaurantId].theme;
+  const [a, b, deep] = DECOR_BY_ID[id]?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 78%, #fff)`, t.deep];
+  return `--aw-a:${a};--aw-b:${b};--aw-deep:${deep}`;
+}
+
+function decorSwatch(item) {
+  switch (item.slot) {
+    case 'toldo': return `<span class="sw sw--awning" style="${awningVars(item.id)}"></span>`;
+    case 'pared': return `<span class="sw scene-wall" data-wall="${item.id}"></span>`;
+    case 'barra': return `<span class="sw sw--counter" data-counter="${item.id}"><span class="bar__counter"></span></span>`;
+    case 'luces': return `<span class="sw sw--lights">${lightsHtml(item.id)}</span>`;
+    default: return `<span class="sw sw--deco">${decoHtml([item.id])}</span>`;
+  }
+}
+
+function renderDecor() {
+  const s = st();
+  const dec = decorOf(s);
+  app.decorTab ??= 'toldo';
+  app.decorPreview ??= {};
+  // Lo que se ve: lo puesto, con lo que estés probando encima.
+  const look = { ...dec.equipped, ...app.decorPreview };
+  const lookDeco = app.decorPreview.deco ?? dec.equipped.deco;
+  const slot = DECOR_SLOTS.find((x) => x.id === app.decorTab);
+  const items = DECOR.filter((x) => x.slot === slot.id);
+  const preview = Object.values(app.decorPreview).flat().find((id) => id && !decorOwned(s, id));
+  const pv = preview ? DECOR_BY_ID[preview] : null;
+  const lockText = (x) => {
+    const av = decorAvailable(s, x);
+    if (av.reason === 'logro_pendiente') return `Logro: ${ACHIEVEMENT_BY_ID[x.achievement]?.name ?? ''}`;
+    if (av.reason === 'nivel_insuficiente') return `Nivel ${x.reqLevel}`;
+    return null;
+  };
+  const screen = document.getElementById('screen');
+  screen.innerHTML = `
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <section class="scene" data-counter="${look.barra}" aria-label="Vista previa del local" style="${awningVars(look.toldo)}">
+        <div class="scene-wall" data-wall="${look.pared}"></div>
+        <div class="scene-awning"></div>
+        <div class="scene-stage">${lightsHtml(look.luces)}${decoHtml(lookDeco)}</div>
+        <div class="scene-guests">${[1, 3, 6].map((l) => `<span class="avatar" style="--p:100"><span class="avatar__face">${customerSvg(l, 'happy', '')}</span></span>`).join('')}</div>
+        <span class="bar__counter"></span>
+      </section>
+      ${pv ? `<div class="decor-buy card">
+        <div style="flex:1;min-width:0"><b>${escapeHtml(pv.name)}</b><small>${lockText(pv) ? `Se desbloquea con ${escapeHtml(lockText(pv))}` : 'Estás viendo cómo queda'}</small></div>
+        ${lockText(pv) ? `<button class="btn btn--sm btn--ghost" data-act="undo">Quitar</button>` : `<button class="btn btn--sm btn--gold" data-act="buy-decor" ${s.coins < pv.cost ? 'disabled' : ''}>${coinSvg()} ${fmt(pv.cost)}</button>`}
+      </div>` : `<p class="note" style="text-align:center">Toca algo para ver cómo queda. Lo que ya es tuyo se pone al instante.</p>`}
+      <div class="chips" role="tablist" aria-label="Qué decorar">
+        ${DECOR_SLOTS.map((x) => `<button class="chip" role="tab" data-slot="${x.id}" aria-pressed="${x.id === slot.id}">${x.name}</button>`).join('')}
+      </div>
+      <div class="decor-grid">${items.map((x) => {
+        const owned = decorOwned(s, x.id);
+        const on = slot.multi ? lookDeco.includes(x.id) : look[slot.id] === x.id;
+        const equipped = slot.multi ? dec.equipped.deco.includes(x.id) : dec.equipped[slot.id] === x.id;
+        const lock = owned ? null : lockText(x);
+        const label = equipped ? 'Puesto' : owned ? 'Tuyo' : lock ?? fmt(x.cost);
+        return `<button class="decor-item ${on ? 'is-on' : ''} ${lock ? 'is-locked' : ''}" data-decor="${x.id}" aria-pressed="${on}">
+          ${decorSwatch(x)}
+          <b>${escapeHtml(x.name)}</b>
+          <small class="${equipped ? 'is-equipped' : owned ? '' : lock ? 'is-lock' : 'is-price'}">${!owned && !lock ? coinSvg() : ''}${escapeHtml(label)}</small>
+        </button>`;
+      }).join('')}</div>
+    </div>`;
+  screen.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.decorTab = b.dataset.slot; renderDecor(); }));
+  screen.querySelectorAll('[data-decor]').forEach((b) => b.addEventListener('click', async () => {
+    const x = DECOR_BY_ID[b.dataset.decor];
+    sfx.tap();
+    if (decorOwned(st(), x.id)) {
+      // Lo tuyo se pone (o en Adornos, se quita) al instante.
+      app.decorPreview = {};
+      try { const res = await app.api.equipDecor(x.id); setProfile(res.profile); applyTheme(app.restaurantId); } catch (err) { errorToast(err); }
+      renderDecor();
+      return;
+    }
+    // Lo que no es tuyo: probarlo en la vista previa.
+    app.decorPreview = x.slot === 'deco' ? { deco: [...new Set([...decorOf(st()).equipped.deco, x.id])] } : { [x.slot]: x.id };
+    renderDecor();
+  }));
+  screen.querySelector('[data-act="undo"]')?.addEventListener('click', () => { app.decorPreview = {}; renderDecor(); });
+  screen.querySelector('[data-act="buy-decor"]')?.addEventListener('click', async () => {
+    if (app.busy) return;
+    app.busy = true;
+    try {
+      const res = await app.api.buyDecor(pv.id);
+      app.decorPreview = {};
+      setProfile(res.profile);
+      applyTheme(app.restaurantId);
+      sfx.buy();
+      confetti(document.body, ['#FFC23D', '#fff', RESTAURANT_BY_ID[app.restaurantId].theme.primary]);
+      toast(`¡${pv.name} en tu local!`, 'good');
+      renderDecor();
+    } catch (err) { errorToast(err); } finally { app.busy = false; }
+  });
+}
+
 // ── Ayudantes (arriba de Mejoras) ───────────────────────────
 function staffState(s, m) {
   const owned = staffOwned(s).includes(m.id);
@@ -953,7 +1064,7 @@ function accountSection(p) {
 
 const REASONS = {
   bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', perdida: 'Servicio con pérdidas', reto_diario: 'Reto del día', mercado: 'Mercado',
-  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante'
+  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante', decoracion: 'Decoración del local'
 };
 
 async function openLedger() {
@@ -990,6 +1101,7 @@ async function play(restaurantId, mode) {
   const kitchen = new Kitchen(host, {
     config: run.config,
     restaurant: RESTAURANT_BY_ID[run.config.restaurantId],
+    decor: decorOf(st()).equipped,
     firstTime,
     onQuit: () => {
       app.api.abandonRun(run.runId);

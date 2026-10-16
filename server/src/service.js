@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, sanitizeStaff, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -18,6 +18,8 @@ const PURCHASE_ERRORS = {
   sin_dinero: [409, 'No tienes suficientes monedas'],
   restaurante_cerrado: [403, 'Primero abre ese restaurante'],
   recetas_pendientes: [403, 'Primero aprende todas las recetas del restaurante anterior'],
+  logro_pendiente: [403, 'Se gana con un logro'],
+  no_comprado: [409, 'Primero cómpralo'],
   personal_bloqueado: [403, 'Este ayudante se desbloquea con un restaurante más avanzado'],
   nivel_maximo: [409, 'Ya está al nivel máximo'],
   tipo_invalido: [400, 'Tipo de compra inválido'],
@@ -149,11 +151,39 @@ export class GameService {
     const owned = (saved.staff?.owned ?? []).filter((x) => STAFF_BY_ID[x]);
     if (hired && !owned.includes(hired)) owned.push(hired);
     const staff = { hired, owned, exp: { ...(saved.staff?.exp ?? {}) } };
-    return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [], staff };
+    return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [], staff, decor: decorOf({ decor: saved.decor }) };
   }
 
-  #saveProgress(playerId, { stats, achievements, staff }) {
-    this.db.run('UPDATE players SET progress_json = ? WHERE id = ?', JSON.stringify({ stats, achievements, staff }), playerId);
+  #saveProgress(playerId, { stats, achievements, staff, decor }) {
+    this.db.run('UPDATE players SET progress_json = ? WHERE id = ?', JSON.stringify({ stats, achievements, staff, decor }), playerId);
+  }
+
+  // ── Decoración del local ──────────────────────────────────
+  buyDecor(playerId, id) {
+    return this.db.tx(() => {
+      const state = this.state(playerId);
+      const d = evaluateDecorBuy(state, id);
+      if (!d.ok) {
+        const [status, msg] = PURCHASE_ERRORS[d.reason] ?? [400, 'No se pudo comprar'];
+        throw new AppError(status, d.reason, msg, { price: d.price, reqLevel: d.reqLevel });
+      }
+      if (d.price > 0) this.#debit(playerId, d.price, 'decoracion', id);
+      this.#saveProgress(playerId, applyDecorBuy(state, id, d.price));
+      return { profile: this.profile(playerId) };
+    });
+  }
+
+  equipDecor(playerId, id) {
+    return this.db.tx(() => {
+      const state = this.state(playerId);
+      const d = evaluateDecorEquip(state, id);
+      if (!d.ok) {
+        const [status, msg] = PURCHASE_ERRORS[d.reason] ?? [400, 'No se pudo poner'];
+        throw new AppError(status, d.reason, msg);
+      }
+      this.#saveProgress(playerId, applyDecorEquip(state, id));
+      return { profile: this.profile(playerId) };
+    });
   }
 
   // ── Personal de cocina ────────────────────────────────────
@@ -363,7 +393,8 @@ export class GameService {
       this.#saveProgress(playerId, {
         stats,
         achievements: [...before.achievements, ...unlocked.map((x) => x.id)],
-        staff: addStaffExp(before.staff, config.staff?.id)
+        staff: addStaffExp(before.staff, config.staff?.id),
+        decor: before.decor
       });
 
       const after = this.profile(playerId);

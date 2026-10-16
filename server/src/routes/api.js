@@ -67,6 +67,13 @@ export default async function api(app, { service, config }) {
     }
   }, async (req) => service.purchase(req.playerId, req.body.kind, req.body.id, req.headers['idempotency-key']));
 
+  for (const [path, fn] of [['/decor/buy', 'buyDecor'], ['/decor/equip', 'equipDecor']]) {
+    app.post(path, {
+      preHandler: auth,
+      schema: { body: { type: 'object', additionalProperties: false, required: ['id'], properties: { id } } }
+    }, async (req) => service[fn](req.playerId, req.body.id));
+  }
+
   app.post('/staff/hire', {
     preHandler: auth,
     schema: {

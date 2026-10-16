@@ -243,3 +243,20 @@ test('un servicio vacío cobra los gastos y la caja no baja de 0', async () => {
   assert.equal(d2.body.profile.state.coins, 0);
   await app.close();
 });
+
+test('decoración por la API: comprar cobra y queda puesta; poner cambia la ranura', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  const poor = await call('POST', '/api/v1/decor/buy', { token, body: { id: 'barra_marmol' } });
+  assert.equal(poor.body.error.code, 'sin_dinero');
+  app.service.db.run('UPDATE players SET coins = 2000');
+  const ok = await call('POST', '/api/v1/decor/buy', { token, body: { id: 'barra_marmol' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.profile.state.coins, 1100);
+  assert.equal(ok.body.profile.state.decor.equipped.barra, 'barra_marmol');
+  const back = await call('POST', '/api/v1/decor/equip', { token, body: { id: 'barra_roble' } });
+  assert.equal(back.body.profile.state.decor.equipped.barra, 'barra_roble');
+  const nope = await call('POST', '/api/v1/decor/equip', { token, body: { id: 'pared_pizarra' } });
+  assert.equal(nope.body.error.code, 'no_comprado');
+  await app.close();
+});

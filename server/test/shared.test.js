@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients, decorOwned, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -371,4 +371,23 @@ test('mercado: las 3 ofertas salen de tus ingredientes y cambian cada día', () 
   });
   assert.ok(new Set(days).size > 1, 'las ofertas cambian de un día a otro');
   assert.equal(Object.values(marketPrices('2026-10-16', marketIngredients(s))).filter((x) => x.deal).length, 3);
+});
+
+test('decoración: comprar, poner y lo que piden logros o nivel', () => {
+  const s = { ...newPlayerState(), coins: 1000 };
+  assert.ok(decorOwned(s, 'toldo_local'));
+  assert.equal(evaluateDecorBuy(s, 'toldo_local').reason, 'ya_comprado');
+  assert.equal(evaluateDecorBuy(s, 'toldo_tricolor').reason, 'logro_pendiente');
+  assert.equal(evaluateDecorBuy(s, 'luces_neon').reason, 'nivel_insuficiente');
+  assert.equal(evaluateDecorBuy({ ...s, coins: 10 }, 'pared_ladrillo').reason, 'sin_dinero');
+  const d = evaluateDecorBuy(s, 'pared_ladrillo');
+  const after = applyDecorBuy(s, 'pared_ladrillo', d.price);
+  assert.equal(after.coins, 500);
+  assert.equal(decorOf(after).equipped.pared, 'pared_ladrillo');
+  assert.equal(evaluateDecorEquip(after, 'barra_marmol').reason, 'no_comprado');
+  const plants = applyDecorBuy(after, 'deco_plantas', 200);
+  assert.deepEqual(decorOf(plants).equipped.deco, ['deco_plantas']);
+  assert.deepEqual(decorOf(applyDecorEquip(plants, 'deco_plantas')).equipped.deco, []);
+  // Con el logro, el tricolor es gratis.
+  assert.ok(decorOwned({ ...s, achievements: ['cadena'] }, 'toldo_tricolor'));
 });

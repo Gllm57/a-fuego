@@ -9,12 +9,15 @@ import {
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
 import { sfx, music, vibrate } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
+import { lightsHtml, decoHtml, decorAttrs } from './decor-art.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
 
 export class Kitchen {
-  constructor(host, { config, restaurant, firstTime, onFinish, onQuit }) {
+  constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor }) {
+    // Decoración elegida en «Mi local» (sólo se ve; no cambia las reglas).
+    this.decor = decor ?? { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: [] };
     this.host = host;
     this.config = config;
     this.restaurant = restaurant;
@@ -63,7 +66,7 @@ export class Kitchen {
   mount() {
     this.host.innerHTML = `
       <div class="game" role="application" aria-label="Cocina">
-        <div class="game__inner" data-station-rows="${this.#stationRows().length}">
+        <div class="game__inner" data-station-rows="${this.#stationRows().length}" ${decorAttrs(this.decor)}>
           <div class="wall">
             <div class="hud">
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
@@ -78,7 +81,7 @@ export class Kitchen {
             </div>
           </div>
           <div class="bar">
-            <div class="lamps" aria-hidden="true"><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span></div>
+            ${lightsHtml(this.decor.luces)}${decoHtml(this.decor.deco)}
             <div class="bar__counter"></div>
             <div class="customers" data-slots="${this.stats.slots}" style="--slots:${this.stats.slots}"></div>
           </div>
@@ -664,11 +667,10 @@ export class Kitchen {
         if (bubble) bubble.innerHTML = `<span class="bubble__thanks">${THANKS[(o.id * 7) % THANKS.length]}</span>`;
         const face = el.querySelector('.avatar__face');
         if (face) face.innerHTML = customerSvg(o.look, 'happy', '', o.vip);
-        el.style.setProperty('--exit-x', `${r.left - pr.left > pr.width / 2 ? 70 : -70}px`);
-        el.style.animationDelay = '.35s';
+        this.#walkOut(el, r, pr);
       }
       el.classList.add(o.status === 'served' ? 'is-served' : 'is-leaving');
-      setTimeout(() => el.remove(), o.status === 'served' ? 1700 : 800);
+      setTimeout(() => el.remove(), o.status === 'served' ? 2300 : 800);
       this.custEls.delete(id);
     }
     box.querySelectorAll('.seat-empty, .queue-badge').forEach((n) => n.remove());
@@ -720,6 +722,36 @@ export class Kitchen {
       el.classList.toggle('is-selected', id === this.selected);
       el.setAttribute('aria-pressed', String(id === this.selected));
     }
+  }
+
+  // Salida del cliente servido: mastica, da las gracias, salta de alegría y se va
+  // caminando con pasitos hasta salir por el borde más cercano del local.
+  #walkOut(el, r, pr) {
+    const left = r.left - pr.left;
+    const toRight = left + r.width / 2 > pr.width / 2;
+    const dist = toRight ? pr.width - left + 12 : -(left + r.width + 12);
+    const dir = toRight ? 1 : -1;
+    const frames = [
+      { offset: 0, transform: 'translate(0, 0) scale(1)' },
+      { offset: 0.16, transform: 'translate(0, 0) scale(1)' },
+      { offset: 0.26, transform: 'translate(0, -20px) scale(1.08)' },
+      { offset: 0.34, transform: 'translate(0, 0) scale(1.04, .94)' },
+      { offset: 0.4, transform: `translate(0, 0) scale(1) rotate(${dir * 4}deg)` }
+    ];
+    // Pasitos: avanza, sube y baja, y se balancea a cada lado.
+    const steps = 6;
+    for (let i = 1; i <= steps; i++) {
+      const t = 0.4 + (0.6 * i) / steps;
+      frames.push({ offset: t, transform: `translate(${(dist * i) / steps}px, ${i % 2 ? -7 : 0}px) rotate(${(i % 2 ? -1 : 1) * dir * 5}deg)` });
+    }
+    el.animate(frames, { duration: 2100, easing: 'linear', fill: 'forwards' });
+    el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.82 }, { opacity: 0 }], { duration: 2100, fill: 'forwards' });
+    const bubble = el.querySelector('.bubble');
+    bubble?.animate([
+      { transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.08 },
+      { transform: 'scale(1)', opacity: 1, offset: 0.14 }, { transform: 'translateY(0)', opacity: 1, offset: 0.36 },
+      { transform: 'translateY(-14px)', opacity: 0, offset: 0.5 }, { transform: 'translateY(-14px)', opacity: 0 }
+    ], { duration: 2100, fill: 'forwards' });
   }
 
   #select(id) {

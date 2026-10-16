@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, DECOR, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta, UPGRADES, RESTAURANTS, RECIPES, STAFF, xpForLevel
@@ -33,7 +33,8 @@ function sandboxState() {
     recipes: RECIPES.map((r) => r.id),
     upgrades,
     inventory: {},
-    staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 5, luis: 15 } }
+    staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 5, luis: 15 } },
+    decor: { owned: DECOR.map((x) => x.id), equipped: { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: [] } }
   };
 }
 
@@ -114,6 +115,8 @@ class HttpApi {
   }
   startRun(restaurantId, mode) { return this.#req('POST', '/runs', { restaurantId, mode }); }
   hireStaff(id) { return this.#req('POST', '/staff/hire', { id }); }
+  buyDecor(id) { return this.#req('POST', '/decor/buy', { id }); }
+  equipDecor(id) { return this.#req('POST', '/decor/equip', { id }); }
   // Reintenta el envío: el servidor es idempotente para la misma partida.
   completeRun(runId, serves, waste = {}, emergency = {}, firesOut = 0) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste, emergency, firesOut }); }
   market() { return this.#req('GET', '/market'); }
@@ -151,6 +154,7 @@ class LocalApi {
         // Partidas guardadas antes de los logros: se reconstruyen los contadores con el diario.
         data.state.stats = { ...emptyStats(), ...data.state.stats };
         data.state.staff = { hired: null, owned: [], exp: {}, ...data.state.staff };
+        data.state.decor = decorOf(data.state);
         // La arepera se agregó como primer local: quien ya jugaba la recibe gratis.
         if (!data.state.restaurants.includes(STARTER_RESTAURANT)) {
           data.state.restaurants = [STARTER_RESTAURANT, ...data.state.restaurants];
@@ -211,6 +215,23 @@ class LocalApi {
     this.#log(-d.price, `compra_${kind}`);
     this.#save();
     return { purchased: { kind, id, price: d.price }, profile: this.#profile() };
+  }
+
+  async buyDecor(id) {
+    const d = evaluateDecorBuy(this.data.state, id);
+    if (!d.ok) throw new ApiError(409, d.reason, PURCHASE_MSG[d.reason] ?? 'No se pudo comprar', d);
+    this.data.state = applyDecorBuy(this.data.state, id, d.price);
+    if (d.price > 0) this.#log(-d.price, 'decoracion');
+    this.#save();
+    return { profile: this.#profile() };
+  }
+
+  async equipDecor(id) {
+    const d = evaluateDecorEquip(this.data.state, id);
+    if (!d.ok) throw new ApiError(409, d.reason, PURCHASE_MSG[d.reason] ?? 'No se pudo poner', d);
+    this.data.state = applyDecorEquip(this.data.state, id);
+    this.#save();
+    return { profile: this.#profile() };
   }
 
   async hireStaff(id) {
@@ -336,6 +357,6 @@ class LocalApi {
 const PURCHASE_MSG = {
   no_existe: 'Ese artículo no existe', ya_comprado: 'Ya lo tienes', nivel_insuficiente: 'Necesitas más nivel de chef',
   sin_dinero: 'No tienes suficientes monedas', restaurante_cerrado: 'Primero abre ese restaurante', nivel_maximo: 'Ya está al nivel máximo',
-  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', recetas_pendientes: 'Primero aprende todas las recetas del restaurante anterior', personal_bloqueado: 'Este ayudante se desbloquea con un restaurante más avanzado', carrito_vacio: 'El carrito está vacío',
+  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', recetas_pendientes: 'Primero aprende todas las recetas del restaurante anterior', logro_pendiente: 'Se gana con un logro', no_comprado: 'Primero cómpralo', personal_bloqueado: 'Este ayudante se desbloquea con un restaurante más avanzado', carrito_vacio: 'El carrito está vacío',
   no_disponible: 'Ese ingrediente no se vende para tus recetas', cantidad_invalida: 'Cantidad inválida'
 };

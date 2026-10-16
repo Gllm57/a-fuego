@@ -13,6 +13,7 @@ import { INGREDIENTS } from './data/ingredients.js';
 import { hashString } from './rng.js';
 import { upgradeLevel, storageCapacity } from './rules.js';
 import { emptyStats } from './achievements.js';
+import { DECOR_BY_ID, defaultDecor } from './data/decor.js';
 
 export const STARTING_COINS = 200;
 // El primer restaurante de la cadena (gratis desde el inicio).
@@ -53,8 +54,67 @@ export function newPlayerState() {
     basketClaimed: null,
     stats: emptyStats(),
     achievements: [],
-    staff: { hired: null, owned: [], exp: {} }
+    staff: { hired: null, owned: [], exp: {} },
+    decor: defaultDecor()
   };
+}
+
+// ── Decoración del local ─────────────────────────────────────
+export function decorOf(state) {
+  const base = defaultDecor();
+  const dec = state.decor ?? {};
+  return { owned: [...(dec.owned ?? [])], equipped: { ...base.equipped, ...(dec.equipped ?? {}), deco: [...(dec.equipped?.deco ?? [])] } };
+}
+
+// Gratis = cuesta 0 y no pide nada; un logro o el nivel lo desbloquean sin pagar.
+export function decorAvailable(state, item) {
+  if (item.achievement && !(state.achievements ?? []).includes(item.achievement)) return { ok: false, reason: 'logro_pendiente', achievement: item.achievement };
+  if (item.reqLevel && levelFromXp(state.xp) < item.reqLevel) return { ok: false, reason: 'nivel_insuficiente', reqLevel: item.reqLevel };
+  return { ok: true };
+}
+
+export function decorOwned(state, id) {
+  const item = DECOR_BY_ID[id];
+  if (!item) return false;
+  if (item.cost === 0 && decorAvailable(state, item).ok) return true;
+  return decorOf(state).owned.includes(id);
+}
+
+// Comprar: cobra y lo pone de una vez.
+export function evaluateDecorBuy(state, id) {
+  const item = DECOR_BY_ID[id];
+  if (!item) return { ok: false, reason: 'no_existe' };
+  if (decorOwned(state, id)) return { ok: false, reason: 'ya_comprado' };
+  const av = decorAvailable(state, item);
+  if (!av.ok) return av;
+  if (state.coins < item.cost) return { ok: false, reason: 'sin_dinero', price: item.cost };
+  return { ok: true, price: item.cost };
+}
+
+export function applyDecorBuy(state, id, price) {
+  const dec = decorOf(state);
+  dec.owned.push(id);
+  return applyDecorEquip({ ...state, coins: state.coins - price, decor: dec }, id);
+}
+
+// Poner o quitar: en «Adornos» se combinan; en las demás ranuras hay uno a la vez.
+export function evaluateDecorEquip(state, id) {
+  const item = DECOR_BY_ID[id];
+  if (!item) return { ok: false, reason: 'no_existe' };
+  if (!decorOwned(state, id)) return { ok: false, reason: 'no_comprado' };
+  return { ok: true };
+}
+
+export function applyDecorEquip(state, id) {
+  const item = DECOR_BY_ID[id];
+  const dec = decorOf(state);
+  if (item.slot === 'deco') {
+    const on = dec.equipped.deco.includes(id);
+    dec.equipped.deco = on ? dec.equipped.deco.filter((x) => x !== id) : [...dec.equipped.deco, id];
+  } else {
+    dec.equipped[item.slot] = id;
+  }
+  return { ...state, decor: dec };
 }
 
 // ── Personal de cocina ──────────────────────────────────────

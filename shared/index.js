@@ -7,3 +7,4 @@ export * from './scoring.js';
 export * from './economy.js';
 export * from './runs.js';
 export * from './achievements.js';
+export * from './data/decor.js';

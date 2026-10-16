@@ -73,14 +73,20 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
   content: ''; position: absolute; left: 0; right: 0; bottom: -15px; height: 16px;
   background: radial-gradient(circle at 50% 0, var(--brand) 13px, transparent 14px) 0 0 / 28px 16px repeat-x;
 }
-.awning--stripes {
+:root { --aw-a: var(--brand); --aw-b: color-mix(in srgb, var(--brand) 78%, #fff); --aw-deep: var(--brand-deep); }
+/* Toldo de tela: barra arriba, rayas con pliegues (luz y sombra) y faldón de ondas con sombra. */
+.awning--stripes, .wall {
   background:
-    repeating-linear-gradient(90deg, var(--brand) 0 28px, color-mix(in srgb, var(--brand) 82%, #fff) 28px 56px);
+    linear-gradient(var(--aw-deep) 0 6px, rgba(255,255,255,.22) 6px 8px, transparent 8px),
+    repeating-linear-gradient(90deg, rgba(0,0,0,.13) 0, rgba(255,255,255,.12) 14px, rgba(0,0,0,.13) 28px),
+    repeating-linear-gradient(90deg, var(--aw-a) 0 28px, var(--aw-b) 28px 56px);
 }
-.awning--stripes::after {
+.awning--stripes::after, .wall::after {
+  bottom: -15px; height: 16px;
   background:
-    radial-gradient(circle at 50% 0, var(--brand) 13px, transparent 14px) 0 0 / 56px 16px repeat-x,
-    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--brand) 82%, #fff) 13px, transparent 14px) 28px 0 / 56px 16px repeat-x;
+    radial-gradient(circle at 50% 0, var(--aw-a) 12.5px, color-mix(in srgb, var(--aw-deep) 55%, transparent) 13px, transparent 14px) 0 0 / 56px 16px repeat-x,
+    radial-gradient(circle at 50% 0, var(--aw-b) 12.5px, color-mix(in srgb, var(--aw-deep) 40%, transparent) 13px, transparent 14px) 28px 0 / 56px 16px repeat-x;
+  filter: drop-shadow(0 4px 3px rgba(0,0,0,.14));
 }
 .topbar { display: flex; align-items: center; gap: 10px; }
 .chef-btn { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: #fff; }
@@ -299,6 +305,43 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .staff-lock { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; border-radius: 999px; background: var(--line); font-weight: 800; font-size: 14px; color: var(--ink-2); }
 .staff-lock svg { width: 18px; height: 18px; }
 .tile--wide { grid-column: 1 / -1; }
+.tile--decor { flex-direction: row; align-items: center; gap: 12px; }
+.tile--decor > svg { width: 22px; height: 22px; color: var(--ink-2); flex: none; }
+/* Vista previa de «Mi local». */
+.scene { position: relative; height: 210px; border-radius: 28px; overflow: hidden; box-shadow: inset 0 0 0 3px var(--line); flex: none; }
+.scene-wall { position: absolute; inset: 0; background: var(--ground); }
+.scene-awning { position: absolute; left: 0; right: 0; top: 0; height: 30px; background: linear-gradient(var(--aw-deep) 0 6px, rgba(255,255,255,.22) 6px 8px, transparent 8px), repeating-linear-gradient(90deg, rgba(0,0,0,.13) 0, rgba(255,255,255,.12) 14px, rgba(0,0,0,.13) 28px), repeating-linear-gradient(90deg, var(--aw-a) 0 28px, var(--aw-b) 28px 56px); }
+.scene-awning::after { content: ''; position: absolute; left: 0; right: 0; bottom: -15px; height: 16px; background: radial-gradient(circle at 50% 0, var(--aw-a) 12.5px, transparent 14px) 0 0 / 56px 16px repeat-x, radial-gradient(circle at 50% 0, var(--aw-b) 12.5px, transparent 14px) 28px 0 / 56px 16px repeat-x; filter: drop-shadow(0 4px 3px rgba(0,0,0,.14)); }
+.scene-stage { position: absolute; left: 0; right: 0; top: 44px; bottom: 0; }
+.scene-stage .lamps { position: absolute; top: -14px; }
+.scene-stage .deco--plants { bottom: 28px; }
+.scene-guests { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; justify-content: center; gap: 22px; z-index: 1; }
+.scene-guests .avatar { width: 58px; height: 58px; }
+.scene-guests .avatar__face { width: 50px; height: 50px; }
+.scene .bar__counter { z-index: 2; height: 40px; }
+.decor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.decor-item { border: 0; border-radius: 22px; padding: 10px 6px 8px; min-height: 108px; background: var(--card); box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--line); display: flex; flex-direction: column; align-items: center; gap: 5px; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.decor-item.is-on { box-shadow: 0 4px 0 var(--brand-deep), inset 0 0 0 3px var(--brand); background: var(--brand-soft); }
+.decor-item b { font-size: 14px; }
+.decor-item small { display: inline-flex; align-items: center; gap: 3px; font-size: 11px; font-weight: 900; color: var(--gold-deep); }
+.decor-item small svg { width: 13px; height: 13px; }
+.decor-item small.is-equipped { color: var(--good); }
+.decor-item small.is-lock { color: var(--ink-2); text-align: center; }
+.decor-item.is-locked .sw { filter: grayscale(.7); opacity: .7; }
+.sw { position: relative; display: block; width: 64px; height: 44px; border-radius: 12px; overflow: hidden; box-shadow: inset 0 0 0 2px rgba(0,0,0,.08); background: var(--ground); }
+.sw.scene-wall { position: relative; inset: auto; }
+.sw--awning { background: linear-gradient(var(--aw-deep) 0 5px, transparent 5px), repeating-linear-gradient(90deg, var(--aw-a) 0 11px, var(--aw-b) 11px 22px); }
+.sw--counter .bar__counter { left: -8px; right: -8px; bottom: -4px; height: 26px; }
+.sw--lights .lamps { top: -6px; transform: scale(.7); transform-origin: top center; }
+.sw--lights .lamp b::after { display: none; }
+.sw--lights .garland { top: 4px; }
+.sw--lights .neon-sign { font-size: 13px; top: 12px; }
+.sw--deco .deco--frame { right: auto; left: 50%; top: 6px; transform: translateX(-50%) scale(.75); }
+.sw--deco .deco--plants { left: 50%; bottom: 0; transform: translateX(-50%) scale(.8); }
+.sw--deco .deco--flags { top: 4px; }
+.decor-buy { display: flex; align-items: center; gap: 12px; padding: 12px 14px; }
+.decor-buy b { display: block; font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.decor-buy small { display: block; font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .tile--staff { flex-direction: row; align-items: center; gap: 12px; }
 .tile--staff > svg { width: 22px; height: 22px; color: var(--ink-2); flex: none; }
 .tile--staff__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
@@ -528,14 +571,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .wall {
   position: relative; z-index: 3;
   padding: calc(8px + var(--safe-top)) 12px 18px;
-  background: repeating-linear-gradient(90deg, var(--brand) 0 26px, color-mix(in srgb, var(--brand) 84%, #fff) 26px 52px);
 }
-.wall::after {
-  content: ''; position: absolute; left: 0; right: 0; bottom: -13px; height: 14px;
-  background:
-    radial-gradient(circle at 50% 0, var(--brand) 12px, transparent 13px) 0 0 / 52px 14px repeat-x,
-    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--brand) 84%, #fff) 12px, transparent 13px) 26px 0 / 52px 14px repeat-x;
-}
+.wall::after { content: ''; position: absolute; left: 0; right: 0; }
 .hud { display: grid; grid-template-columns: 44px 1fr auto; gap: 10px; align-items: center; }
 .hud .round-btn { background: rgba(255,255,255,.95); box-shadow: 0 3px 0 rgba(0,0,0,.18); }
 .timer { display: flex; align-items: center; gap: 10px; color: #fff; min-width: 0; }
@@ -557,6 +594,29 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .lamp i { width: 2px; height: 14px; background: var(--ink-3); }
 .lamp b { width: 30px; height: 15px; border-radius: 34px 34px 6px 6px; background: var(--brand-deep); position: relative; }
 .lamp b::after { content: ''; position: absolute; left: 50%; bottom: -60px; width: 120px; height: 70px; transform: translateX(-50%); background: radial-gradient(ellipse at 50% 0, color-mix(in srgb, var(--gold) 35%, transparent), transparent 70%); }
+/* ── Decoración del local (Mi local) ── */
+[data-wall="pared_azulejos"] .bar, [data-wall="pared_azulejos"].scene-wall { background: repeating-conic-gradient(#EAF4F7 0 25%, #D2E8EF 0 50%) 0 0 / 28px 28px; }
+[data-wall="pared_ladrillo"] .bar, [data-wall="pared_ladrillo"].scene-wall { background: linear-gradient(#F3D4C2 2px, transparent 2px) 0 0 / 100% 18px, linear-gradient(90deg, #F3D4C2 2px, transparent 2px) 0 0 / 36px 36px, linear-gradient(90deg, #F3D4C2 2px, transparent 2px) 18px 18px / 36px 36px, #E2A98A; }
+[data-wall="pared_madera"] .bar, [data-wall="pared_madera"].scene-wall { background: repeating-linear-gradient(90deg, #E7C9A4 0 30px, #DDBB92 30px 32px); }
+[data-wall="pared_pizarra"] .bar, [data-wall="pared_pizarra"].scene-wall { background: radial-gradient(circle at 30% 40%, #4A5058, #33373D); }
+[data-wall="pared_mural"] .bar, [data-wall="pared_mural"].scene-wall { background: radial-gradient(circle at 80% 30%, #FFD36A 0 30px, transparent 31px), linear-gradient(170deg, #FFE7B3, #F8C8D4 50%, #CDEFF0); }
+[data-counter="barra_nogal"] .bar__counter { background: linear-gradient(#7A5640, #3E2A1E); }
+[data-counter="barra_marmol"] .bar__counter { background: radial-gradient(ellipse at 30% 30%, #fff, transparent 60%), linear-gradient(#F4F1EC, #CFC8BE); }
+[data-counter="barra_talavera"] .bar__counter { background: repeating-linear-gradient(90deg, #2F6FB3 0 14px, #F4F1EC 14px 28px); }
+.garland { position: absolute; top: 2px; left: 6px; right: 6px; height: 26px; border-bottom: 2px solid rgba(60,40,30,.55); border-radius: 0 0 50% 50%; display: flex; justify-content: space-around; align-items: flex-end; pointer-events: none; z-index: 0; }
+.garland i { width: 9px; height: 13px; margin-bottom: -9px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: var(--c); box-shadow: 0 0 10px 2px color-mix(in srgb, var(--c) 70%, transparent); animation: bulb 1.6s ease-in-out infinite alternate; animation-delay: var(--d); }
+@keyframes bulb { from { opacity: .7; } to { opacity: 1; } }
+.neon-sign { position: absolute; top: 4px; left: 50%; transform: translateX(-50%); z-index: 0; pointer-events: none; font-family: var(--font-display); font-weight: 700; font-size: 22px; color: #fff; white-space: nowrap; text-shadow: 0 0 4px var(--aw-a), 0 0 10px var(--aw-a), 0 0 22px var(--aw-a); animation: neon 3s infinite; }
+@keyframes neon { 0%, 18%, 22%, 100% { opacity: 1; } 20% { opacity: .55; } }
+.deco { position: absolute; pointer-events: none; z-index: 0; }
+.deco--flags { top: 0; left: 0; right: 0; display: flex; justify-content: space-around; padding: 0 12px; }
+.deco--flags i { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 16px solid var(--c); filter: drop-shadow(0 2px 1px rgba(0,0,0,.15)); }
+.deco--frame { right: 16px; top: 34px; width: 50px; height: 38px; border: 4px solid #8E5A2C; border-radius: 5px; background: linear-gradient(#9FD3F0 0 55%, #4FA35B 55%); box-shadow: 0 5px 8px -5px rgba(0,0,0,.45); }
+.deco--frame i { position: absolute; left: 8px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: #FFD36A; }
+.deco--plants { left: 4px; bottom: 22px; display: flex; flex-direction: column; align-items: center; }
+.deco--plants-r { left: auto; right: 4px; }
+.deco--plants i { width: 30px; height: 30px; border-radius: 50%; background: #3E8E4A; box-shadow: 10px -4px 0 -5px #4FA35B, -9px -3px 0 -6px #4FA35B; }
+.deco--plants b { width: 22px; height: 18px; margin-top: -4px; background: #C2683A; border-radius: 3px 3px 8px 8px; }
 .bar__counter { position: absolute; left: -10px; right: -10px; bottom: -6px; height: 34px; border-radius: 50% 50% 0 0 / 100% 100% 0 0; background: linear-gradient(var(--wood), var(--wood-deep)); box-shadow: inset 0 4px 0 rgba(255,255,255,.25); }
 .customers { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(var(--slots, 3), minmax(0, 1fr)); gap: 6px; align-items: end; min-height: 128px; padding-bottom: 14px; }
 .customer { position: relative; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; animation: customer-in .55s var(--ease-spring) both; }
@@ -610,7 +670,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .customer.is-vip .avatar::before { content: ''; position: absolute; inset: -5px; border-radius: 50%; border: 3px dashed var(--gold-deep); animation: spin 8s linear infinite; }
 .vip-tag { position: absolute; top: -8px; right: -10px; z-index: 2; background: var(--gold); color: var(--ink); font-family: var(--font-display); font-weight: 700; font-size: 10px; padding: 2px 7px; border-radius: 999px; box-shadow: 0 2px 0 var(--gold-deep); transform: rotate(10deg); }
 .customer.is-leaving { animation: customer-angry .75s ease both; pointer-events: none; }
-.customer.is-served { animation: customer-happy 1.3s ease-in-out both; pointer-events: none; }
+.customer.is-served { animation: none; pointer-events: none; }
 .seat-empty { display: flex; flex-direction: column; align-items: center; gap: 4px; opacity: .55; padding-bottom: 2px; }
 .seat-empty i { width: 54px; height: 54px; border-radius: 50%; border: 3px dashed var(--line-deep); }
 .seat-empty span { font-size: 10px; font-weight: 800; color: var(--ink-2); }

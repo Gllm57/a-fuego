@@ -27,6 +27,10 @@ usa las propinas para construir tu cadena de restaurantes.
 - **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.
 - **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada restaurante avanzado. Pepe corta en una tabla (con el Diner, contrato 5.500), Rosa voltea y saca lo listo de una sartén (con la Trattoria, 11.000) y Don Luis hace más pacientes a los clientes (con la Izakaya, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
 
+- **Mi local** (Inicio → Mi local): decora el restaurante con toldo, pared, luces, barra y adornos.
+  Se ve en la cocina y en el toldo de arriba. Unos se compran, otros se ganan con logros o nivel;
+  sólo cambian cómo se ve.
+
 ### Economía (difícil a propósito)
 
 - **Mercado:** sólo cocinas con lo que compraste. Precios que cambian cada día (±25 %),
@@ -106,6 +110,7 @@ client/   Juego web para celular (HTML/CSS/JS sin framework ni build)
 | GET | `/me` | Perfil, progreso del imperio, siguiente meta, reto diario |
 | GET | `/me/ledger` | Historial de monedas |
 | GET | `/me/runs` | Diario de caja (servicios con ganancias y gastos) |
+| POST | `/decor/buy` · `/decor/equip` | Compra o pone una decoración `{id}` |
 | GET | `/market` | Precios del día, despensa, capacidad y canasta |
 | POST | `/market/buy` | Compra ingredientes `{items: {tomate: 5}}` |
 | POST | `/market/basket` | Recoge la canasta gratis del día |
