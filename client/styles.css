@@ -665,6 +665,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .deco { position: absolute; pointer-events: none; z-index: 0; }
 .deco--flags { top: 0; left: 0; right: 0; display: flex; justify-content: space-around; padding: 0 12px; }
 .deco--flags i { width: 0; height: 0; border-left: 9px solid transparent; border-right: 9px solid transparent; border-top: 16px solid var(--c); filter: drop-shadow(0 2px 1px rgba(0,0,0,.15)); }
+/* En la cocina el toldo baja más: la guacamaya cuelga un poco más abajo para no quedar tapada. */
+.bar .deco--guacamaya { top: 12px; }
 .deco--plants { left: 2px; bottom: 22px; width: 38px; height: 48px; }
 .plant-leaves { transform-origin: 22px 34px; animation: sway 4.5s ease-in-out infinite; }
 .deco--plants-r .plant-leaves { animation-duration: 5.5s; animation-delay: -2s; }
@@ -679,13 +681,16 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .floor__it svg { display: block; height: 100%; width: auto; overflow: visible; }
 .floor--l .floor__it + .floor__it { margin-left: -9px; }
 .floor--r .floor__it + .floor__it { margin-right: -9px; }
-.customer { position: relative; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 4px; animation: customer-in .55s var(--ease-spring) both; }
+.customer { position: relative; background: none; border: 0; padding: 0; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 7px; animation: customer-in .55s var(--ease-spring) both; }
 .bubble {
   position: relative; background: var(--paper); border-radius: 22px; padding: 6px 8px 5px; min-width: 76px; max-width: 100%;
   box-shadow: 0 6px 14px -6px rgba(90,40,10,.4); display: flex; flex-direction: column; align-items: center; gap: 2px;
   transition: transform .25s var(--ease-spring), box-shadow .2s;
 }
-.bubble::after { content: ''; position: absolute; bottom: -7px; left: 50%; width: 14px; height: 14px; background: var(--paper); transform: translateX(-50%) rotate(45deg); border-radius: 0 0 4px 0; }
+/* La punta va detrás del texto (z-index -1 dentro de la burbuja): antes tapaba la parte
+   de abajo de las letras del centro del nombre. */
+.bubble { isolation: isolate; }
+.bubble::after { content: ''; position: absolute; z-index: -1; bottom: -5px; left: 50%; width: 11px; height: 11px; background: var(--paper); transform: translateX(-50%) rotate(45deg); border-radius: 0 0 3px 0; }
 .bubble__dish { display: flex; align-items: center; }
 .bubble__dish svg { width: 22px; height: 22px; margin: 0 -2px; }
 .bubble__name { font-size: 11px; font-weight: 800; text-align: center; line-height: 1.1; max-width: 96px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
