@@ -162,41 +162,6 @@ export function plateSvgItems(recipe, filled = null) {
   ).join('');
 }
 
-// Fachada con arco para las tarjetas de restaurante. Cada cocina tiene un detalle propio.
-// Letrero de cada fachada, por restaurante.
-const SIGNS = {
-  // Arepera: una arepa dorada.
-  arepera: (p) => `<ellipse cx="150" cy="40" rx="24" ry="14" fill="#F6DA8A"/><ellipse cx="150" cy="37" rx="24" ry="11" fill="#FBE7B0"/><circle cx="140" cy="36" r="2" fill="#C99A3A"/><circle cx="156" cy="34" r="2.2" fill="#C99A3A"/><circle cx="162" cy="41" r="1.8" fill="#C99A3A"/>`,
-  taqueria: (p) => `<circle cx="150" cy="40" r="16" fill="#FFC23D"/><path d="M150 18v-8M150 70v-8M128 40h-8M180 40h-8" stroke="#FFC23D" stroke-width="4" stroke-linecap="round"/>`,
-  diner: (p) => `<rect x="118" y="26" width="64" height="26" rx="13" fill="#fff"/><text x="150" y="45" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="16" fill="${p}">66</text>`,
-  trattoria: (p) => `<path d="M134 52h32l-4-26h-24z" fill="#fff"/><circle cx="150" cy="22" r="6" fill="${p}"/>`,
-  izakaya: (p) => `<ellipse cx="128" cy="40" rx="11" ry="15" fill="#E8452C"/><ellipse cx="172" cy="40" rx="11" ry="15" fill="#E8452C"/><path d="M128 25v-6M172 25v-6M128 55v5M172 55v5" stroke="#2A170D" stroke-width="3"/>`,
-  cevicheria: (p) => `<path d="M126 48c8-16 40-16 48 0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="30" r="9" fill="#fff"/>`,
-  asador: (p) => `<rect x="120" y="34" width="60" height="16" rx="5" fill="#fff"/><path d="M130 34v16M142 34v16M154 34v16M166 34v16" stroke="${p}" stroke-width="3"/><path d="M150 30c-8-6-2-14 2-18 0 6 8 8 4 18z" fill="#FFC23D"/>`,
-  coreana: (p) => `<circle cx="150" cy="38" r="17" fill="#fff"/><path d="M137 38a13 13 0 0 1 26 0 6.5 6.5 0 0 1-13 0 6.5 6.5 0 0 0-13 0z" fill="#C8102E"/><path d="M137 38a6.5 6.5 0 0 0 13 0 6.5 6.5 0 0 1 13 0 13 13 0 0 1-26 0z" fill="#1C4E9C"/>`
-};
-
-export function storefrontSvg(theme, id = 'arepera') {
-  const p = theme.primary, d = theme.deep;
-  const scallops = Array.from({ length: 9 }, (_, i) => `<circle cx="${62 + i * 22}" cy="98" r="11" fill="${i % 2 ? '#fff' : p}"/>`).join('');
-  return `<svg viewBox="0 0 300 240" aria-hidden="true">
-    <ellipse cx="150" cy="236" rx="140" ry="14" fill="${d}" opacity=".18"/>
-    <path d="M40 236V120a110 110 0 0 1 220 0v116z" fill="#FFF8EE"/>
-    <path d="M40 120a110 110 0 0 1 220 0" fill="none" stroke="${d}" stroke-width="10"/>
-    ${(SIGNS[id] ?? SIGNS.arepera)(p)}
-    <path d="M50 98h200v10H50z" fill="${p}"/>
-    ${scallops}
-    <circle cx="86" cy="156" r="24" fill="${p}" opacity=".16"/><circle cx="86" cy="156" r="24" fill="none" stroke="${d}" stroke-width="5"/>
-    <path d="M86 132v48M62 156h48" stroke="${d}" stroke-width="3"/>
-    <circle cx="214" cy="156" r="24" fill="${p}" opacity=".16"/><circle cx="214" cy="156" r="24" fill="none" stroke="${d}" stroke-width="5"/>
-    <path d="M214 132v48M190 156h48" stroke="${d}" stroke-width="3"/>
-    <path d="M124 236v-62a26 26 0 0 1 52 0v62z" fill="${d}"/>
-    <circle cx="166" cy="206" r="3.5" fill="#FFC23D"/>
-    <circle cx="28" cy="214" r="18" fill="#5E9E4A"/><circle cx="18" cy="200" r="12" fill="#77B85E"/><path d="M16 236l4-20h16l4 20z" fill="#C2703A"/>
-    <circle cx="272" cy="214" r="18" fill="#4E8E3A"/><circle cx="284" cy="200" r="11" fill="#6AAA52"/><path d="M260 236l4-20h16l4 20z" fill="#C2703A"/>
-  </svg>`;
-}
-
 export function panLogoSvg(cls = 'boot__pan') {
   return `<svg class="${cls}" viewBox="0 0 120 120" aria-hidden="true">
     <rect x="80" y="54" width="40" height="12" rx="6" fill="#3B2A20"/>

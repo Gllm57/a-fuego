@@ -1,7 +1,7 @@
 // Aplicación: pantallas, navegación y flujo de partidas.
 
 import {
-  RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
+  RESTAURANTS, RESTAURANT_BY_ID, facadeStage, facadeNext, FACADE_STAGES, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
   evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, DECOR, DECOR_BY_ID, DECOR_SLOTS, decorOf, decorOwned, decorAvailable, ACHIEVEMENT_BY_ID, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
@@ -10,7 +10,8 @@ import { Kitchen } from './game.js';
 import { sfx } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
 import { lightsHtml, decoHtml } from './decor-art.js';
-import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
+import { storefrontSvg, obraSvg } from './facades.js';
+import { ingredientSvg, processSvg, icon, coinSvg, starSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
 import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
 
 const app = {
@@ -295,16 +296,21 @@ function restaurantCard(r, i) {
   const owned = s.restaurants.includes(r.id);
   const recipes = recipesOf(r.id);
   const learned = recipes.filter((x) => s.recipes.includes(x.id)).length;
+  const stage = facadeStage(s, r.id);
+  const next = facadeNext(s, r.id);
+  // Recién abierto: los andamios caen y aparece su fachada.
+  const reveal = app.revealRest === r.id;
   return `
-    <button class="rest ${owned ? '' : 'is-locked'}" role="listitem" data-rest="${r.id}" aria-pressed="${r.id === app.restaurantId}"
+    <button class="rest ${owned ? '' : 'is-locked'} ${reveal ? 'is-revealing' : ''}" role="listitem" data-rest="${r.id}" aria-pressed="${r.id === app.restaurantId}"
       style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">
-      <span class="rest__art">${storefrontSvg(r.theme, r.id)}
+      <span class="rest__art">${storefrontSvg(r.theme, r.id, { stage })}${reveal ? `<span class="rest__obra" aria-hidden="true">${obraSvg(r.theme)}</span>` : ''}
         ${owned ? '' : `<span class="rest__lock">${icon('lock')}<span>${lockLabel(r)} · ${coinSvg()} ${fmt(r.cost)}</span></span>`}
       </span>
       <span class="rest__body">
         <span class="rest__cuisine">Cocina ${r.cuisine}</span>
         <span class="rest__name">${r.name}</span>
         <span class="rest__meta">${learned}/${recipes.length} recetas · ${r.seats} mesas · gastos ${fmt(r.upkeep)}/servicio</span>
+        ${owned ? `<span class="rest__stage" data-stage="${stage}">${icon(stage >= 3 ? 'crown' : 'home')} ${FACADE_STAGES[stage]}${next ? ` · <small>${next}</small>` : ''}</span>` : ''}
       </span>
     </button>`;
 }
@@ -348,7 +354,7 @@ function openRestaurant(r) {
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
     <div class="rest-hero ${can ? '' : 'is-locked'}" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft};--r-deep:${r.theme.deep}">
-      <div class="rest-hero__art">${storefrontSvg(r.theme, r.id)}</div>
+      <div class="rest-hero__art">${storefrontSvg(r.theme, r.id, { stage: facadeStage(st(), r.id) })}</div>
       <span class="rest-hero__kicker">Cocina ${escapeHtml(r.cuisine.toLowerCase())}</span>
       ${can ? '' : `<span class="rest-hero__lock">${icon('lock')}</span>`}
     </div>
@@ -375,9 +381,10 @@ function openRestaurant(r) {
         app.restaurantId = r.id;
         localSet('afuego.restaurant', r.id);
         applyTheme(r.id);
-        confetti(document.body, [r.theme.primary, '#FFC23D', '#fff', r.theme.deep]);
+        app.revealRest = r.id;
         go('home');
-        setTimeout(() => showUnlocks(r), 350);
+        setTimeout(() => confetti(document.body, [r.theme.primary, '#FFC23D', '#fff', r.theme.deep]), 1100);
+        setTimeout(() => { app.revealRest = null; showUnlocks(r); }, 2300);
       }
     });
   });
@@ -1108,10 +1115,15 @@ async function play(restaurantId, mode) {
 async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   try {
     const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste, outcome.emergency, outcome.firesOut);
+    const rid = run.config.restaurantId;
+    const stageBefore = facadeStage(st(), rid);
     kitchen.destroy();
     app.market = null;
     showResults(host, run, res);
     setProfile(res.profile);
+    // Si la fachada del local subió de etapa, se avisa al terminar.
+    const stageAfter = facadeStage(st(), rid);
+    if (stageAfter > stageBefore) setTimeout(() => toast(`¡Tu fachada mejoró! ${RESTAURANT_BY_ID[rid].name}: ${FACADE_STAGES[stageAfter]}`, 'good'), 1800);
   } catch (err) {
     if (err.status === 0 && attempt < 3) return setTimeout(() => submitRun(host, kitchen, run, outcome, attempt + 1), 1500);
     kitchen.destroy();

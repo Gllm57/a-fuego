@@ -70,6 +70,8 @@ test('partida completa: valida, paga, es idempotente y aparece en el ranking', a
   const premio = logros.reduce((a, x) => a + x.reward, 0);
   assert.equal(done.body.profile.state.coins, 200 + done.body.result.coins + premio);
   assert.equal(done.body.profile.state.stats.runs, 1);
+  // La fachada cuenta los servicios de cada local.
+  assert.equal(done.body.profile.state.restStats.arepera?.runs, 1, JSON.stringify(done.body.profile.state.restStats));
   assert.deepEqual(done.body.profile.state.achievements, logros.map((x) => x.id));
   // La despensa se descontó.
   const used = done.body.result.used;

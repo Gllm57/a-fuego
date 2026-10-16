@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, retiredDecorRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, DECOR, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, retiredDecorRefund, addRestRun, emptyStats, STARTER_RESTAURANT, sanitizeStaff, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, DECOR, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta, UPGRADES, RESTAURANTS, RECIPES, STAFF, xpForLevel
@@ -34,6 +34,7 @@ function sandboxState() {
     upgrades,
     inventory: {},
     staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 5, luis: 15 } },
+    restStats: Object.fromEntries(RESTAURANTS.map((r, i) => [r.id, i < 3 ? { runs: 40, threeStars: 12 } : i < 6 ? { runs: 30, threeStars: 2 } : { runs: 3, threeStars: 0 }])),
     decor: { owned: DECOR.map((x) => x.id), equipped: { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: [] } }
   };
 }
@@ -155,6 +156,8 @@ class LocalApi {
         data.state.stats = { ...emptyStats(), ...data.state.stats };
         data.state.staff = { hired: null, owned: [], exp: {}, ...data.state.staff };
         data.state.decor = decorOf(data.state);
+        // Servicios por local (fachadas): las partidas guardadas antes se cuentan con el diario.
+        if (!data.state.restStats) data.state.restStats = data.history.reduceRight((acc, h) => (h.restaurantId ? addRestRun(acc, h.restaurantId, h.stars ?? 0) : acc), {});
         // La arepera se agregó como primer local: quien ya jugaba la recibe gratis.
         if (!data.state.restaurants.includes(STARTER_RESTAURANT)) {
           data.state.restaurants = [STARTER_RESTAURANT, ...data.state.restaurants];
@@ -176,6 +179,7 @@ class LocalApi {
           data.state.upgrades = { ...full.upgrades, ...data.state.upgrades, ...full.upgrades };
           data.state.xp = Math.max(data.state.xp ?? 0, full.xp);
           data.state.decor = { ...data.state.decor, owned: full.decor.owned };
+          data.state.restStats = { ...full.restStats, ...data.state.restStats };
         }
         // Un ayudante contratado antes de abrir su restaurante (versión anterior) deja de trabajar.
         data.state = sanitizeStaff(data.state);
@@ -297,6 +301,7 @@ class LocalApi {
       }
     }
     s.stats = addRunToStats(s.stats, result);
+    s.restStats = addRestRun(s.restStats ?? {}, run.config.restaurantId, result.stars);
     s.staff = addStaffExp(s.staff ?? { hired: null, exp: {} }, run.config.staff?.id);
     const unlocked = pendingAchievements(s);
     for (const x of unlocked) {

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  RECIPES, RESTAURANTS, INGREDIENTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
+  RECIPES, RESTAURANTS, INGREDIENTS, facadeStage, addRestRun, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, RESTAURANT_BY_ID, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
   restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients, decorOwned, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, retiredDecorRefund
@@ -427,4 +427,16 @@ test('en el asador y la barbacoa coreana un jugador honesto vende y el servidor 
     assert.ok(res.served > 3, `${rid}: ${res.served}`);
     assert.ok(res.gross > 0);
   }
+});
+
+test('la fachada de cada local sube de etapa jugando', () => {
+  const s = newPlayerState();
+  assert.equal(facadeStage(s, 'taqueria'), 0);
+  assert.equal(facadeStage(s, 'arepera'), 1);
+  let rs = {};
+  for (let i = 0; i < 25; i++) rs = addRestRun(rs, 'arepera', i < 10 ? 3 : 1);
+  assert.deepEqual(rs.arepera, { runs: 25, threeStars: 10 });
+  assert.equal(facadeStage({ ...s, restStats: rs }, 'arepera'), 2);
+  const all = RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id);
+  assert.equal(facadeStage({ ...s, recipes: all, restStats: rs }, 'arepera'), 3);
 });

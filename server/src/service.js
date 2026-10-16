@@ -156,6 +156,11 @@ export class GameService {
       inventory,
       dailyClaimed: p.daily_claimed,
       basketClaimed: p.basket_claimed,
+      // Servicios por local (para la fachada de Inicio), contados de las partidas validadas.
+      restStats: Object.fromEntries(this.db.all(
+        "SELECT restaurant_id AS r, COUNT(*) AS runs, SUM(CASE WHEN stars >= 3 THEN 1 ELSE 0 END) AS three FROM runs WHERE player_id = ? AND status = 'completed' GROUP BY restaurant_id",
+        playerId
+      ).map((x) => [x.r, { runs: x.runs, threeStars: x.three ?? 0 }])),
       ...this.#progress(p)
     });
   }
@@ -413,6 +418,11 @@ export class GameService {
         decor: before.decor
       });
 
+      // El servicio queda terminado antes de armar el perfil, para que ya cuente en la fachada.
+      this.db.run(
+        "UPDATE runs SET status = 'completed', finished_at = ?, score = ?, stars = ?, coins = ?, xp = ? WHERE id = ?",
+        now, result.score, result.stars, result.coins + dailyBonus, result.xp, runId
+      );
       const after = this.profile(playerId);
       const response = {
         result,
@@ -420,10 +430,7 @@ export class GameService {
         levelUp: after.level.level > levelBefore ? after.level.level : null,
         profile: after
       };
-      this.db.run(
-        "UPDATE runs SET status = 'completed', finished_at = ?, score = ?, stars = ?, coins = ?, xp = ?, result_json = ? WHERE id = ?",
-        now, result.score, result.stars, result.coins + dailyBonus, result.xp, JSON.stringify(response), runId
-      );
+      this.db.run('UPDATE runs SET result_json = ? WHERE id = ?', JSON.stringify(response), runId);
       return { response };
     });
     if (outcome.error) throw outcome.error;

@@ -445,3 +445,37 @@ export function inventoryDelta(result) {
   for (const [ing, n] of Object.entries(result.waste ?? {})) add(ing, -n);
   return delta;
 }
+
+// Fachada de cada local en Inicio: 0 = en obra (sin abrir), 1 = recién abierto,
+// 2 = con clientela (25 servicios ahí), 3 = leyenda (menú completo y 10 servicios de 3 estrellas ahí).
+export const FACADE_CLIENTELA_RUNS = 25;
+export const FACADE_LEYENDA_STARS = 10;
+export const FACADE_STAGES = Object.freeze(['En obra', 'Recién abierto', 'Con clientela', 'Local leyenda']);
+
+export function facadeStage(state, restaurantId) {
+  if (!state.restaurants?.includes(restaurantId)) return 0;
+  const rs = state.restStats?.[restaurantId] ?? {};
+  const menuDone = recipesOf(restaurantId).every((r) => state.recipes?.includes(r.id));
+  if (menuDone && (rs.threeStars ?? 0) >= FACADE_LEYENDA_STARS) return 3;
+  return (rs.runs ?? 0) >= FACADE_CLIENTELA_RUNS ? 2 : 1;
+}
+
+// Lo que falta para la siguiente etapa, en palabras cortas (null si ya es leyenda).
+export function facadeNext(state, restaurantId) {
+  const stage = facadeStage(state, restaurantId);
+  const rs = state.restStats?.[restaurantId] ?? {};
+  if (stage === 1) return `${Math.min(rs.runs ?? 0, FACADE_CLIENTELA_RUNS)}/${FACADE_CLIENTELA_RUNS} servicios`;
+  if (stage === 2) {
+    const recipes = recipesOf(restaurantId);
+    const learned = recipes.filter((r) => state.recipes?.includes(r.id)).length;
+    if (learned < recipes.length) return `Menú ${learned}/${recipes.length}`;
+    return `${Math.min(rs.threeStars ?? 0, FACADE_LEYENDA_STARS)}/${FACADE_LEYENDA_STARS} servicios de 3 estrellas`;
+  }
+  return null;
+}
+
+// Suma un servicio terminado a los contadores del local (para la fachada).
+export function addRestRun(restStats, restaurantId, stars) {
+  const prev = restStats?.[restaurantId] ?? { runs: 0, threeStars: 0 };
+  return { ...restStats, [restaurantId]: { runs: prev.runs + 1, threeStars: prev.threeStars + (stars >= 3 ? 1 : 0) } };
+}
