@@ -584,7 +584,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .order__comps { display: flex; gap: 5px; flex-wrap: nowrap; margin-top: 6px; min-width: 0; }
 /* La comanda nunca cambia de alto: con 5 o más ingredientes las fichas se compactan
    en una sola fila, así los fogones y la despensa no se mueven. */
-.order { height: 96px; box-sizing: border-box; }
+.order { height: 112px; box-sizing: border-box; padding-bottom: 24px; }
 .order > div:last-child { min-width: 0; }
 .order__title, .order__hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .order__title { display: block; }
@@ -648,7 +648,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 /* Con dos filas de fogones, el área de clientes cede alto para la despensa */
 .game__inner[data-station-rows="2"] .bar { min-height: clamp(132px, 17dvh, 160px); height: clamp(132px, 17dvh, 160px); padding-top: 18px; }
 .game__inner[data-station-rows="2"] .lamps { display: none; }
-.game__inner[data-station-rows="2"] .order { min-height: 84px; height: 84px; padding-top: 10px; padding-bottom: 16px; }
+.game__inner[data-station-rows="2"] .order { min-height: 104px; height: 104px; padding-top: 10px; padding-bottom: 22px; }
 .game__inner[data-station-rows="2"] .station__status { min-height: 11px; }
 .station {
   --p: 0; --fill: var(--warn);
@@ -777,6 +777,10 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .tuto-art--serve .plate { animation: bump 1.6s ease-in-out infinite; }
 .tuto-coin { display: flex; align-items: center; gap: 4px; font-family: var(--font-display); font-weight: 700; font-size: 22px; color: var(--gold-deep); animation: float 1.6s ease-in-out infinite; }
 .tuto-coin .coin { width: 28px; height: 28px; }
+.tuto-coin--bad { color: var(--bad); }
+.tuto-lives { display: flex; gap: 4px; background: var(--paper); border-radius: 999px; padding: 6px 10px; box-shadow: 0 4px 10px -6px rgba(0,0,0,.3); }
+.tuto-lives .life svg { width: 26px; height: 26px; }
+.tuto-art--lose .life.is-breaking { animation: heart-break 1.4s ease-in-out infinite; }
 .tuto-hand { position: absolute; right: -14px; bottom: -18px; width: 40px; height: 40px; color: var(--ink); background: #fff; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 6px 12px -4px rgba(0,0,0,.35); animation: tap-hand 1.3s ease-in-out infinite; }
 .tuto-hand svg { width: 26px; height: 26px; }
 .tuto__dots { display: flex; gap: 6px; }
@@ -977,7 +981,11 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
   .avatar__face, .avatar__face svg { width: 44px; height: 44px; }
   .bubble__dish svg { width: 18px; height: 18px; }
   .customers { min-height: 106px; padding-bottom: 10px; }
-  .order { min-height: 80px; height: 80px; grid-template-columns: 60px 1fr; padding: 10px 12px 16px; }
+  .order { min-height: 84px; height: 84px; grid-template-columns: 60px 1fr; padding: 10px 12px 20px; }
+  /* Pantallas bajas (p. ej. iPhone con la barra de Safari): sin la línea de ayuda, las fichas
+     de ingredientes caben enteras sobre el borde dentado de la comanda. */
+  .order__hint { display: none; }
+  .order__comps { margin-top: 5px; }
   .order__plate { width: 60px; height: 60px; }
   .order__stack svg { width: 22px; height: 22px; }
   .order__title { font-size: 16px; }
@@ -985,7 +993,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
   .counter { --ring-max: 52px; }
   .game__inner[data-station-rows="2"] .bar { min-height: 112px; height: 112px; padding-top: 12px; }
   .game__inner[data-station-rows="2"] .customers { min-height: 96px; padding-bottom: 8px; }
-  .game__inner[data-station-rows="2"] .order { min-height: 70px; height: 76px; padding: 8px 12px 14px; }
+  .game__inner[data-station-rows="2"] .order { min-height: 80px; height: 80px; padding: 8px 12px 18px; }
   .game__inner[data-station-rows="2"] .counter { padding: 6px 4px; gap: 3px; margin-top: 8px; }
   .game__inner[data-station-rows="2"] .station__status { display: none; }
   .game__inner[data-station-rows="2"] .st-group[data-count="2"] { padding-top: 3px; }

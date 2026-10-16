@@ -209,6 +209,15 @@ export class Kitchen {
           <span class="combo is-on" style="position:static">Combo ×1.3</span>
           <span class="avatar" style="--p:100;width:64px;height:64px"><span class="avatar__face" style="width:56px;height:56px">${customerSvg(2, 'happy', '', true)}</span></span>
         </div>`
+      },
+      {
+        title: 'Cuidado: puedes perder',
+        text: `Tienes ${SERVICE_LIVES} vidas por servicio: cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina. Y al cerrar siempre pagas los gastos del local: si vendes menos, pierdes dinero.`,
+        art: `<div class="tuto-art tuto-art--lose">
+          <span class="avatar" style="--p:8;--fill:var(--bad);width:64px;height:64px"><span class="avatar__face" style="width:56px;height:56px">${customerSvg(4, 'angry', '')}</span></span>
+          <span class="tuto-lives"><span class="life">${icon('heart')}</span><span class="life">${icon('heart')}</span><span class="life is-lost is-breaking">${icon('heart')}</span></span>
+          <span class="tuto-coin tuto-coin--bad">${coinSvg()}<b>−${fmt(this.config.upkeep ?? 0)}</b></span>
+        </div>`
       }
     ];
     let idx = 0;
