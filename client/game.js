@@ -197,6 +197,7 @@ export class Kitchen {
       const s = slides[idx];
       ov.innerHTML = `
         <div class="tuto" role="dialog" aria-label="Cómo se juega">
+          <button class="card-x" data-act="close" aria-label="Cerrar">${icon('close')}</button>
           <div class="tuto__step">PASO ${idx + 1} DE ${slides.length}</div>
           <div class="tuto__stage" key="${idx}">${s.art}</div>
           <h2>${s.title}</h2>
@@ -212,6 +213,7 @@ export class Kitchen {
         if (idx < slides.length - 1) { idx++; draw(); } else { ov.remove(); done(); }
       });
       ov.querySelector('[data-act="skip"]').addEventListener('click', () => { ov.remove(); done(); });
+      ov.querySelector('[data-act="close"]').addEventListener('click', () => { sfx.tap(); ov.remove(); done(); });
     };
     draw();
     this.el.root.appendChild(ov);
@@ -228,6 +230,7 @@ export class Kitchen {
     const extras = this.stationKeys.length - STATION_IDS.length;
     ov.innerHTML = `
       <div class="brief">
+        <button class="card-x" data-act="close" aria-label="Volver sin empezar">${icon('close')}</button>
         <div class="brief__kicker">PARTE DEL DÍA</div>
         <h2>${escapeHtml(this.restaurant.name)}</h2>
         <div class="bubbles">
@@ -248,6 +251,8 @@ export class Kitchen {
         <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
       </div>`;
     ov.querySelector('[data-act="go"]').addEventListener('click', () => { ov.remove(); this.#countdown(); });
+    // La X vuelve al inicio sin empezar: no se gasta nada de la despensa.
+    ov.querySelector('[data-act="close"]').addEventListener('click', () => { sfx.tap(); this.destroy(); this.onQuit(); });
     ov.querySelector('[data-act="howto"]').addEventListener('click', () => { ov.remove(); this.#tutorial(() => this.#briefing()); });
     this.el.root.appendChild(ov);
   }
