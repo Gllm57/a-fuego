@@ -19,10 +19,10 @@ export const VIP_PRICE_MULT = 2;
 export const VIP_PATIENCE_MULT = 0.7;
 // Toques necesarios para apagar un fuego en una estación.
 export const FIRE_TAPS = 6;
-// Dificultad por restaurante (0 = taquería … 4 = cevichería): paciencia de los
-// clientes y ritmo de llegada. El diner ya se nota más exigente que la taquería.
-export const TIER_PATIENCE = Object.freeze([1, 0.88, 0.82, 0.76, 0.68]);
-export const TIER_PACE = Object.freeze([1, 0.91, 0.87, 0.82, 0.76]);
+// Dificultad por restaurante (0 = arepera … 5 = cevichería): paciencia de los
+// clientes y ritmo de llegada. Cada local se nota más exigente que el anterior.
+export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.76, 0.68]);
+export const TIER_PACE = Object.freeze([1.04, 0.97, 0.91, 0.87, 0.82, 0.76]);
 // Grupos: dos amigos que llegan juntos y quieren comer a la vez.
 export const GROUP_WINDOW_MS = 10_000;
 export const GROUP_BONUS = 0.25;

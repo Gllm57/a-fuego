@@ -117,6 +117,22 @@ export function starSvg(cls = 'star') {
   return `<svg class="${cls}" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.5l2.9 6 6.6.8-4.9 4.5 1.3 6.5L12 17l-5.9 3.3 1.3-6.5L2.5 9.3l6.6-.8z" fill="#FFC23D" stroke="#B7791F" stroke-width="1.2" stroke-linejoin="round"/><path d="M12 5.5l1.6 3.4" stroke="#fff" stroke-width="1.4" stroke-linecap="round" opacity=".7"/></svg>`;
 }
 
+// Asistentes de cocina: cara con gorro de chef, colores según cada uno.
+export function staffSvg(member, extra = '') {
+  const { shirt, skin, bg } = member.look;
+  return `<svg viewBox="0 0 62 62" aria-hidden="true" ${extra}>
+    <circle cx="31" cy="31" r="30" fill="${bg}"/>
+    <path d="M12 58c2-11 10-16 19-16s17 5 19 16z" fill="${shirt}"/>
+    <path d="M26 43l5 6 5-6" fill="#fff"/>
+    <circle cx="31" cy="30" r="13" fill="${skin}"/>
+    <path d="M18 22c-4-1-5-7-1-9 1-5 7-6 9-3 2-4 8-4 10 0 3-3 8-1 8 3 4 2 3 8-1 9z" fill="#fff" stroke="#E3C8A6" stroke-width="1.4"/>
+    <rect x="18" y="20" width="26" height="5" rx="2.5" fill="#fff" stroke="#E3C8A6" stroke-width="1.4"/>
+    <circle cx="26" cy="31" r="1.8" fill="#2A170D"/><circle cx="36" cy="31" r="1.8" fill="#2A170D"/>
+    <path d="M26 36c3 3 7 3 10 0" stroke="#2A170D" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <circle cx="22" cy="35" r="2.2" fill="#F28C6B" opacity=".45"/><circle cx="40" cy="35" r="2.2" fill="#F28C6B" opacity=".45"/>
+  </svg>`;
+}
+
 // Clientes: ver people.js
 export { customerSvg } from './people.js';
 

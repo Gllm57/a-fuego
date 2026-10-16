@@ -14,8 +14,8 @@ test('crear invitado devuelve perfil inicial con bono de bienvenida', async () =
   const { token, profile } = await guest(call);
   assert.ok(token);
   assert.equal(profile.state.coins, 200);
-  assert.equal(profile.state.inventory.tortilla, 14);
-  assert.deepEqual(profile.state.restaurants, ['taqueria']);
+  assert.equal(profile.state.inventory.harina_maiz, 18);
+  assert.deepEqual(profile.state.restaurants, ['arepera']);
   const me = await call('GET', '/api/v1/me', { token });
   assert.equal(me.status, 200);
   const ledger = await call('GET', '/api/v1/me/ledger', { token });
@@ -54,7 +54,7 @@ test('compras: dinero insuficiente, éxito, libro contable e idempotencia', asyn
 test('partida completa: valida, paga, es idempotente y aparece en el ranking', async () => {
   const { app, clock, call } = await makeApp();
   const { token } = await guest(call);
-  const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
   assert.equal(start.status, 201);
   const { runId, config } = start.body;
   const serves = honestServes(config);
@@ -79,7 +79,7 @@ test('partida completa: valida, paga, es idempotente y aparece en el ranking', a
   const again = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
   assert.deepEqual(again.body, done.body);
 
-  const board = await call('GET', '/api/v1/leaderboard/taqueria', { token });
+  const board = await call('GET', '/api/v1/leaderboard/arepera', { token });
   assert.equal(board.body.entries[0].score, done.body.result.score);
   assert.equal(board.body.entries[0].me, true);
   await app.close();
@@ -88,7 +88,7 @@ test('partida completa: valida, paga, es idempotente y aparece en el ranking', a
 test('no se puede enviar una partida antes de jugarla (reloj del servidor)', async () => {
   const { app, clock, call } = await makeApp();
   const { token } = await guest(call);
-  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
   clock.t += 5000;
   const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: honestServes(body.config) } });
   assert.equal(res.status, 422);
@@ -100,7 +100,7 @@ test('tramposos reincidentes quedan bloqueados', async () => {
   const { app, clock, call } = await makeApp({ maxCheatStrikes: 2 });
   const { token } = await guest(call);
   for (let i = 0; i < 2; i++) {
-    const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+    const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
     const o = ordersForConfig(body.config)[0];
     clock.t += body.config.durationMs;
     const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: [{ orderId: o.id, recipeId: o.recipeId, servedAt: o.arriveAt + 1 }] } });
@@ -156,12 +156,12 @@ test('mercado: comprar, canasta diaria y despensa llena', async () => {
   assert.equal(m.status, 200);
   assert.equal(m.body.capacity, 60);
   assert.equal(m.body.used, 40);
-  const price = m.body.items.find((i) => i.id === 'cebolla').price;
-  const buy = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 3 } } });
+  const price = m.body.items.find((i) => i.id === 'queso').price;
+  const buy = await call('POST', '/api/v1/market/buy', { token, body: { items: { queso: 3 } } });
   assert.equal(buy.status, 200, JSON.stringify(buy.body));
   assert.equal(buy.body.profile.state.coins, 200 - price * 3);
-  assert.equal(buy.body.profile.state.inventory.cebolla, 12);
-  const full = await call('POST', '/api/v1/market/buy', { token, body: { items: { cebolla: 30 } } });
+  assert.equal(buy.body.profile.state.inventory.queso, 14);
+  const full = await call('POST', '/api/v1/market/buy', { token, body: { items: { queso: 30 } } });
   assert.equal(full.body.error.code, 'despensa_llena');
   const notSold = await call('POST', '/api/v1/market/buy', { token, body: { items: { salmon: 1 } } });
   assert.equal(notSold.status, 400);
@@ -176,12 +176,45 @@ test('no se puede servir más de lo que hay en la despensa', async () => {
   const { app, clock, call } = await makeApp();
   const { token } = await guest(call);
   app.service.db.run('UPDATE inventory SET qty = 1');
-  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'taqueria' } });
+  const { body } = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
   clock.t += body.config.durationMs + 2000;
   const greedy = honestServes({ ...body.config, stock: undefined });
   assert.ok(greedy.length >= 2);
   const res = await call('POST', `/api/v1/runs/${body.runId}/complete`, { token, body: { serves: greedy } });
   assert.equal(res.status, 422);
   assert.equal(res.body.error.details.reason, 'sin_ingredientes');
+  await app.close();
+});
+
+test('personal: contratar por la API y sumar experiencia tras un servicio', async () => {
+  const { app, clock, call } = await makeApp();
+  const { token } = await guest(call);
+  const low = await call('POST', '/api/v1/staff/hire', { token, body: { id: 'pepe' } });
+  assert.equal(low.body.error.code, 'nivel_insuficiente');
+  app.service.db.run('UPDATE players SET xp = 100000');
+  const ok = await call('POST', '/api/v1/staff/hire', { token, body: { id: 'pepe' } });
+  assert.equal(ok.status, 200, JSON.stringify(ok.body));
+  assert.equal(ok.body.profile.state.staff.hired, 'pepe');
+  const start = await call('POST', '/api/v1/runs', { token, body: { restaurantId: 'arepera' } });
+  assert.equal(start.body.config.salary, 40);
+  clock.t += start.body.config.durationMs + 3000;
+  const done = await call('POST', `/api/v1/runs/${start.body.runId}/complete`, { token, body: { serves: [] } });
+  assert.equal(done.status, 200);
+  assert.equal(done.body.profile.state.staff.exp.pepe, 1);
+  const fire = await call('POST', '/api/v1/staff/hire', { token, body: { id: null } });
+  assert.equal(fire.body.profile.state.staff.hired, null);
+  await app.close();
+});
+
+test('jugadores anteriores reciben la arepera gratis', async () => {
+  const { app, call } = await makeApp();
+  const { token } = await guest(call);
+  app.service.db.run("DELETE FROM unlocks WHERE item_id IN ('arepera', 'arepa_queso', 'empanada')");
+  app.service.db.run("INSERT INTO unlocks (player_id, kind, item_id, level, created_at) SELECT id, 'restaurant', 'taqueria', 1, 0 FROM players");
+  const again = new app.service.constructor({ db: app.service.db, config: app.service.config, now: app.service.now });
+  const pid = app.service.db.get('SELECT id FROM players').id;
+  const st = again.state(pid);
+  assert.deepEqual(st.restaurants, ['arepera', 'taqueria']);
+  assert.ok(st.recipes.includes('arepa_queso'));
   await app.close();
 });

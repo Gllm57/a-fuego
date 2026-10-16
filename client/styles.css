@@ -276,6 +276,41 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .tile span { font-size: 12px; font-weight: 700; color: var(--ink-2); }
 .tile--daily { background: linear-gradient(150deg, var(--brand-soft), var(--card) 70%); }
 .tile--daily .tile__icon { background: var(--brand); color: #fff; animation: float 3s ease-in-out infinite; }
+.tile--wide { grid-column: 1 / -1; }
+.tile--staff { flex-direction: row; align-items: center; gap: 12px; }
+.tile--staff > svg { width: 22px; height: 22px; color: var(--ink-2); flex: none; }
+.tile--staff__text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.staff-face { width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center; flex: none; background: var(--brand-soft); color: var(--brand-deep); overflow: hidden; }
+.staff-face svg { width: 100%; height: 100%; }
+.tile--staff .staff-face > svg:only-child:not([viewBox="0 0 62 62"]) { width: 26px; height: 26px; }
+.staff-face--lg { width: 64px; height: 64px; }
+.staff-card { display: flex; flex-direction: column; gap: 10px; border: 3px solid transparent; }
+.staff-card.is-hired { border-color: var(--brand); }
+.staff-card__head { display: flex; align-items: center; gap: 12px; }
+.staff-card__name { display: block; font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.staff-card__role { display: block; font-size: 13px; font-weight: 800; color: var(--brand-deep); }
+.staff-card .tag { background: var(--ground); color: var(--ink-2); font-size: 12px; padding: 5px 10px; }
+.staff-card__desc { margin: 0; font-size: 14px; font-weight: 700; color: var(--ink-2); }
+.staff-card__exp { display: flex; flex-direction: column; gap: 5px; font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.staff-card__exp .progress { height: 7px; }
+.staff-card__exp .progress__fill { background-color: var(--gold); }
+.staff-card__foot { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.staff-card__foot > span:first-child { flex: 1; }
+.staff-card__foot b { color: var(--ink); }
+.staff-card__badge, .staff-card__lock { display: inline-flex; align-items: center; gap: 4px; font-weight: 900; }
+.staff-card__badge { color: var(--good); }
+.staff-card__badge svg, .staff-card__lock svg { width: 16px; height: 16px; }
+/* Asistente en la cocina: una ficha flotante que no mueve nada del diseño. */
+.helper-chip { display: flex; align-items: center; gap: 5px; max-width: 100%; margin-top: 2px; padding: 2px 10px 2px 2px; border: 0; border-radius: 999px; background: rgba(0,0,0,.22); color: #fff; font: 800 12px var(--font-body); cursor: pointer; min-height: 24px; }
+.helper-chip__face { width: 22px; height: 22px; border-radius: 50%; overflow: hidden; flex: none; }
+.brief__helper .helper-chip__face { width: 30px; height: 30px; }
+.helper-chip__face svg { width: 100%; height: 100%; }
+.helper-chip__text { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.helper-chip.is-paused { background: rgba(0,0,0,.45); opacity: .8; }
+.helper-chip.is-busy .helper-chip__face { animation: eat-bounce .6s ease-in-out infinite; }
+.helper-badge { position: absolute; top: -4px; right: -4px; width: 26px; height: 26px; border-radius: 50%; overflow: hidden; border: 2px solid var(--paper); box-shadow: 0 2px 6px rgba(0,0,0,.25); z-index: 3; pointer-events: none; }
+.helper-badge svg { width: 100%; height: 100%; }
+.station.is-helper-paused .helper-badge { filter: grayscale(1); opacity: .6; }
 .tile .done-badge { color: var(--good); font-weight: 800; font-size: 13px; }
 
 /* Recetas */
@@ -447,7 +482,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .hud__coins.is-bump { animation: bump .45s var(--ease-spring); }
 
 /* Clientes frente a la barra */
-.bar { position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px 8px 0; min-height: clamp(150px, 21dvh, 196px); }
+/* La barra de clientes tiene alto fijo: los globos nunca empujan la cocina hacia abajo. */
+.bar { position: relative; display: flex; flex-direction: column; justify-content: flex-end; padding: 34px 8px 0; min-height: clamp(150px, 21dvh, 196px); height: clamp(150px, 21dvh, 196px); }
 .lamps { position: absolute; left: 0; right: 0; top: 0; display: flex; justify-content: space-around; pointer-events: none; }
 .lamp { display: flex; flex-direction: column; align-items: center; animation: sway 4s ease-in-out infinite; transform-origin: top center; }
 .lamp:nth-child(2) { animation-delay: -1.3s; } .lamp:nth-child(3) { animation-delay: -2.6s; }
@@ -503,7 +539,17 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .order__stack svg { width: 28px; height: 28px; margin: -3px; animation: drop-in .45s var(--ease-spring) both; }
 .order__title { font-family: var(--font-display); font-weight: 600; font-size: 18px; display: flex; align-items: center; gap: 6px; }
 .order__hint { font-size: 12px; font-weight: 700; color: var(--ink-2); }
-.order__comps { display: flex; gap: 5px; flex-wrap: wrap; margin-top: 6px; }
+.order__comps { display: flex; gap: 5px; flex-wrap: nowrap; margin-top: 6px; min-width: 0; }
+/* La comanda nunca cambia de alto: con 5 o más ingredientes las fichas se compactan
+   en una sola fila, así los fogones y la despensa no se mueven. */
+.order { height: 96px; box-sizing: border-box; }
+.order > div:last-child { min-width: 0; }
+.order__title, .order__hint { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.order__title { display: block; }
+.order__comps[data-count="5"] .need, .order__comps[data-count="6"] .need { padding: 1px 4px 1px 1px; }
+.order__comps[data-count="5"] .need svg, .order__comps[data-count="6"] .need svg { width: 20px; height: 20px; }
+.order__comps[data-count="5"] .need .proc, .order__comps[data-count="6"] .need .proc { width: 11px; height: 11px; }
+.order__comps[data-count="5"], .order__comps[data-count="6"] { gap: 3px; }
 .need { display: inline-flex; align-items: center; gap: 1px; padding: 2px 7px 2px 2px; border-radius: 999px; background: var(--ground); box-shadow: inset 0 0 0 2px transparent; font-size: 11px; font-weight: 800; color: var(--ink-2); transition: background .2s, box-shadow .2s; }
 .need svg { width: 24px; height: 24px; }
 .need .proc { width: 14px; height: 14px; }
@@ -558,9 +604,9 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .st-group__row { display: flex; gap: 4px; }
 .st-group[data-count="2"] { background: rgba(255,255,255,.6); border-radius: calc(var(--ring) / 2 + 6px); padding: 4px 6px 2px; box-shadow: inset 0 0 0 2px rgba(201,139,82,.25); }
 /* Con dos filas de fogones, el área de clientes cede alto para la despensa */
-.game__inner[data-station-rows="2"] .bar { min-height: clamp(132px, 17dvh, 160px); padding-top: 18px; }
+.game__inner[data-station-rows="2"] .bar { min-height: clamp(132px, 17dvh, 160px); height: clamp(132px, 17dvh, 160px); padding-top: 18px; }
 .game__inner[data-station-rows="2"] .lamps { display: none; }
-.game__inner[data-station-rows="2"] .order { min-height: 84px; padding-top: 10px; padding-bottom: 16px; }
+.game__inner[data-station-rows="2"] .order { min-height: 84px; height: 84px; padding-top: 10px; padding-bottom: 16px; }
 .game__inner[data-station-rows="2"] .station__status { min-height: 11px; }
 .station {
   --p: 0; --fill: var(--warn);
@@ -716,6 +762,8 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .brief__legend i { width: 12px; height: 12px; border-radius: 50%; }
 .lg-rush { background: var(--gold); } .lg-fire { background: var(--bad); } .lg-vip { background: var(--night); }
 .brief .btn--xl { margin-top: 4px; }
+.brief__helper { display: flex; align-items: center; gap: 8px; background: var(--ground); border-radius: 999px; padding: 4px 14px 4px 4px; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.brief__helper b { color: var(--ink); }
 
 /* Resultados */
 .results { flex: 1; overflow-y: auto; padding: calc(28px + var(--safe-top)) 18px calc(24px + var(--safe-bottom)); display: flex; flex-direction: column; align-items: center; gap: 18px; color: #fff; position: relative; background: radial-gradient(circle at 50% 18%, color-mix(in srgb, var(--brand) 55%, var(--night)), var(--night) 60%); }
@@ -877,21 +925,21 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 }
 
 @media (max-height: 700px) {
-  .bar { min-height: 140px; padding-top: 22px; }
+  .bar { min-height: 140px; height: 140px; padding-top: 22px; }
   .lamps { display: none; }
   .avatar { width: 52px; height: 52px; }
   .avatar__face, .avatar__face svg { width: 44px; height: 44px; }
   .bubble__dish svg { width: 18px; height: 18px; }
   .customers { min-height: 106px; padding-bottom: 10px; }
-  .order { min-height: 80px; grid-template-columns: 60px 1fr; padding: 10px 12px 16px; }
+  .order { min-height: 80px; height: 80px; grid-template-columns: 60px 1fr; padding: 10px 12px 16px; }
   .order__plate { width: 60px; height: 60px; }
   .order__stack svg { width: 22px; height: 22px; }
   .order__title { font-size: 16px; }
   .need svg { width: 20px; height: 20px; }
   .counter { --ring-max: 52px; }
-  .game__inner[data-station-rows="2"] .bar { min-height: 112px; padding-top: 12px; }
+  .game__inner[data-station-rows="2"] .bar { min-height: 112px; height: 112px; padding-top: 12px; }
   .game__inner[data-station-rows="2"] .customers { min-height: 96px; padding-bottom: 8px; }
-  .game__inner[data-station-rows="2"] .order { min-height: 70px; padding: 8px 12px 14px; }
+  .game__inner[data-station-rows="2"] .order { min-height: 70px; height: 76px; padding: 8px 12px 14px; }
   .game__inner[data-station-rows="2"] .counter { padding: 6px 4px; gap: 3px; margin-top: 8px; }
   .game__inner[data-station-rows="2"] .station__status { display: none; }
   .game__inner[data-station-rows="2"] .st-group[data-count="2"] { padding-top: 3px; }

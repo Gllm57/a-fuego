@@ -4,15 +4,17 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
-const stocked = () => ({ ...newPlayerState(), inventory: { tortilla: 40, carne_res: 40, cebolla: 40, queso: 40 } });
-const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'taqueria', randomSeed: seed, day: '2026-10-15' });
+const stocked = () => ({ ...newPlayerState(), inventory: { harina_maiz: 40, carne_res: 40, queso: 40 } });
+const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'arepera', randomSeed: seed, day: '2026-10-15' });
 
-test('el catálogo tiene 40 recetas, 8 por restaurante', () => {
-  assert.equal(RECIPES.length, 40);
+test('el catálogo tiene 48 recetas, 8 por restaurante, y empieza en la arepera', () => {
+  assert.equal(RECIPES.length, 48);
+  assert.equal(RESTAURANTS[0].id, 'arepera');
+  assert.equal(RESTAURANTS[0].cost, 0);
   for (const r of RESTAURANTS) assert.equal(RECIPES.filter((x) => x.restaurant === r.id).length, 8);
 });
 
@@ -82,18 +84,18 @@ test('las mejoras aceleran la cocina y las mesas crecen con el restaurante', () 
 
 test('la economía exige dinero y nivel', () => {
   const s = newPlayerState();
-  assert.equal(evaluatePurchase(s, 'restaurant', 'diner').reason, 'recetas_pendientes');
-  assert.equal(evaluatePurchase({ ...s, recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) }, 'restaurant', 'diner').reason, 'nivel_insuficiente');
-  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(3), recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) }, 'restaurant', 'diner').reason, 'sin_dinero');
-  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(6), coins: 9000 }, 'restaurant', 'diner').reason, 'recetas_pendientes');
-  const allTaco = RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id);
+  assert.equal(evaluatePurchase(s, 'restaurant', 'taqueria').reason, 'recetas_pendientes');
+  assert.equal(evaluatePurchase({ ...s, recipes: RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id) }, 'restaurant', 'taqueria').reason, 'nivel_insuficiente');
+  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(3), recipes: RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id) }, 'restaurant', 'taqueria').reason, 'sin_dinero');
+  assert.equal(evaluatePurchase({ ...s, xp: xpForLevel(6), coins: 9000 }, 'restaurant', 'taqueria').reason, 'recetas_pendientes');
+  const allTaco = RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id);
   const rich = { ...s, xp: xpForLevel(3), coins: 5000, recipes: allTaco };
-  const d = evaluatePurchase(rich, 'restaurant', 'diner');
+  const d = evaluatePurchase(rich, 'restaurant', 'taqueria');
   assert.ok(d.ok);
   const after = applyGrants(rich, d.price, d.grants);
-  assert.equal(after.coins, 2500);
-  assert.ok(after.recipes.includes('hamburguesa'));
-  assert.equal(evaluatePurchase(after, 'restaurant', 'diner').reason, 'ya_comprado');
+  assert.equal(after.coins, 3500);
+  assert.ok(after.recipes.includes('taco_asada'));
+  assert.equal(evaluatePurchase(after, 'restaurant', 'taqueria').reason, 'ya_comprado');
   assert.equal(evaluatePurchase(s, 'recipe', 'lomo').reason, 'restaurante_cerrado');
 });
 
@@ -118,7 +120,7 @@ test('generateOrders exige menú', () => {
 });
 
 test('no se puede cocinar sin ingredientes en la despensa', () => {
-  const st = { ...newPlayerState(), inventory: { tortilla: 1, carne_res: 1, cebolla: 1, queso: 1 } };
+  const st = { ...newPlayerState(), inventory: { harina_maiz: 1, carne_res: 1, queso: 1 } };
   const c = cfgFor(st);
   const all = honestServes({ ...c, stock: undefined });
   assert.ok(all.length > 2);
@@ -128,8 +130,8 @@ test('no se puede cocinar sin ingredientes en la despensa', () => {
 test('los gastos del local se descuentan y el resultado nunca es negativo', () => {
   const c = cfgFor();
   const res = scoreRun(c, { serves: honestServes(c) });
-  assert.equal(res.upkeep, 60);
-  assert.equal(res.coins, Math.max(0, res.gross - 60));
+  assert.equal(res.upkeep, 50);
+  assert.equal(res.coins, Math.max(0, res.gross - 50));
   assert.equal(scoreRun(c, { serves: [] }).coins, 0);
 });
 
@@ -146,20 +148,20 @@ test('mercado: precios del día, ofertas, mayoreo y capacidad', () => {
   assert.equal(lineTotal(10, 10), 90);
   const s = { ...newPlayerState(), coins: 1000 };
   assert.equal(evaluateMarketBuy(s, { salmon: 1 }, '2026-10-15').reason, 'no_disponible');
-  assert.equal(evaluateMarketBuy(s, { tortilla: 30 }, '2026-10-15').reason, 'despensa_llena');
-  const ok = evaluateMarketBuy(s, { tortilla: 5 }, '2026-10-15');
+  assert.equal(evaluateMarketBuy(s, { harina_maiz: 30 }, '2026-10-15').reason, 'despensa_llena');
+  const ok = evaluateMarketBuy(s, { harina_maiz: 5 }, '2026-10-15');
   assert.ok(ok.ok);
   const after = applyInventory(s, ok.delta, ok.price);
-  assert.equal(after.inventory.tortilla, 19);
+  assert.equal(after.inventory.harina_maiz, 23);
   assert.equal(after.coins, 1000 - ok.price);
-  assert.equal(evaluateMarketBuy({ ...s, coins: 0 }, { tortilla: 5 }, '2026-10-15').reason, 'sin_dinero');
+  assert.equal(evaluateMarketBuy({ ...s, coins: 0 }, { harina_maiz: 5 }, '2026-10-15').reason, 'sin_dinero');
 });
 
 test('canasta diaria respeta la capacidad', () => {
   const s = newPlayerState();
   const b = dailyBasket('2026-10-15', s);
   assert.ok(Object.values(b.items).reduce((a, n) => a + n, 0) <= 12);
-  const full = { ...s, inventory: { tortilla: 60 } };
+  const full = { ...s, inventory: { harina_maiz: 60 } };
   assert.deepEqual(dailyBasket('2026-10-15', full).items, {});
 });
 
@@ -175,15 +177,15 @@ test('los críticos VIP pagan más y hay eventos de fuego', () => {
 });
 
 test('pedido urgente: amplía la despensa, cuesta el doble y tiene límite', () => {
-  const st = { ...newPlayerState(), inventory: { tortilla: 1, carne_res: 1, cebolla: 1, queso: 1 } };
+  const st = { ...newPlayerState(), inventory: { harina_maiz: 1, carne_res: 1, queso: 1 } };
   const c = cfgFor(st);
-  const all = honestServes({ ...c, stock: { tortilla: 4, carne_res: 4, cebolla: 4, queso: 4 } });
-  const emergency = { tortilla: 3, carne_res: 3, cebolla: 3, queso: 3 };
+  const all = honestServes({ ...c, stock: { harina_maiz: 4, carne_res: 4, queso: 4 } });
+  const emergency = { harina_maiz: 3, carne_res: 3, queso: 3 };
   const res = scoreRun(c, { serves: all, emergency });
   const cost = Object.entries(emergency).reduce((a, [ing, n]) => a + c.emergencyPrices[ing] * n, 0);
   assert.equal(res.emergencyCost, cost);
   assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - cost));
-  assert.throws(() => scoreRun(c, { serves: [], emergency: { tortilla: 13 } }), (e) => e.reason === 'urgente_excedido');
+  assert.throws(() => scoreRun(c, { serves: [], emergency: { harina_maiz: 13 } }), (e) => e.reason === 'urgente_excedido');
   assert.throws(() => scoreRun(c, { serves: [], emergency: { salmon: 1 } }), (e) => e.reason === 'urgente_invalido');
   const delta = inventoryDelta(res);
   for (const ing of Object.keys(emergency)) assert.ok(delta[ing] <= emergency[ing]);
@@ -191,11 +193,11 @@ test('pedido urgente: amplía la despensa, cuesta el doble y tiene límite', () 
 
 test('surtir: el plan cubre el menú sin pasarse de la capacidad', () => {
   const s = { ...newPlayerState(), inventory: {} };
-  const plan = restockPlan(s, 'taqueria', 10);
-  assert.ok(Object.keys(plan).length >= 4);
+  const plan = restockPlan(s, 'arepera', 10);
+  assert.ok(Object.keys(plan).length >= 3);
   assert.ok(inventoryCount(plan) <= storageCapacity(s.upgrades));
-  const full = { ...s, inventory: { tortilla: 60 } };
-  assert.deepEqual(restockPlan(full, 'taqueria', 10), {});
+  const full = { ...s, inventory: { harina_maiz: 60 } };
+  assert.deepEqual(restockPlan(full, 'arepera', 10), {});
 });
 
 test('equipo extra: exige nivel y permite cocinar en paralelo', () => {
@@ -218,9 +220,9 @@ test('la siguiente meta guía a completar el recetario antes de abrir otro local
   const s = { ...newPlayerState(), xp: xpForLevel(6) };
   const g = nextGoal(s);
   assert.equal(g.kind, 'recipe');
-  assert.equal(RECIPES.find((r) => r.id === g.id).restaurant, 'taqueria');
-  const all = { ...s, recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) };
-  assert.deepEqual([nextGoal(all).kind, nextGoal(all).id], ['restaurant', 'diner']);
+  assert.equal(RECIPES.find((r) => r.id === g.id).restaurant, 'arepera');
+  const all = { ...s, recipes: RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id) };
+  assert.deepEqual([nextGoal(all).kind, nextGoal(all).id], ['restaurant', 'taqueria']);
 });
 
 test('las mesas extra ya no se venden y se reembolsan', () => {
@@ -244,8 +246,8 @@ test('grupos: llegan juntos en locales de 4+ mesas y pagan bono si comen a la ve
   }
   assert.ok(found, 'debería haber algún grupo');
   assert.equal(found.b.arriveAt - found.a.arriveAt, 400);
-  const taq = buildRunConfig({ ...s, restaurants: ['taqueria'], recipes: newPlayerState().recipes, inventory: newPlayerState().inventory }, { restaurantId: 'taqueria', randomSeed: 'g1', day: '2026-10-16' });
-  assert.ok(ordersForConfig(taq).every((o) => o.group == null), 'la taquería (3 mesas) no tiene grupos');
+  const taq = buildRunConfig({ ...s, restaurants: ['arepera'], recipes: newPlayerState().recipes, inventory: newPlayerState().inventory }, { restaurantId: 'arepera', randomSeed: 'g1', day: '2026-10-16' });
+  assert.ok(ordersForConfig(taq).every((o) => o.group == null), 'la arepera (3 mesas) no tiene grupos');
 
   const { a, b } = found;
   const both = new Map([[a.id, 30_000], [b.id, 35_000]]);
@@ -258,9 +260,10 @@ test('grupos: llegan juntos en locales de 4+ mesas y pagan bono si comen a la ve
   assert.ok(juntos > solo);
 });
 
-test('el diner es más exigente que la taquería', () => {
-  assert.ok(TIER_PATIENCE[1] <= 0.9);
-  assert.ok(TIER_PACE[1] < 0.94);
+test('cada restaurante es más exigente que el anterior', () => {
+  for (let i = 1; i < TIER_PATIENCE.length; i++) assert.ok(TIER_PATIENCE[i] < TIER_PATIENCE[i - 1]);
+  for (let i = 1; i < TIER_PACE.length; i++) assert.ok(TIER_PACE[i] < TIER_PACE[i - 1]);
+  assert.equal(TIER_PATIENCE.length, RESTAURANTS.length);
 });
 
 test('logros: contadores y cobro una sola vez', () => {
@@ -272,4 +275,28 @@ test('logros: contadores y cobro una sola vez', () => {
   s.achievements = ids;
   assert.equal(pendingAchievements(s).length, 0);
   assert.equal(achievementProgress(s).find((x) => x.id === 'platos_50').value, 12);
+});
+
+test('asistentes: nivel para contratar, sueldo por servicio y rangos', () => {
+  const s = stocked();
+  assert.equal(evaluateHire(s, 'pepe').reason, 'nivel_insuficiente');
+  assert.equal(evaluateHire(s, 'nadie').reason, 'no_existe');
+  const lvl = { ...s, xp: xpForLevel(7) };
+  assert.ok(evaluateHire(lvl, 'luis').ok);
+  const hired = applyHire(lvl, 'luis');
+  assert.equal(evaluateHire(hired, 'luis').reason, 'ya_comprado');
+  const base = cfgFor(lvl);
+  const c = cfgFor(hired);
+  assert.equal(c.salary, 90);
+  assert.equal(c.staff.rank, 0);
+  assert.ok(c.stats.patienceMult > base.stats.patienceMult);
+  const res = scoreRun(c, { serves: honestServes(c) });
+  assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - 90));
+  assert.equal(res.salary, 90);
+  assert.equal(staffRank(0), 0);
+  assert.equal(staffRank(5), 1);
+  assert.equal(staffRank(40), 2);
+  const exp = addStaffExp(hired.staff, 'luis');
+  assert.equal(exp.exp.luis, 1);
+  assert.equal(applyHire(hired, null).staff.hired, null);
 });

@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -34,6 +34,21 @@ export class GameService {
     this.config = config;
     this.now = now;
     this.#refundRetiredUpgrades();
+    this.#grantStarterRestaurant();
+  }
+
+  // La arepera se agregó como primer local: quien ya jugaba la recibe gratis con sus recetas iniciales.
+  #grantStarterRestaurant() {
+    const missing = this.db.all(
+      "SELECT id FROM players WHERE id NOT IN (SELECT player_id FROM unlocks WHERE kind = 'restaurant' AND item_id = ?)", STARTER_RESTAURANT
+    );
+    const free = recipesOf(STARTER_RESTAURANT).filter((r) => r.learnCost === 0).map((r) => r.id);
+    for (const { id } of missing) {
+      this.db.tx(() => {
+        this.#grant(id, 'restaurant', STARTER_RESTAURANT, 1);
+        for (const r of free) this.#grant(id, 'recipe', r, 1);
+      });
+    }
   }
 
   #refundRetiredUpgrades() {
@@ -129,7 +144,27 @@ export class GameService {
   #progress(p) {
     let saved = {};
     try { saved = JSON.parse(p.progress_json ?? '{}'); } catch { /* vacío */ }
-    return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [] };
+    const staff = { hired: STAFF_BY_ID[saved.staff?.hired] ? saved.staff.hired : null, exp: { ...(saved.staff?.exp ?? {}) } };
+    return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [], staff };
+  }
+
+  #saveProgress(playerId, { stats, achievements, staff }) {
+    this.db.run('UPDATE players SET progress_json = ? WHERE id = ?', JSON.stringify({ stats, achievements, staff }), playerId);
+  }
+
+  // ── Personal de cocina ────────────────────────────────────
+  hireStaff(playerId, id) {
+    return this.db.tx(() => {
+      const state = this.state(playerId);
+      const d = evaluateHire(state, id);
+      if (!d.ok) {
+        const [status, msg] = PURCHASE_ERRORS[d.reason] ?? [400, 'No se pudo contratar'];
+        throw new AppError(status, d.reason, msg, { reqLevel: d.reqLevel });
+      }
+      const next = applyHire(state, id);
+      this.#saveProgress(playerId, next);
+      return { profile: this.profile(playerId) };
+    });
   }
 
   profile(playerId) {
@@ -234,7 +269,7 @@ export class GameService {
       const res = JSON.parse(r.result_json).result;
       return {
         id: r.id, restaurantId: r.restaurantId, mode: r.mode, finishedAt: r.finishedAt, stars: r.stars,
-        gross: res.gross, upkeep: res.upkeep, net: res.coins, emergencyCost: res.emergencyCost ?? 0, served: res.served, totalOrders: res.totalOrders,
+        gross: res.gross, upkeep: res.upkeep, salary: res.salary ?? 0, net: res.coins, emergencyCost: res.emergencyCost ?? 0, served: res.served, totalOrders: res.totalOrders,
         ingredientCost: res.ingredientCost, vipServed: res.vipServed
       };
     });
@@ -316,8 +351,11 @@ export class GameService {
       const stats = addRunToStats(before.stats, result);
       const unlocked = pendingAchievements({ ...before, stats });
       for (const x of unlocked) this.#credit(playerId, x.reward, 'logro', x.id);
-      this.db.run('UPDATE players SET progress_json = ? WHERE id = ?',
-        JSON.stringify({ stats, achievements: [...before.achievements, ...unlocked.map((x) => x.id)] }), playerId);
+      this.#saveProgress(playerId, {
+        stats,
+        achievements: [...before.achievements, ...unlocked.map((x) => x.id)],
+        staff: addStaffExp(before.staff, config.staff?.id)
+      });
 
       const after = this.profile(playerId);
       const response = {

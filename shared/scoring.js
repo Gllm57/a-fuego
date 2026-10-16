@@ -184,7 +184,8 @@ export function scoreRun(config, submission) {
   }
 
   const upkeep = config.upkeep ?? 0;
-  const coins = Math.max(0, gross - upkeep - emergencyCost);
+  const salary = config.salary ?? 0;
+  const coins = Math.max(0, gross - upkeep - salary - emergencyCost);
   const target = orders.reduce((sum, o) => sum + RECIPE_BY_ID[o.recipeId].price * (o.vip ? VIP_PRICE_MULT : 1), 0);
   const ratio = target > 0 ? gross / target : 0;
   const stars = STAR_THRESHOLDS.filter((th) => ratio >= th).length;
@@ -206,6 +207,8 @@ export function scoreRun(config, submission) {
     gross,
     tips,
     upkeep,
+    salary,
+    staff: config.staff?.id ?? null,
     emergency,
     emergencyCost,
     coins,

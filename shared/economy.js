@@ -8,13 +8,15 @@
 //   4. Mejorar la cocina (más rápida, más paciencia, más despensa…).
 // Al completar el 100 % del imperio se obtiene el título «Chef Leyenda».
 
-import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, recipesOf } from './data/catalog.js';
+import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, STAFF_BY_ID, STAFF_RANKS, recipesOf } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { hashString } from './rng.js';
 import { upgradeLevel, storageCapacity } from './rules.js';
 import { emptyStats } from './achievements.js';
 
 export const STARTING_COINS = 200;
+// El primer restaurante de la cadena (gratis desde el inicio).
+export const STARTER_RESTAURANT = RESTAURANTS[0].id;
 
 // Mejoras que ya no existen: se devuelve lo pagado. Las mesas ahora vienen con cada restaurante.
 export const RETIRED_UPGRADES = Object.freeze({ mesas: [1500, 5000] });
@@ -43,15 +45,43 @@ export function newPlayerState() {
   return {
     coins: STARTING_COINS,
     xp: 0,
-    restaurants: ['taqueria'],
-    recipes: recipesOf('taqueria').filter((x) => x.learnCost === 0).map((x) => x.id),
+    restaurants: [STARTER_RESTAURANT],
+    recipes: recipesOf(STARTER_RESTAURANT).filter((x) => x.learnCost === 0).map((x) => x.id),
     upgrades: {},
-    inventory: { tortilla: 14, carne_res: 9, cebolla: 9, queso: 8 },
+    inventory: { harina_maiz: 18, queso: 11, carne_res: 11 },
     dailyClaimed: null,
     basketClaimed: null,
     stats: emptyStats(),
-    achievements: []
+    achievements: [],
+    staff: { hired: null, exp: {} }
   };
+}
+
+// ── Personal de cocina ──────────────────────────────────────
+export function staffRank(services = 0) {
+  let rank = 0;
+  STAFF_RANKS.forEach((r, i) => { if (services >= r.from) rank = i; });
+  return rank;
+}
+
+// Contratar (o despedir con id = null). No cuesta dinero: cobra sueldo en cada servicio.
+export function evaluateHire(state, id) {
+  if (id === null) return { ok: true };
+  const member = STAFF_BY_ID[id];
+  if (!member) return { ok: false, reason: 'no_existe' };
+  if (state.staff?.hired === id) return { ok: false, reason: 'ya_comprado' };
+  if (levelFromXp(state.xp) < member.reqLevel) return { ok: false, reason: 'nivel_insuficiente', reqLevel: member.reqLevel };
+  return { ok: true };
+}
+
+export function applyHire(state, id) {
+  return { ...state, staff: { hired: id, exp: { ...(state.staff?.exp ?? {}) } } };
+}
+
+// Un servicio más de experiencia para quien trabajó.
+export function addStaffExp(staff, id) {
+  if (!id) return staff;
+  return { ...staff, exp: { ...staff.exp, [id]: (staff.exp?.[id] ?? 0) + 1 } };
 }
 
 // Decide si una compra es válida. Nunca muta el estado.

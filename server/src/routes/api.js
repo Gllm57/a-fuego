@@ -67,6 +67,16 @@ export default async function api(app, { service, config }) {
     }
   }, async (req) => service.purchase(req.playerId, req.body.kind, req.body.id, req.headers['idempotency-key']));
 
+  app.post('/staff/hire', {
+    preHandler: auth,
+    schema: {
+      body: {
+        type: 'object', additionalProperties: false, required: ['id'],
+        properties: { id: { anyOf: [id, { type: 'null' }] } }
+      }
+    }
+  }, async (req) => service.hireStaff(req.playerId, req.body.id));
+
   app.get('/me/runs', { preHandler: auth }, async (req) => ({ entries: service.history(req.playerId) }));
 
   app.get('/market', { preHandler: auth }, async (req) => service.market(req.playerId));

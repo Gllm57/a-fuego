@@ -1,9 +1,9 @@
 // Construcción de la configuración de un servicio a partir del estado del jugador.
 // La configuración es inmutable durante la partida: se valida contra ella.
 
-import { RESTAURANT_BY_ID, RESTAURANTS, RECIPE_BY_ID } from './data/catalog.js';
+import { RESTAURANT_BY_ID, RESTAURANTS, RECIPE_BY_ID, STAFF_BY_ID } from './data/catalog.js';
 import { kitchenStats, RUN_DURATION_MS } from './rules.js';
-import { menuFor, dailyChallenge, marketPrices } from './economy.js';
+import { menuFor, dailyChallenge, marketPrices, staffRank } from './economy.js';
 import { EMERGENCY_PRICE_MULT } from './rules.js';
 
 export class RunStartError extends Error {
@@ -36,11 +36,24 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
   // Precios del pedido urgente (el doble del mercado de hoy), fijados al empezar.
   const prices = marketPrices(day);
   const emergencyPrices = Object.fromEntries(Object.keys(stock).map((ing) => [ing, prices[ing].price * EMERGENCY_PRICE_MULT]));
+  // Asistente contratado: su rango queda fijo durante el servicio.
+  const stats = kitchenStats(state.upgrades, restaurantId);
+  const member = STAFF_BY_ID[state.staff?.hired];
+  let staff = null;
+  if (member) {
+    const rank = staffRank(state.staff.exp?.[member.id] ?? 0);
+    staff = { id: member.id, rank, salary: member.salary };
+    const lv = member.levels[rank];
+    if (lv.patience) stats.patienceMult = Math.round(stats.patienceMult * lv.patience * 100) / 100;
+    if (lv.tip) stats.tipBonus = Math.round((stats.tipBonus + lv.tip) * 100) / 100;
+  }
   return {
     version: 3,
     emergencyPrices,
     tier: RESTAURANTS.indexOf(rest),
     upkeep: rest.upkeep,
+    staff,
+    salary: staff?.salary ?? 0,
     stock,
     restaurantId,
     mode,
@@ -48,6 +61,6 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
     seed: String(seed),
     menu,
     durationMs: RUN_DURATION_MS,
-    stats: kitchenStats(state.upgrades, restaurantId)
+    stats
   };
 }

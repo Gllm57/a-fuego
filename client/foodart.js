@@ -1,4 +1,4 @@
-// Ilustración propia para cada uno de los 40 ingredientes (lienzo de 48×48).
+// Ilustración propia para cada uno de los 45 ingredientes (lienzo de 48×48).
 // Estilo "pegatina": contorno cálido oscuro, sombra interior y un brillo.
 
 const K = 'stroke="#3B2416" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"';
@@ -242,5 +242,39 @@ export const FOOD = {
     <path d="M8 16.5h26M8 24.5h26M8 32.5h26M17 8v32M25.5 8v32" stroke="#3A1E0B" stroke-width="1.4"/>
     <path d="M22 20l18 4v16H22z" fill="#E8452C" ${K}/>
     <path d="M22 26l18 3" stroke="#FFC23D" stroke-width="2"/>
-    ${shine(12, 12, 2, 1.2)}`
+    ${shine(12, 12, 2, 1.2)}`,
+
+  // Paquete de harina de maíz precocida, amarillo con una arepa dibujada.
+  harina_maiz: `${shadow}
+    <path d="M11 41c-1-11 1-23 5-29h16c4 6 6 18 5 29z" fill="#F6DA8A" ${K}/>
+    <path d="M16 12l-1-5h18l-1 5" fill="#E9C36A" ${K}/>
+    <rect x="14" y="21" width="20" height="13" rx="6" fill="#C8102E" opacity=".9"/>
+    <ellipse cx="24" cy="27.5" rx="6" ry="3.4" fill="#F7E3A6" stroke="#3B2416" stroke-width="1.2"/>
+    <path d="M21 27h6" stroke="#C99A3A" stroke-width="1.2" stroke-linecap="round"/>
+    ${shine(16, 16, 2.4, 1.4)}`,
+
+  platano: `${shadow}
+    <path d="M8 16c3 14 13 22 28 20 3 0 4-3 1-4-12 1-20-6-24-18-1-3-6-2-5 2z" fill="#F2C94C" ${K}/>
+    <path d="M12 18c4 9 11 15 22 15" stroke="#D6A62C" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <path d="M8 16l-2-4 4-1 2 4" fill="#5E8F28" ${K}/>
+    <circle cx="37" cy="33" r="1.6" fill="#3B2416"/>
+    ${shine(15, 20, 3, 1.4, 50)}`,
+
+  caraota: `${shadow}
+    ${[[16, 31, -20], [28, 33, 15], [22, 23, 30], [32, 23, -10], [13, 22, 10]].map(([x, y, r]) => `<g transform="rotate(${r} ${x} ${y})"><path d="M${x - 7} ${y}c0-5 4-7 7-6 2 0 3 2 5 2s3-1 3 2c0 5-4 8-9 8-4 0-6-3-6-6z" fill="#2B2220" stroke="#120D0C" stroke-width="1.4"/><ellipse cx="${x - 2}" cy="${y - 2}" rx="2" ry="1" fill="#fff" opacity=".35"/><path d="M${x - 3} ${y + 1}h3" stroke="#F5EFE6" stroke-width="1" stroke-linecap="round"/></g>`).join('')}`,
+
+  aceituna: `${shadow}
+    <path d="M21 9c2-3 6-4 9-2" stroke="#5E4A2A" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <path d="M26 9c4-3 9-2 11 1-4 2-8 2-11-1z" fill="#6E9E36" ${K}/>
+    <ellipse cx="17" cy="28" rx="9" ry="11" fill="#7C8A2E" ${K}/>
+    <ellipse cx="31" cy="30" rx="8.5" ry="10.5" fill="#55601C" ${K}/>
+    <circle cx="17" cy="28" r="3" fill="#D9412B"/>
+    <circle cx="31" cy="30" r="2.8" fill="#D9412B"/>
+    ${shine(13, 22, 2.4, 1.4)}${shine(27, 24, 2.2, 1.3)}`,
+
+  hoja_platano: `${shadow}
+    <path d="M6 38C10 20 22 8 42 6c-2 18-14 31-36 32z" fill="#2F7D3A" ${K}/>
+    <path d="M8 36L40 8" stroke="#A5D46A" stroke-width="2" stroke-linecap="round"/>
+    <path d="M14 30l-4-8M20 25l-3-9M26 20l-1-9M19 31l9 2M25 25l9 2M31 19l7 1" stroke="#1F5426" stroke-width="1.3" stroke-linecap="round"/>
+    ${shine(28, 13, 3, 1.4)}`
 };

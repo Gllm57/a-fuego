@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta
@@ -85,6 +85,7 @@ class HttpApi {
     return this.#req('POST', '/shop/purchase', { kind, id }, { 'idempotency-key': key });
   }
   startRun(restaurantId, mode) { return this.#req('POST', '/runs', { restaurantId, mode }); }
+  hireStaff(id) { return this.#req('POST', '/staff/hire', { id }); }
   // Reintenta el envío: el servidor es idempotente para la misma partida.
   completeRun(runId, serves, waste = {}, emergency = {}, firesOut = 0) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste, emergency, firesOut }); }
   market() { return this.#req('GET', '/market'); }
@@ -121,6 +122,12 @@ class LocalApi {
         data.ledger ??= [];
         // Partidas guardadas antes de los logros: se reconstruyen los contadores con el diario.
         data.state.stats = { ...emptyStats(), ...data.state.stats };
+        data.state.staff ??= { hired: null, exp: {} };
+        // La arepera se agregó como primer local: quien ya jugaba la recibe gratis.
+        if (!data.state.restaurants.includes(STARTER_RESTAURANT)) {
+          data.state.restaurants = [STARTER_RESTAURANT, ...data.state.restaurants];
+          for (const r of base.recipes) if (!data.state.recipes.includes(r)) data.state.recipes = [...data.state.recipes, r];
+        }
         if (legacy) {
           for (const h of data.history) {
             data.state.stats.runs += 1;
@@ -171,6 +178,14 @@ class LocalApi {
     return { purchased: { kind, id, price: d.price }, profile: this.#profile() };
   }
 
+  async hireStaff(id) {
+    const d = evaluateHire(this.data.state, id);
+    if (!d.ok) throw new ApiError(409, d.reason, PURCHASE_MSG[d.reason] ?? 'No se pudo contratar', d);
+    this.data.state = applyHire(this.data.state, id);
+    this.#save();
+    return { profile: this.#profile() };
+  }
+
   async startRun(restaurantId, mode) {
     try {
       const config = buildRunConfig(this.data.state, { restaurantId, mode, randomSeed: crypto.randomUUID?.() ?? String(Math.random()), day: todayUTC() });
@@ -207,6 +222,7 @@ class LocalApi {
       }
     }
     s.stats = addRunToStats(s.stats, result);
+    s.staff = addStaffExp(s.staff ?? { hired: null, exp: {} }, run.config.staff?.id);
     const unlocked = pendingAchievements(s);
     for (const x of unlocked) {
       s.coins += x.reward;
@@ -217,7 +233,7 @@ class LocalApi {
     this.data.bests[rid] = Math.max(this.data.bests[rid] ?? 0, result.score);
     this.data.history.unshift({
       id: runId, restaurantId: rid, mode: run.config.mode, finishedAt: Date.now(), stars: result.stars,
-      gross: result.gross, upkeep: result.upkeep, net: result.coins, emergencyCost: result.emergencyCost, served: result.served, totalOrders: result.totalOrders,
+      gross: result.gross, upkeep: result.upkeep, salary: result.salary ?? 0, net: result.coins, emergencyCost: result.emergencyCost, served: result.served, totalOrders: result.totalOrders,
       ingredientCost: result.ingredientCost, vipServed: result.vipServed
     });
     this.data.history = this.data.history.slice(0, 30);

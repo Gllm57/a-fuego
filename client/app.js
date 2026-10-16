@@ -3,12 +3,12 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName
 } from './shared/index.js';
 import { createApi, ApiError } from './api.js';
 import { Kitchen } from './game.js';
 import { sfx, getPrefs, setPref } from './audio.js';
-import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems } from './art.js';
+import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
 import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
 
 const app = {
@@ -17,7 +17,7 @@ const app = {
   market: null,
   cart: {},
   tab: 'home',
-  restaurantId: localGet('afuego.restaurant') ?? 'taqueria',
+  restaurantId: localGet('afuego.restaurant') ?? 'arepera',
   recipeTab: null,
   boardTab: null,
   busy: false
@@ -103,10 +103,11 @@ const TABS = [
 const PAGES = {
   home: { title: null },
   market: { title: 'Mercado', sub: 'Precios de hoy · cambian cada día' },
-  recipes: { title: 'Recetario', sub: '40 recetas de 5 cocinas del mundo' },
+  recipes: { title: 'Recetario', sub: '48 recetas de 6 cocinas del mundo' },
   upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
   diary: { title: 'Diario de caja', sub: 'Logros, ganancias y gastos de tus servicios', back: 'home' },
-  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' }
+  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' },
+  staff: { title: 'Personal de cocina', sub: 'Un asistente a la vez · cobra sueldo en cada servicio', back: 'home' }
 };
 
 function renderShell() {
@@ -143,7 +144,7 @@ function go(tab) {
   const screen = document.getElementById('screen');
   screen.style.animation = 'none'; void screen.offsetWidth; screen.style.animation = '';
   screen.scrollTop = 0;
-  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking })[tab]();
+  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking, staff: renderStaff })[tab]();
   renderNavDots();
 }
 
@@ -259,6 +260,7 @@ function renderHome() {
           <b>Ranking</b>
           <span>Top de la semana</span>
         </button>
+        ${staffTile(s)}
       </div>
     </div>`;
 
@@ -267,6 +269,7 @@ function renderHome() {
   screen.querySelectorAll('[data-act="to-market"]').forEach((b) => b.addEventListener('click', () => go('market')));
   screen.querySelector('[data-act="diary"]').addEventListener('click', () => go('diary'));
   screen.querySelector('[data-act="ranking"]').addEventListener('click', () => go('ranking'));
+  screen.querySelector('[data-act="staff"]').addEventListener('click', () => go('staff'));
   screen.querySelector('[data-act="goal"]').addEventListener('click', () => {
     if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; go('recipes'); }
     else if (goal.kind === 'restaurant') openRestaurant(RESTAURANT_BY_ID[goal.id]);
@@ -661,6 +664,7 @@ async function renderDiary() {
         <div class="ticket__row"><span>Clientes atendidos</span><b>${e.served}/${e.totalOrders}${e.vipServed ? ` · ${e.vipServed} VIP` : ''}</b></div>
         <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(e.gross)}</b></div>
         <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(e.upkeep)}</b></div>
+        ${e.salary ? `<div class="ticket__row"><span>Sueldo del asistente</span><b class="neg">−${fmt(e.salary)}</b></div>` : ''}
         ${e.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(e.emergencyCost)}</b></div>` : ''}
         <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(e.net)}</b></div>
         <div class="ticket__row"><span class="note">Ingredientes usados (pagados en el mercado)</span><b class="note">~${fmt(e.ingredientCost)}</b></div>
@@ -700,6 +704,65 @@ function bindAchievements(screen) {
     e.currentTarget.setAttribute('aria-expanded', String(app.medalsOpen));
     sfx.tap();
   });
+}
+
+// ── Personal de cocina ──────────────────────────────────────
+function staffTile(s) {
+  const hired = STAFF_BY_ID[s.staff?.hired];
+  const first = Math.min(...STAFF.map((m) => m.reqLevel));
+  return `<button class="tile tile--wide tile--staff" data-act="staff">
+    <span class="staff-face">${hired ? staffSvg(hired) : icon('user')}</span>
+    <span class="tile--staff__text"><b>Personal de cocina</b>
+      <span>${hired ? `${hired.name} · ${hired.role} · sueldo ${fmt(hired.salary)}` : level() >= first ? 'Contrata un asistente para la cocina' : `Contrata asistentes desde el nivel ${first}`}</span></span>
+    ${icon('arrow')}
+  </button>`;
+}
+
+function renderStaff() {
+  const s = st();
+  const hiredId = s.staff?.hired ?? null;
+  const screen = document.getElementById('screen');
+  screen.innerHTML = `
+    <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
+      ${STAFF.map((m) => {
+        const exp = s.staff?.exp?.[m.id] ?? 0;
+        const rank = staffRank(exp);
+        const nextRank = STAFF_RANKS[rank + 1];
+        const pct = nextRank ? Math.round((exp - STAFF_RANKS[rank].from) / (nextRank.from - STAFF_RANKS[rank].from) * 100) : 100;
+        const on = hiredId === m.id;
+        const locked = level() < m.reqLevel;
+        return `<article class="card staff-card ${on ? 'is-hired' : ''}">
+          <div class="staff-card__head">
+            <span class="staff-face staff-face--lg">${staffSvg(m)}</span>
+            <div style="flex:1;min-width:0"><b class="staff-card__name">${m.name}</b><span class="staff-card__role">${m.role}</span></div>
+            <span class="tag">${m.stations.length ? m.stations.map((st) => STATIONS[st].name).join(' y ') : 'Barra'}</span>
+          </div>
+          <p class="staff-card__desc">${m.desc}</p>
+          <div class="staff-card__exp"><span>${rankName(m, rank)}${nextRank ? ` · ${exp - STAFF_RANKS[rank].from}/${nextRank.from - STAFF_RANKS[rank].from} servicios para ${rankName(m, rank + 1)}` : ' · rango máximo'}</span>
+            <div class="progress"><div class="progress__fill" style="width:${pct}%"></div></div></div>
+          <div class="staff-card__foot">
+            <span>Sueldo <b>${fmt(m.salary)}</b>/servicio</span>
+            ${on ? `<button class="btn btn--sm btn--ghost" data-fire>Despedir</button><span class="staff-card__badge">${icon('check')} Contratado</span>`
+              : locked ? `<span class="staff-card__lock">${icon('lock')} Nivel ${m.reqLevel}</span>`
+              : `<button class="btn btn--sm" data-hire="${m.id}">${hiredId ? 'Cambiar a ' + m.name : 'Contratar'}</button>`}
+          </div>
+        </article>`;
+      }).join('')}
+      <p class="note" style="text-align:center">El sueldo se paga al cerrar cada servicio, junto con los gastos del local. Con cada servicio tu asistente gana experiencia y trabaja mejor.</p>
+    </div>`;
+  const hire = async (id) => {
+    if (app.busy) return;
+    app.busy = true;
+    try {
+      const res = await app.api.hireStaff(id);
+      setProfile(res.profile);
+      sfx.buy();
+      toast(id ? `¡${STAFF_BY_ID[id].name} se une a tu cocina!` : 'Asistente despedido', id ? 'good' : '');
+      renderStaff();
+    } catch (err) { errorToast(err); } finally { app.busy = false; }
+  };
+  screen.querySelectorAll('[data-hire]').forEach((b) => b.addEventListener('click', () => hire(b.dataset.hire)));
+  screen.querySelector('[data-fire]')?.addEventListener('click', () => hire(null));
 }
 
 // ── Ranking ─────────────────────────────────────────────────
@@ -773,7 +836,7 @@ function openProfile() {
         return;
       }
       setProfile(await app.api.reset());
-      app.restaurantId = 'taqueria';
+      app.restaurantId = 'arepera';
       app.market = null;
       app.cart = {};
       close(); renderShell();
@@ -917,6 +980,7 @@ function showResults(host, run, res) {
         <div class="ticket">
           <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(result.gross)}</b></div>
           <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(result.upkeep)}</b></div>
+          ${result.salary ? `<div class="ticket__row"><span>Sueldo de ${escapeHtml(STAFF_BY_ID[result.staff]?.name ?? 'tu asistente')}</span><b class="neg">−${fmt(result.salary)}</b></div>` : ''}
           ${result.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(result.emergencyCost)}</b></div>` : ''}
           ${rewards.dailyBonus ? `<div class="ticket__row"><span>Bono reto del día</span><b class="pos">+${fmt(rewards.dailyBonus)}</b></div>` : ''}
           ${achievementCoins ? `<div class="ticket__row"><span>Premios por logros</span><b class="pos">+${fmt(achievementCoins)}</b></div>` : ''}

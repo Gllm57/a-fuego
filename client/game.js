@@ -4,9 +4,9 @@
 import {
   RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig, plateEarnings,
   rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS,
-  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS
+  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS, STAFF_BY_ID, STAFF_RANKS, rankName
 } from './shared/index.js';
-import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon } from './art.js';
+import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
 import { sfx, music, vibrate, getPrefs, setPref } from './audio.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
@@ -46,6 +46,8 @@ export class Kitchen {
     this.coins = 0;
     this.firesOut = 0;
     this.groupSeen = false;
+    // Asistente contratado (si hay): trabaja solo en sus fogones.
+    this.helper = config.staff ? { ...STAFF_BY_ID[config.staff.id], rank: config.staff.rank, paused: false, task: '' } : null;
     this.itemSeq = 0;
     this.custEls = new Map();
     this.sig = { order: '', stations: {}, pantry: '' };
@@ -63,7 +65,9 @@ export class Kitchen {
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
               <div class="timer">
                 <span class="ring timer__ring"><span class="ring__inner timer__clock">${clockText(this.config.durationMs)}</span></span>
-                <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span><span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span></span>
+                <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span>${this.helper
+                  ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
+                  : `<span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span>`}</span>
               </div>
               <span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
             </div>
@@ -96,13 +100,15 @@ export class Kitchen {
       stations: Object.fromEntries(this.stationKeys.map((s) => [s, this.host.querySelector(`[data-station="${s}"]`)])),
       pantry: [...this.host.querySelectorAll('.jar')],
       shelfCount: this.host.querySelector('.shelf__count'),
-      urgent: this.host.querySelector('.shelf__urgent')
+      urgent: this.host.querySelector('.shelf__urgent'),
+      helper: this.host.querySelector('.helper-chip')
     };
     this.#bind();
     this.#renderCustomers();
     this.#renderOrder();
     this.#renderStock();
     this.stationKeys.forEach((s) => this.#renderStation(s));
+    this.#helperUi(true);
     this.#intro();
   }
 
@@ -126,6 +132,16 @@ export class Kitchen {
       else this.#select(Number(target.dataset.order));
     });
     root.querySelector('[data-act="pause"]').addEventListener('click', () => this.pause());
+    this.el.helper?.addEventListener('click', (e) => {
+      e.stopPropagation();
+      if (!this.running || this.paused) return;
+      this.helper.paused = !this.helper.paused;
+      sfx.tap();
+      for (const st of this.stationKeys) {
+        if (this.helper.stations.includes(this.#type(st))) this.el.stations[st].classList.toggle('is-helper-paused', this.helper.paused);
+      }
+      this.#helperUi(true);
+    });
     this.onVisibility = () => { if (document.hidden && this.running) this.pause(); };
     document.addEventListener('visibilitychange', this.onVisibility);
   }
@@ -246,6 +262,7 @@ export class Kitchen {
           <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">${clockText(dur)}</span>
         </div>
         <div class="brief__legend"><span><i class="lg-rush"></i>Hora pico</span><span><i class="lg-fire"></i>Fuego</span><span><i class="lg-vip"></i>Crítico</span></div>
+        ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy (${rankName(this.helper, this.helper.rank).toLowerCase()}) · sueldo ${fmt(this.config.salary ?? 0)}</span></div>` : ''}
         <p>${extras > 0 ? `Tienes ${extras} ${extras > 1 ? 'fogones extra' : 'fogón extra'} para cocinar en paralelo. ` : ''}Gastos del local: ${fmt(this.config.upkeep ?? 0)}.</p>
         <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
         <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
@@ -398,6 +415,7 @@ export class Kitchen {
         this.#renderStock();
       }
     }
+    this.#helperWork();
     // Hora pico.
     if (this.rushState === 'before' && t >= this.rush.from) {
       this.rushState = 'on';
@@ -439,6 +457,53 @@ export class Kitchen {
       }
       this.#renderCustomers();
     }
+  }
+
+  #stName(type) {
+    return this.restaurant.stationNames?.[type] ?? STATIONS[type].name;
+  }
+
+  // El asistente trabaja como si tocara él: mismas reglas que el jugador.
+  #helperWork() {
+    const h = this.helper;
+    if (!h) return;
+    const lv = h.levels[h.rank];
+    let task = '';
+    if (!h.paused) {
+      for (const st of this.stationKeys) {
+        if (!h.stations.includes(this.#type(st)) || this.fires[st]) continue;
+        const item = this.stations[st];
+        if (!item) continue;
+        if (item.kind === 'tap' && lv.tapMs) {
+          task ||= `corta ${INGREDIENTS[item.ingredient].name.toLowerCase()}`;
+          if (this.t - Math.max(item.lastTapAt ?? 0, item.startedAt) >= lv.tapMs) this.#onStation(st, this.el.stations[st]);
+        } else if (item.kind === 'timer' && lv.reactMs) {
+          const state = this.#timerState(item);
+          if (state === 'flip' && this.t - item.flip.at >= lv.reactMs * 0.6) { task = `voltea ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.#onStation(st, this.el.stations[st]); }
+          else if ((state === 'ready' || state === 'burning') && this.t - item.readyAt >= lv.reactMs) { task = `saca ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.#onStation(st, this.el.stations[st]); }
+          else if (state === 'burnt') this.#onStation(st, this.el.stations[st]);
+          else task ||= `vigila ${this.#stName(this.#type(st)).toLowerCase()}`;
+        }
+      }
+    }
+    if (task !== h.task) { h.task = task; this.#helperUi(); }
+  }
+
+  #helperUi(force = false) {
+    const h = this.helper;
+    const el = this.el.helper;
+    if (!h || !el) return;
+    const rank = rankName(h, h.rank).toLowerCase();
+    let text;
+    if (h.paused) text = `${h.name} en pausa · toca`;
+    else if (h.task) text = `${h.name} ${h.task}`;
+    else if (!h.stations.length) text = `${h.name} atiende la barra`;
+    else text = `${h.name} ${h.fem ? 'lista' : 'listo'} · ${rank}`;
+    if (!force && el.dataset.text === text) return;
+    el.dataset.text = text;
+    el.querySelector('.helper-chip__text').textContent = text;
+    el.classList.toggle('is-paused', h.paused);
+    el.classList.toggle('is-busy', Boolean(h.task) && !h.paused);
   }
 
   // Avisos grandes en fila: nunca se enciman dos a la vez.
@@ -624,7 +689,7 @@ export class Kitchen {
       <div>
         <div class="order__title">${escapeHtml(o.recipe.name)}${o.vip ? ` <span class="tag tag--deal" style="padding:2px 8px;font-size:11px">${icon('crown', 'style="width:12px;height:12px"')} ×2</span>` : ''}</div>
         <div class="order__hint">${hint}</div>
-        <div class="order__comps">${o.recipe.components.map((c, i) => {
+        <div class="order__comps" data-count="${o.recipe.components.length}">${o.recipe.components.map((c, i) => {
           const out = !o.filled[i] && !o.busy[i] && (this.stock[c.ingredient] ?? 0) <= 0;
           return `<span class="need ${o.filled[i] ? 'is-done' : o.busy[i] ? 'is-busy' : out ? 'is-out' : ''}">${ingredientSvg(c.ingredient)}${processSvg(c.process)}</span>`;
         }).join('')}
@@ -720,12 +785,12 @@ export class Kitchen {
     const keys = this.stationKeys.filter((k) => this.#type(k) === type);
     return `<div class="st-group" data-count="${keys.length}">
       <div class="st-group__row">${keys.map((k, i) => `
-        <button class="station" data-station="${k}" aria-label="${STATIONS[type].name}${keys.length > 1 ? ` ${i + 1}` : ''}">
-          <span class="station__ring"><span class="station__disc">${STATION_ART[type]}<span class="station__slot"></span></span></span>
+        <button class="station" data-station="${k}" aria-label="${this.#stName(type)}${keys.length > 1 ? ` ${i + 1}` : ''}">
+          <span class="station__ring"><span class="station__disc">${STATION_ART[type]}<span class="station__slot"></span></span></span>${this.helper?.stations.includes(type) ? `<span class="helper-badge">${staffSvg(this.helper)}</span>` : ''}
           <span class="station__status">Libre</span>
         </button>`).join('')}
       </div>
-      <span class="station__name">${STATIONS[type].name}</span>
+      <span class="station__name">${this.#stName(type)}</span>
     </div>`;
   }
 
@@ -746,7 +811,7 @@ export class Kitchen {
       slot.dataset.item = '';
       slot.innerHTML = '<span class="flames"><i></i><i></i><i></i></span>';
       status.textContent = `¡Apaga! ×${fire.taps}`;
-      el.setAttribute('aria-label', `${STATIONS[this.#type(st)].name}: en llamas, toca ${fire.taps} veces`);
+      el.setAttribute('aria-label', `${this.#stName(this.#type(st))}: en llamas, toca ${fire.taps} veces`);
       return;
     }
     if (!item) {
@@ -754,7 +819,7 @@ export class Kitchen {
       slot.innerHTML = '';
       status.textContent = 'Libre';
       el.style.removeProperty('--glow');
-      el.setAttribute('aria-label', `${STATIONS[this.#type(st)].name}: libre`);
+      el.setAttribute('aria-label', `${this.#stName(this.#type(st))}: libre`);
       return;
     }
     if (slot.dataset.item !== String(item.id)) {
@@ -768,7 +833,7 @@ export class Kitchen {
       if (!slot.querySelector('.station__tool')) slot.insertAdjacentHTML('beforeend', `<span class="station__tool">${TOOL_ART[this.#type(st)] ?? ''}</span>`);
       status.textContent = this.#type(st) === 'tabla' ? '¡Corta!' : '¡Bate!';
       slot.insertAdjacentHTML('beforeend', `<span class="station__taps">${Array.from({ length: item.need }, (_, i) => `<i class="${i < item.taps ? 'is-on' : ''}"></i>`).join('')}</span>`);
-      label = `${STATIONS[this.#type(st)].name}: toca ${item.need - item.taps} veces más`;
+      label = `${this.#stName(this.#type(st))}: toca ${item.need - item.taps} veces más`;
     } else {
       const type = this.#type(st);
       const fx = state === 'burning' || state === 'burnt' ? 'smoke' : type === 'sarten' ? 'sizzle' : type === 'olla' ? 'bubbles' : type === 'horno' ? 'heat' : 'steam';
@@ -780,7 +845,7 @@ export class Kitchen {
       if (state === 'flip') el.classList.add('is-flip');
       else if (state !== 'cooking') el.classList.add(`is-${state}`);
       if (item.flip?.done) slot.querySelector('.station__item')?.classList.add('is-flipped');
-      label = `${STATIONS[this.#type(st)].name}: ${text}`;
+      label = `${this.#stName(this.#type(st))}: ${text}`;
     }
     el.setAttribute('aria-label', label);
   }

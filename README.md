@@ -22,7 +22,8 @@ usa las propinas para construir tu cadena de restaurantes.
   con menos de 10 s de diferencia, los dos pagan +25 %.
 - **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
   desde la pausa o el perfil.
-- **40 recetas** en 5 restaurantes (mexicana, americana, italiana, japonesa y peruana).
+- **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.
+- **Personal de cocina:** contrata un asistente (Pepe corta en la tabla, Rosa voltea y saca lo listo del budare y el horno, Don Luis hace más pacientes a los clientes). Cobra sueldo por servicio y mejora con la experiencia (novato → hábil → experto).
 
 ### Economía (difícil a propósito)
 
@@ -44,10 +45,11 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Inversión | Efecto |
 |---|---|
 | Ingredientes del mercado | Sin ellos no hay servicio |
-| Abrir restaurantes (2.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros. **Requiere haber aprendido las 8 recetas del restaurante anterior** |
+| Abrir restaurantes (1.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros. **Requiere haber aprendido las 8 recetas del restaurante anterior** |
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
 | Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, despensa más grande |
 | Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 en la Izakaya y la Cevichería |
+| Asistente de cocina (nivel 3, 5 y 7) | Sueldo 40 / 70 / 90 por servicio |
 | Logros (12) | Metas cortas con premio: primer servicio, combos, 3 estrellas, fuegos apagados, grupos, críticos… (50 → 2.000) |
 | Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
 
@@ -107,6 +109,7 @@ client/   Juego web para celular (HTML/CSS/JS sin framework ni build)
 | POST | `/market/basket` | Recoge la canasta gratis del día |
 | GET | `/catalog` | Catálogo completo |
 | POST | `/shop/purchase` | Compra `{kind: restaurant\|recipe\|upgrade, id}` |
+| POST | `/staff/hire` | Contrata un asistente `{id}` (o lo despide con `{id: null}`) |
 | POST | `/runs` | Empieza un servicio `{restaurantId, mode: normal\|daily}` |
 | POST | `/runs/:id/complete` | Envía platos servidos y desperdicio; descuenta la despensa y cobra |
 | POST | `/runs/:id/abandon` | Abandona el servicio |

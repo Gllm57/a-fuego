@@ -42,7 +42,12 @@ export const INGREDIENTS = Object.freeze({
   pan:       { name: 'Pan',           shape: 'bun',    color: '#E0A040', accent: '#B07424', cost: 3 },
   fresa:     { name: 'Fresa',         shape: 'berry',  color: '#E2394B', accent: '#2E7D32', cost: 6 },
   miel:      { name: 'Miel',          shape: 'jar',    color: '#F2A93B', accent: '#C27C16', cost: 5 },
-  chocolate: { name: 'Chocolate',     shape: 'block',  color: '#5C3317', accent: '#3A1E0B', cost: 7 }
+  chocolate: { name: 'Chocolate',     shape: 'block',  color: '#5C3317', accent: '#3A1E0B', cost: 7 },
+  harina_maiz:{ name: 'Harina de maíz', shape: 'mound', color: '#F6DA8A', accent: '#D6AF4E', cost: 2 },
+  platano:   { name: 'Plátano',       shape: 'long',   color: '#F2C94C', accent: '#5E8F28', cost: 3 },
+  caraota:   { name: 'Caraotas',      shape: 'grain',  color: '#2B2220', accent: '#120D0C', cost: 2 },
+  aceituna:  { name: 'Aceitunas',     shape: 'round',  color: '#7C8A2E', accent: '#55601C', cost: 4 },
+  hoja_platano:{ name: 'Hoja de plátano', shape: 'leaf', color: '#2F7D3A', accent: '#1F5426', cost: 2 }
 });
 
 export const INGREDIENT_IDS = Object.freeze(Object.keys(INGREDIENTS));

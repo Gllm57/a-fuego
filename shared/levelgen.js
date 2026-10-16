@@ -67,7 +67,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
 // Sólo hacen la partida más lenta, así que el servidor no necesita validarlos.
 export function generateEvents({ seed, durationMs, tier = 0 }) {
   const rng = createRng(`${seed}:events`);
-  const count = 1 + (tier >= 2 ? 1 : 0) + (tier >= 4 ? 1 : 0) + (rng() < 0.4 ? 1 : 0);
+  const count = 1 + (tier >= 3 ? 1 : 0) + (tier >= 5 ? 1 : 0) + (rng() < 0.4 ? 1 : 0);
   const events = [];
   for (let i = 0; i < count; i++) {
     const slice = (durationMs - 30_000) / count;

@@ -27,16 +27,20 @@ export const STATION_IDS = Object.freeze(Object.keys(STATIONS));
 // La meta del dinero: abrir los 5 restaurantes de la cadena.
 // `upkeep`: gastos fijos por servicio (gas, luz, personal), se descuentan de lo ganado.
 // `seats`: clientes atendidos a la vez; crece con cada restaurante, hasta 5.
+// `stationNames`: nombre local de un fogón (en la arepera la sartén es el budare).
 export const RESTAURANTS = Object.freeze([
-  { id: 'taqueria',  name: 'Taquería La Lumbre', cuisine: 'Mexicana',      cost: 0,     reqLevel: 1,  upkeep: 60, seats: 3,
+  { id: 'arepera',   name: 'Arepera El Ávila',   cuisine: 'Venezolana',    cost: 0,     reqLevel: 1,  upkeep: 50, seats: 3,
+    stationNames: { sarten: 'Budare' },
+    theme: { primary: '#C46A00', deep: '#7A3A00', soft: '#FFE7B3', ground: '#FFF8E6' } },
+  { id: 'taqueria',  name: 'Taquería La Lumbre', cuisine: 'Mexicana',      cost: 1500,  reqLevel: 3,  upkeep: 60, seats: 3,
     theme: { primary: '#D9412B', deep: '#8F2414', soft: '#FDE3D8', ground: '#FFF3E3' } },
-  { id: 'diner',     name: 'Diner Ruta 66',      cuisine: 'Americana',     cost: 2500,  reqLevel: 3,  upkeep: 100, seats: 4,
+  { id: 'diner',     name: 'Diner Ruta 66',      cuisine: 'Americana',     cost: 3500,  reqLevel: 5,  upkeep: 100, seats: 4,
     theme: { primary: '#2F5FD0', deep: '#1B3A85', soft: '#DCE6FB', ground: '#F3F6FD' } },
-  { id: 'trattoria', name: 'Trattoria Fuoco',    cuisine: 'Italiana',      cost: 6000,  reqLevel: 6,  upkeep: 150, seats: 4,
+  { id: 'trattoria', name: 'Trattoria Fuoco',    cuisine: 'Italiana',      cost: 7000,  reqLevel: 8,  upkeep: 150, seats: 4,
     theme: { primary: '#1E7A5A', deep: '#0F4A35', soft: '#D6EEE4', ground: '#F2F8F4' } },
-  { id: 'izakaya',   name: 'Izakaya Hinode',     cuisine: 'Japonesa',      cost: 12000, reqLevel: 9,  upkeep: 210, seats: 5,
+  { id: 'izakaya',   name: 'Izakaya Hinode',     cuisine: 'Japonesa',      cost: 13000, reqLevel: 11, upkeep: 210, seats: 5,
     theme: { primary: '#B3264A', deep: '#6E1229', soft: '#F8DCE3', ground: '#FBF4F1' } },
-  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 12, upkeep: 280, seats: 5,
+  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 13, upkeep: 280, seats: 5,
     theme: { primary: '#C77A00', deep: '#7A4A00', soft: '#FBEBCD', ground: '#FFF8EA' } }
 ]);
 
@@ -47,6 +51,16 @@ const r = (id, name, restaurant, comps, price, learnCost, reqLevel) => ({
 });
 
 export const RECIPES = Object.freeze([
+  // ── Venezolana ─────────────────────────────────────────────
+  r('arepa_queso',  'Arepa de queso',    'arepera', [['harina_maiz','freir'],['queso','crudo']], 30, 0, 1),
+  r('empanada',     'Empanada de carne', 'arepera', [['harina_maiz','freir'],['carne_res','cortar']], 35, 0, 1),
+  r('tequenos',     'Tequeños',          'arepera', [['queso','cortar'],['harina','freir']], 40, 200, 2),
+  r('reina_pepiada','Reina pepiada',     'arepera', [['harina_maiz','freir'],['pollo','hervir'],['aguacate','batir']], 50, 350, 2),
+  r('cachapa',      'Cachapa con cochino','arepera', [['maiz','batir'],['queso','crudo'],['cerdo','freir']], 55, 500, 3),
+  r('patacon',      'Patacón zuliano',   'arepera', [['platano','freir'],['carne_res','cortar'],['queso','crudo'],['lechuga','cortar']], 65, 800, 4),
+  r('pabellon',     'Pabellón criollo',  'arepera', [['arroz','hervir'],['caraota','hervir'],['carne_res','cortar'],['platano','freir']], 75, 1100, 5),
+  r('hallaca',      'Hallaca',           'arepera', [['harina_maiz','batir'],['cerdo','hervir'],['aceituna','crudo'],['hoja_platano','cortar']], 90, 1600, 6),
+
   // ── Mexicana ───────────────────────────────────────────────
   r('taco_asada',   'Taco de asada',     'taqueria', [['tortilla','crudo'],['carne_res','freir'],['cebolla','cortar']], 40, 0, 1),
   r('quesadilla',   'Quesadilla',        'taqueria', [['tortilla','freir'],['queso','crudo']], 30, 0, 1),
@@ -117,6 +131,26 @@ export const UPGRADES = Object.freeze([
   { id: 'extra_horno',  name: 'Segundo horno',  desc: 'Hornea dos cosas a la vez',       station: 'horno',  extra: true, costs: [2600], reqLevels: [7] }
 ]);
 
+// Personal de cocina: un asistente a la vez, con sueldo por servicio.
+// `ranks` según servicios trabajados; cada rango lo hace más rápido o mejor.
+//  - pepe: corta solo en la tabla (`tapMs` entre cortes).
+//  - rosa: voltea y recoge de la sartén y el horno (`reactMs` tras el aviso).
+//  - luis: los clientes esperan más (`patience`) y dejan más propina (`tip`).
+export const STAFF = Object.freeze([
+  { id: 'pepe', name: 'Pepe', role: 'El picador', stations: ['tabla'], salary: 40, reqLevel: 3,
+    desc: 'Corta solo lo que pongas en la tabla. Tú lo pones; él hace los cortes.',
+    look: { shirt: '#1C4E9C', skin: '#E9B98F', bg: '#FFE7B3' }, levels: [{ tapMs: 460 }, { tapMs: 360 }, { tapMs: 270 }] },
+  { id: 'rosa', name: 'Rosa', role: 'La del budare', fem: true, stations: ['sarten', 'horno'], salary: 70, reqLevel: 5,
+    desc: 'Voltea la carne a tiempo y saca del fuego lo que está listo antes de que se queme.',
+    look: { shirt: '#C8102E', skin: '#C98E66', bg: '#FDE3D8' }, levels: [{ reactMs: 1150 }, { reactMs: 700 }, { reactMs: 350 }] },
+  { id: 'luis', name: 'Don Luis', role: 'El mesero', stations: [], salary: 90, reqLevel: 7,
+    desc: 'Atiende la barra: los clientes esperan más y dejan mejor propina.',
+    look: { shirt: '#2A170D', skin: '#8D5A3B', bg: '#DCE6FB' }, levels: [{ patience: 1.12, tip: 0.03 }, { patience: 1.15, tip: 0.05 }, { patience: 1.2, tip: 0.08 }] }
+]);
+export const STAFF_RANKS = Object.freeze([{ name: 'Novato', fem: 'Novata', from: 0 }, { name: 'Hábil', fem: 'Hábil', from: 5 }, { name: 'Experto', fem: 'Experta', from: 15 }]);
+export const rankName = (member, rank) => (member?.fem ? STAFF_RANKS[rank].fem : STAFF_RANKS[rank].name);
+
+export const STAFF_BY_ID = Object.freeze(Object.fromEntries(STAFF.map((x) => [x.id, x])));
 export const RECIPE_BY_ID = Object.freeze(Object.fromEntries(RECIPES.map((x) => [x.id, x])));
 export const RESTAURANT_BY_ID = Object.freeze(Object.fromEntries(RESTAURANTS.map((x) => [x.id, x])));
 export const UPGRADE_BY_ID = Object.freeze(Object.fromEntries(UPGRADES.map((x) => [x.id, x])));
