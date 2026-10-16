@@ -185,9 +185,12 @@ export function marketIngredients(state) {
 }
 
 // Precios del día: ±25 % sobre el costo base y 3 ofertas al 40 % de descuento.
-export function marketPrices(day) {
+// Las ofertas salen de los ingredientes que el jugador puede comprar (`pool`), así
+// cada día ve tres ofertas distintas que de verdad le sirven.
+export function marketPrices(day, pool = null) {
   const ids = Object.keys(INGREDIENTS);
-  const deals = new Set([...ids].sort((a, b) => hashString(`deal:${day}:${a}`) - hashString(`deal:${day}:${b}`)).slice(0, DEALS_PER_DAY));
+  const candidates = pool && pool.length >= DEALS_PER_DAY ? pool : ids;
+  const deals = new Set([...candidates].sort((a, b) => hashString(`deal:${day}:${a}`) - hashString(`deal:${day}:${b}`)).slice(0, DEALS_PER_DAY));
   const prices = {};
   for (const id of ids) {
     const f = 0.75 + 0.5 * (hashString(`price:${day}:${id}`) / 4294967296);
@@ -207,7 +210,7 @@ export function evaluateMarketBuy(state, items, day) {
   const entries = Object.entries(items ?? {}).filter(([, q]) => q !== 0);
   if (entries.length === 0) return no('carrito_vacio');
   const sellable = new Set(marketIngredients(state));
-  const prices = marketPrices(day);
+  const prices = marketPrices(day, marketIngredients(state));
   let price = 0;
   let units = 0;
   for (const [ing, qty] of entries) {

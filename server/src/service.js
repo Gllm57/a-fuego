@@ -220,7 +220,7 @@ export class GameService {
   market(playerId) {
     const state = this.state(playerId);
     const day = todayUTC(new Date(this.now()));
-    const prices = marketPrices(day);
+    const prices = marketPrices(day, marketIngredients(state));
     return {
       day,
       items: marketIngredients(state).map((id) => ({ id, ...prices[id] })),

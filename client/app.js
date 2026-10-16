@@ -327,14 +327,43 @@ function openRestaurant(r) {
     : d.reason === 'nivel_insuficiente' ? `Necesitas nivel de chef ${r.reqLevel} (tienes ${level()}).`
     : d.reason === 'sin_dinero' ? `Te faltan ${fmt(r.cost - s.coins)} monedas.` : '';
   const recipes = recipesOf(r.id);
+  // Requisitos para abrirlo, cada uno con su avance.
+  const prog = prev ? recipeProgress(s, prev.id) : null;
+  const reqs = [
+    prev && { done: prog.learned >= prog.total, icon: 'book', label: `Aprender las ${prog.total} recetas de ${prev.name}`, value: `${prog.learned}/${prog.total}`, pct: prog.learned / prog.total },
+    { done: level() >= r.reqLevel, icon: 'up', label: `Nivel de chef ${r.reqLevel}`, value: `Tienes ${level()}`, pct: Math.min(1, level() / r.reqLevel) },
+    { done: s.coins >= r.cost, icon: 'market', label: `${fmt(r.cost)} monedas`, value: `Tienes ${fmt(s.coins)}`, pct: r.cost ? Math.min(1, s.coins / r.cost) : 1 }
+  ].filter(Boolean);
+  const helper = STAFF.find((m) => m.reqRestaurant === r.id);
+  const i = RESTAURANTS.indexOf(r);
+  const perks = [
+    `${icon('book')} ${recipes.length} recetas`,
+    `${icon('table')} ${r.seats} mesas`,
+    `${coinSvg()} Gastos ${fmt(r.upkeep)}`,
+    (TIER_GROUP_CHANCE[i] ?? 0) > 0 ? `${icon('people')} Grupos` : '',
+    helper ? `${staffSvg(helper, 'class="perk__face"')} ${helper.name}` : ''
+  ].filter(Boolean);
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
-    <div class="sheet__art rest__art" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">${storefrontSvg(r.theme, RESTAURANTS.indexOf(r))}</div>
-    <p class="note">Cocina ${r.cuisine}: ${recipes.length} recetas, ${recipes.filter((x) => x.learnCost === 0).length} incluidas. ${r.seats} clientes a la vez, platos más caros, clientes más exigentes y gastos de ${fmt(r.upkeep)} por servicio.</p>
+    <div class="rest-hero ${can ? '' : 'is-locked'}" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft};--r-deep:${r.theme.deep}">
+      <div class="rest-hero__art">${storefrontSvg(r.theme, i)}</div>
+      <span class="rest-hero__kicker">Cocina ${escapeHtml(r.cuisine.toLowerCase())}</span>
+      ${can ? '' : `<span class="rest-hero__lock">${icon('lock')}</span>`}
+    </div>
+    <div class="perks">${perks.map((p) => `<span class="perk">${p}</span>`).join('')}</div>
+    <section class="reqs" aria-label="Requisitos">
+      <h3>${can ? '¡Cumples todo para abrirlo!' : 'Para abrirlo necesitas'}</h3>
+      ${reqs.map((q) => `<div class="req ${q.done ? 'is-done' : ''}">
+        <span class="req__icon">${icon(q.done ? 'check' : q.icon)}</span>
+        <div class="req__body"><div class="req__row"><b>${escapeHtml(q.label)}</b><span>${q.done ? 'Listo' : escapeHtml(q.value)}</span></div>
+          <div class="req__bar"><i style="width:${Math.round(q.pct * 100)}%"></i></div></div>
+      </div>`).join('')}
+    </section>
+    <div class="section-title" style="margin-top:4px"><h2 style="font-size:16px">Sus recetas</h2><span>${recipes.filter((x) => x.learnCost === 0).length} incluidas</span></div>
     <div class="comp-list">${recipes.map((x) => `<span class="comp">${ingredientSvg(x.components[0].ingredient)}${escapeHtml(x.name)}</span>`).join('')}</div>
-    <p class="note"><strong>${reason}</strong></p>
+    ${!can && reason ? `<p class="note" style="text-align:center"><strong>${reason}</strong></p>` : ''}
     ${d.reason === 'recetas_pendientes'
-      ? `<button class="btn btn--xl" data-go-recipes="${prev.id}">${icon('book')} Ver recetas de ${prev.cuisine.toLowerCase()}</button>`
+      ? `<button class="btn btn--xl" data-go-recipes="${prev.id}">${icon('book')} Ir a las recetas</button>`
       : `<button class="btn btn--xl btn--gold" data-buy ${can ? '' : 'disabled'}>${coinSvg()} Abrir por ${fmt(r.cost)}</button>`}
   `, (sheet, close) => {
     sheet.querySelector('[data-go-recipes]')?.addEventListener('click', (e) => { close(); app.recipeTab = e.currentTarget.dataset.goRecipes; go('recipes'); });
@@ -385,6 +414,15 @@ function showUnlocks(r) {
   `, (sheet, close) => {
     sheet.querySelector('[data-act="market"]').addEventListener('click', () => { close(); go('market'); });
   });
+}
+
+// Cuánto falta para que cambien los precios y las ofertas (a medianoche UTC, igual que el servidor).
+function untilTomorrow() {
+  const now = new Date();
+  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
+  const mins = Math.max(1, Math.round((next - now.getTime()) / 60000));
+  const h = Math.floor(mins / 60);
+  return h > 0 ? `${h} h ${mins % 60} min` : `${mins} min`;
 }
 
 async function buy(kind, id) {
@@ -445,7 +483,7 @@ function drawMarket() {
       <button class="btn btn--sm btn--good" data-act="basket">Recoger</button>
     </section>`}
 
-    ${deals.length ? `<div class="section-title"><h2>Ofertas de hoy</h2><span>−40%</span></div>
+    ${deals.length ? `<div class="section-title"><h2>Ofertas de hoy</h2><span>−40% · nuevas en ${untilTomorrow()}</span></div>
     <div class="deals">${deals.map((d) => `
       <div class="deal"><span class="deal__bubble">${ingredientSvg(d.id)}<span class="deal__badge">−40%</span></span><b>${INGREDIENTS[d.id].name}</b><span>${coinSvg('coin" style="width:14px;height:14px;vertical-align:-2px')} ${d.price} c/u</span></div>`).join('')}
     </div>` : ''}

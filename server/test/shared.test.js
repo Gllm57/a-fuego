@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -358,4 +358,17 @@ test('un ayudante contratado antes de abrir su restaurante no trabaja', () => {
   assert.deepEqual(sanitizeStaff(s).staff.owned, []);
   assert.equal(evaluateHire(s, 'luis').reason, 'ya_comprado');
   assert.equal(evaluateHire(sanitizeStaff(s), 'luis').reason, 'personal_bloqueado');
+});
+
+test('mercado: las 3 ofertas salen de tus ingredientes y cambian cada día', () => {
+  const s = newPlayerState();
+  const pool = ['harina_maiz', 'queso', 'carne_res', 'pollo', 'aguacate', 'harina'];
+  const days = ['2026-10-14', '2026-10-15', '2026-10-16', '2026-10-17'].map((d) => {
+    const p = marketPrices(d, pool);
+    const deals = pool.filter((id) => p[id].deal);
+    assert.equal(deals.length, 3);
+    return deals.join();
+  });
+  assert.ok(new Set(days).size > 1, 'las ofertas cambian de un día a otro');
+  assert.equal(Object.values(marketPrices('2026-10-16', marketIngredients(s))).filter((x) => x.deal).length, 3);
 });

@@ -252,7 +252,7 @@ export class Kitchen {
             <button class="card-x" data-act="close" aria-label="Cerrar">${icon('close')}</button>
           </div>
           <div class="tuto__stage tuto__stage--${dir}" style="--theme:${this.restaurant.theme.primary}">
-            <span class="tuto__wall" aria-hidden="true"></span><span class="tuto__counter" aria-hidden="true"></span>
+            ${awningSvg(this.restaurant.theme)}<span class="tuto__counter" aria-hidden="true"></span>
             ${s.art}
           </div>
           <div class="tuto__head"><span class="tuto__icon">${icon(s.icon)}</span><div><small>PASO ${idx + 1} DE ${slides.length}</small><h2>${s.title}</h2></div></div>
@@ -649,17 +649,26 @@ export class Kitchen {
     const box = this.el.customers;
     const visible = this.#visible();
     const ids = new Set(visible.map((o) => o.id));
+    // Posiciones de antes, para que los que se quedan se deslicen a su nuevo lugar.
+    const before = new Map([...this.custEls].map(([id, el]) => [id, el.getBoundingClientRect()]));
+    const pr = box.getBoundingClientRect();
     for (const [id, el] of this.custEls) {
       if (ids.has(id)) continue;
       const o = this.orders[id];
-      const r = el.getBoundingClientRect();
-      const pr = box.getBoundingClientRect();
+      const r = before.get(id);
       Object.assign(el.style, { position: 'absolute', left: `${r.left - pr.left}px`, top: `${r.top - pr.top}px`, width: `${r.width}px`, zIndex: 2 });
-      el.classList.remove('is-selected');
-      // Al servido se le deja un momento para que reciba el plato antes de irse.
-      if (o.status === 'served') el.style.animationDelay = '.45s';
+      el.classList.remove('is-selected', 'is-waiting-friend');
+      if (o.status === 'served') {
+        // Contento: el globo da las gracias, salta, y se va caminando hacia afuera.
+        const bubble = el.querySelector('.bubble');
+        if (bubble) bubble.innerHTML = `<span class="bubble__thanks">${THANKS[(o.id * 7) % THANKS.length]}</span>`;
+        const face = el.querySelector('.avatar__face');
+        if (face) face.innerHTML = customerSvg(o.look, 'happy', '', o.vip);
+        el.style.setProperty('--exit-x', `${r.left - pr.left > pr.width / 2 ? 70 : -70}px`);
+        el.style.animationDelay = '.35s';
+      }
       el.classList.add(o.status === 'served' ? 'is-served' : 'is-leaving');
-      setTimeout(() => el.remove(), o.status === 'served' ? 1300 : 800);
+      setTimeout(() => el.remove(), o.status === 'served' ? 1700 : 800);
       this.custEls.delete(id);
     }
     box.querySelectorAll('.seat-empty, .queue-badge').forEach((n) => n.remove());
@@ -696,6 +705,16 @@ export class Kitchen {
       b.className = 'queue-badge';
       b.textContent = `+${q} en fila`;
       box.appendChild(b);
+    }
+    // Los que se quedan se deslizan desde su lugar anterior (sin saltos).
+    for (const [id, el] of this.custEls) {
+      const r0 = before.get(id);
+      if (!r0) continue;
+      const r1 = el.getBoundingClientRect();
+      const dx = r0.left - r1.left, dy = r0.top - r1.top;
+      if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
+        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1)' });
+      }
     }
     for (const [id, el] of this.custEls) {
       el.classList.toggle('is-selected', id === this.selected);
@@ -1170,6 +1189,28 @@ function clockText(ms) {
 }
 
 // Ingredientes que hay que voltear en la sartén a mitad de cocción.
+// Toldo del local para el tutorial: barra, rayas con volumen, faldón de ondas y sombra.
+function awningSvg(theme) {
+  const p = theme.primary, d = theme.deep, light = '#FFF8EE';
+  const n = 12, w = 30;
+  const stripes = Array.from({ length: n }, (_, i) => `<rect x="${i * w}" y="8" width="${w}" height="26" fill="${i % 2 ? light : p}"/>`).join('');
+  const scallops = Array.from({ length: n }, (_, i) => `<path d="M${i * w} 33h${w}v1a${w / 2} ${w / 2 - 3} 0 0 1-${w} 0z" fill="${i % 2 ? light : p}" stroke="${d}" stroke-width="1.4" stroke-opacity=".35"/>`).join('');
+  return `<svg class="tuto__awning" viewBox="0 0 360 58" preserveAspectRatio="none" aria-hidden="true">
+    <defs>
+      <linearGradient id="aw-fold" x1="0" x2="1"><stop offset="0" stop-color="#000" stop-opacity=".12"/><stop offset=".5" stop-color="#fff" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity=".12"/></linearGradient>
+      <pattern id="aw-folds" width="30" height="58" patternUnits="userSpaceOnUse"><rect width="30" height="58" fill="url(#aw-fold)"/></pattern>
+      <linearGradient id="aw-shadow" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#000" stop-opacity=".18"/><stop offset="1" stop-color="#000" stop-opacity="0"/></linearGradient>
+    </defs>
+    <rect y="40" width="360" height="18" fill="url(#aw-shadow)"/>
+    ${stripes}${scallops}
+    <rect y="8" width="360" height="38" fill="url(#aw-folds)" opacity=".8"/>
+    <rect y="0" width="360" height="9" rx="2" fill="${d}"/>
+    <rect y="2" width="360" height="2" fill="#fff" opacity=".25"/>
+  </svg>`;
+}
+
+const THANKS = ['¡Delicioso!', '¡Gracias!', '¡Qué rico!', '¡10 de 10!', '¡Vuelvo mañana!', '¡Exquisito!'];
+
 const FLIP_INGREDIENTS = new Set(['carne_res', 'pollo', 'cerdo', 'pescado', 'salmon', 'atun', 'camaron', 'huevo', 'tortilla']);
 // Verduras y frutas que se lavan antes de usarse (salpicadura de agua).
 const WASH_INGREDIENTS = new Set(['lechuga', 'tomate', 'cilantro', 'albahaca', 'fresa', 'pepino', 'limon', 'aguacate', 'chile', 'aji', 'papa', 'camote', 'cebolla', 'champinon', 'pina']);

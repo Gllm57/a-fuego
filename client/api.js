@@ -287,7 +287,7 @@ class LocalApi {
   #market() {
     const s = this.data.state;
     const day = todayUTC();
-    const prices = marketPrices(day);
+    const prices = marketPrices(day, marketIngredients(s));
     return {
       day,
       items: marketIngredients(s).map((id) => ({ id, ...prices[id] })),

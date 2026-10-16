@@ -3,7 +3,7 @@
 
 import { RESTAURANT_BY_ID, RESTAURANTS, RECIPE_BY_ID, STAFF_BY_ID } from './data/catalog.js';
 import { kitchenStats, RUN_DURATION_MS } from './rules.js';
-import { menuFor, dailyChallenge, marketPrices, staffRank } from './economy.js';
+import { menuFor, dailyChallenge, marketPrices, marketIngredients, staffRank } from './economy.js';
 import { EMERGENCY_PRICE_MULT } from './rules.js';
 
 export class RunStartError extends Error {
@@ -34,7 +34,7 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
   if (Object.values(stock).every((n) => n === 0)) throw new RunStartError('despensa_vacia');
   const rest = RESTAURANT_BY_ID[restaurantId];
   // Precios del pedido urgente (el doble del mercado de hoy), fijados al empezar.
-  const prices = marketPrices(day);
+  const prices = marketPrices(day, marketIngredients(state));
   const emergencyPrices = Object.fromEntries(Object.keys(stock).map((ing) => [ing, prices[ing].price * EMERGENCY_PRICE_MULT]));
   // Asistente contratado: su rango queda fijo durante el servicio.
   const stats = kitchenStats(state.upgrades, restaurantId);
