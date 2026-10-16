@@ -294,14 +294,17 @@ test('logros: contadores y cobro una sola vez', () => {
   assert.equal(achievementProgress(s).find((x) => x.id === 'platos_50').value, 12);
 });
 
-test('asistentes: nivel para contratar, sueldo por servicio y rangos', () => {
+test('asistentes: uno por restaurante, contrato, sueldo por servicio y rangos', () => {
   const s = stocked();
-  // Se desbloquean con restaurantes avanzados, piden nivel y el contrato cuesta.
+  // Cada uno se desbloquea al abrir su restaurante, no todos a la vez.
   assert.equal(evaluateHire(s, 'pepe').reason, 'personal_bloqueado');
   assert.equal(evaluateHire(s, 'nadie').reason, 'no_existe');
+  const withDiner = { ...s, coins: 99999, restaurants: ['arepera', 'taqueria', 'diner'] };
+  assert.ok(evaluateHire(withDiner, 'pepe').ok);
+  assert.equal(evaluateHire(withDiner, 'rosa').reason, 'personal_bloqueado');
+  assert.equal(evaluateHire(withDiner, 'luis').reason, 'personal_bloqueado');
   const chain = { ...s, restaurants: ['arepera', 'taqueria', 'diner', 'trattoria', 'izakaya'] };
-  assert.equal(evaluateHire(chain, 'luis').reason, 'nivel_insuficiente');
-  assert.equal(evaluateHire({ ...chain, xp: xpForLevel(12) }, 'luis').reason, 'sin_dinero');
+  assert.equal(evaluateHire(chain, 'luis').reason, 'sin_dinero');
   const lvl = { ...chain, xp: xpForLevel(12), coins: 30000 };
   const d = evaluateHire(lvl, 'luis');
   assert.equal(d.price, 18000);

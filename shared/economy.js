@@ -73,7 +73,6 @@ export function evaluateHire(state, id) {
   if (state.staff?.hired === id) return { ok: false, reason: 'ya_comprado' };
   if (staffOwned(state).includes(id)) return { ok: true, price: 0 };
   if (!state.restaurants.includes(member.reqRestaurant)) return { ok: false, reason: 'personal_bloqueado', restaurant: member.reqRestaurant };
-  if (levelFromXp(state.xp) < member.reqLevel) return { ok: false, reason: 'nivel_insuficiente', reqLevel: member.reqLevel };
   if (state.coins < member.hireCost) return { ok: false, reason: 'sin_dinero', price: member.hireCost };
   return { ok: true, price: member.hireCost };
 }

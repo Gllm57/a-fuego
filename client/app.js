@@ -345,6 +345,9 @@ function openRestaurant(r) {
         applyTheme(r.id);
         confetti(document.body, [r.theme.primary, '#FFC23D', '#fff', r.theme.deep]);
         toast(`¡Abriste ${r.name}! Compra sus ingredientes en el mercado`, 'good');
+        // Algunos locales traen un ayudante nuevo para contratar en Mejoras.
+        const helper = STAFF.find((m) => m.reqRestaurant === r.id);
+        if (helper) setTimeout(() => toast(`Nuevo ayudante: ${helper.name}, ${helper.role.toLowerCase()}. Contrátalo en Mejoras`, 'good'), 2600);
         go('home');
       }
     });
@@ -712,16 +715,15 @@ function staffState(s, m) {
   const exp = s.staff?.exp?.[m.id] ?? 0;
   const rank = staffRank(exp);
   const restOk = s.restaurants.includes(m.reqRestaurant);
-  const lvlOk = level() >= m.reqLevel;
-  return { owned, exp, rank, hired: s.staff?.hired === m.id, restOk, lvlOk, unlocked: owned || (restOk && lvlOk) };
+  return { owned, exp, rank, hired: s.staff?.hired === m.id, restOk, unlocked: owned || restOk };
 }
 
 function staffSection(s) {
   return `<section class="card helpers">
-    <div class="helpers__head"><h2>Ayudantes</h2><span>Uno a la vez · contrato + sueldo</span></div>
+    <div class="helpers__head"><h2>Ayudantes</h2><span>Uno nuevo con Diner, Trattoria e Izakaya</span></div>
     <div class="helpers__row">${STAFF.map((m) => {
       const x = staffState(s, m);
-      const label = x.hired ? 'Trabajando' : x.owned ? 'Contratable' : x.unlocked ? fmt(m.hireCost) : RESTAURANT_BY_ID[m.reqRestaurant].name.split(' ')[0];
+      const label = x.hired ? 'Trabajando' : x.owned ? 'Contratable' : x.unlocked ? fmt(m.hireCost) : `Con ${RESTAURANT_BY_ID[m.reqRestaurant].name.split(' ')[0]}`;
       return `<button class="helper ${x.hired ? 'is-hired' : ''} ${x.unlocked ? '' : 'is-locked'}" data-staff="${m.id}" aria-label="${m.name}, ${m.role}">
         <span class="staff-face">${staffSvg(m)}${x.unlocked ? '' : `<span class="helper__lock">${icon('lock')}</span>`}</span>
         <b>${m.name}</b><small>${x.hired ? icon('check') : ''}${escapeHtml(label)}</small>
@@ -741,7 +743,6 @@ function openStaffSheet(id) {
     if (x.hired) action = `<button class="btn btn--ghost btn--wide" data-hire="">Despedir</button>`;
     else if (x.owned) action = `<button class="btn btn--wide" data-hire="${m.id}">Llamar a ${m.name} · gratis</button>`;
     else if (!x.restOk) action = `<div class="staff-lock">${icon('lock')} Se desbloquea al abrir <b>${escapeHtml(RESTAURANT_BY_ID[m.reqRestaurant].name)}</b></div>`;
-    else if (!x.lvlOk) action = `<div class="staff-lock">${icon('lock')} Necesitas nivel <b>${m.reqLevel}</b></div>`;
     else action = `<button class="btn btn--wide" data-hire="${m.id}" ${s.coins < m.hireCost ? 'disabled' : ''}>Contratar · ${coinSvg()} ${fmt(m.hireCost)}</button>`;
     return `
       <div class="sheet__head"><h2>${m.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
@@ -754,7 +755,7 @@ function openStaffSheet(id) {
         <div class="ticket">
           <div class="ticket__row"><span>Contrato (una vez)</span><b>${x.owned ? 'Pagado' : fmt(m.hireCost)}</b></div>
           <div class="ticket__row"><span>Sueldo por servicio</span><b class="neg">−${fmt(m.salary)}</b></div>
-          <div class="ticket__row"><span>Requisitos</span><b>${escapeHtml(RESTAURANT_BY_ID[m.reqRestaurant].name)} · Nv ${m.reqLevel}</b></div>
+          <div class="ticket__row"><span>Se desbloquea con</span><b>${escapeHtml(RESTAURANT_BY_ID[m.reqRestaurant].name)}</b></div>
         </div>
         ${x.owned ? `<div class="staff-card__exp"><span>${rankName(m, x.rank)}${nextRank ? ` · ${x.exp - STAFF_RANKS[x.rank].from}/${nextRank.from - STAFF_RANKS[x.rank].from} servicios para ${rankName(m, x.rank + 1)}` : ' · rango máximo'}</span>
           <div class="progress"><div class="progress__fill" style="width:${pct}%"></div></div></div>` : ''}

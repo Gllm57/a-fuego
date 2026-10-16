@@ -24,7 +24,7 @@ usa las propinas para construir tu cadena de restaurantes.
 - **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
   desde la pausa o el perfil.
 - **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.
-- **Ayudantes** (arriba de Mejoras): se desbloquean desde el tercer restaurante. Pepe corta en una tabla (Diner, nv 6, contrato 5.500), Rosa voltea y saca lo listo de una sartén (Trattoria, nv 9, 11.000) y Don Luis hace más pacientes a los clientes (Izakaya, nv 12, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
+- **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada restaurante avanzado. Pepe corta en una tabla (con el Diner, contrato 5.500), Rosa voltea y saca lo listo de una sartén (con la Trattoria, 11.000) y Don Luis hace más pacientes a los clientes (con la Izakaya, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
 
 ### Economía (difícil a propósito)
 

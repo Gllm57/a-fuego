@@ -248,8 +248,7 @@ export class Kitchen {
     const pct = (ms) => `${((ms / dur) * 100).toFixed(1)}%`;
     const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
     const vips = this.orders.filter((o) => o.vip);
-    // Qué fogones tienes repetidos, y cuánto cuesta abrir hoy.
-    const doubled = STATION_IDS.filter((st) => this.stationKeys.includes(`${st}#2`)).map((st) => this.#stName(st));
+    // Cuánto cuesta abrir hoy.
     const cost = (this.config.upkeep ?? 0) + (this.config.salary ?? 0);
     const costText = this.helper ? `${fmt(this.config.upkeep ?? 0)} del local + ${fmt(this.config.salary ?? 0)} del sueldo de ${this.helper.name}` : 'gastos del local';
     ov.innerHTML = `
@@ -274,7 +273,6 @@ export class Kitchen {
         <ul class="brief__rules">
           <li>${icon('heart')}<span><b>${SERVICE_LIVES} vidas.</b> Cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina.</span></li>
           <li>${coinSvg()}<span><b>Al cerrar pagas ${fmt(cost)}</b> (${costText}). Si vendes menos, pierdes la diferencia.</span></li>
-          ${doubled.length ? `<li>${icon('fire')}<span><b>Fogones dobles:</b> ${doubled.join(', ')}. Puedes cocinar dos cosas iguales a la vez.</span></li>` : ''}
         </ul>
         <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
         <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
