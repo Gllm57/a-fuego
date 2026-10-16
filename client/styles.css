@@ -76,12 +76,12 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 :root { --aw-a: var(--brand); --aw-b: color-mix(in srgb, var(--brand) 82%, #fff); --aw-deep: var(--brand-deep); }
 .awning--stripes {
   background:
-    repeating-linear-gradient(90deg, var(--aw-a) 0 28px, var(--aw-b) 28px 56px);
+    repeating-linear-gradient(90deg, var(--brand) 0 28px, color-mix(in srgb, var(--brand) 82%, #fff) 28px 56px);
 }
 .awning--stripes::after {
   background:
-    radial-gradient(circle at 50% 0, var(--aw-a) 13px, transparent 14px) 0 0 / 56px 16px repeat-x,
-    radial-gradient(circle at 50% 0, var(--aw-b) 13px, transparent 14px) 28px 0 / 56px 16px repeat-x;
+    radial-gradient(circle at 50% 0, var(--brand) 13px, transparent 14px) 0 0 / 56px 16px repeat-x,
+    radial-gradient(circle at 50% 0, color-mix(in srgb, var(--brand) 82%, #fff) 13px, transparent 14px) 28px 0 / 56px 16px repeat-x;
 }
 .topbar { display: flex; align-items: center; gap: 10px; }
 .chef-btn { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; background: none; border: 0; padding: 0; cursor: pointer; text-align: left; color: #fff; }
@@ -313,7 +313,70 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .scene-guests { position: absolute; left: 0; right: 0; bottom: 30px; display: flex; justify-content: center; gap: 22px; z-index: 1; }
 .scene-guests .avatar { width: 58px; height: 58px; }
 .scene-guests .avatar__face { width: 50px; height: 50px; }
-.scene .bar__counter { z-index: 2; height: 40px; }
+.scene [data-wall="pared_floral"] .bar, [data-wall="pared_floral"].scene-wall { background: radial-gradient(circle at 25% 25%, #F28CA8 0 4px, transparent 5px) 0 0 / 34px 34px, radial-gradient(circle at 75% 75%, #F2C200 0 3px, transparent 4px) 0 0 / 34px 34px, radial-gradient(circle at 75% 25%, #9BD18F 0 2.5px, transparent 3.5px) 0 0 / 34px 34px, #FFF4F6; }
+[data-wall="pared_picnic"] .bar, [data-wall="pared_picnic"].scene-wall { background: repeating-linear-gradient(0deg, rgba(226,57,75,.28) 0 14px, transparent 14px 28px), repeating-linear-gradient(90deg, rgba(226,57,75,.28) 0 14px, transparent 14px 28px), #FFF8F4; }
+[data-wall="pared_atardecer"] .bar, [data-wall="pared_atardecer"].scene-wall { background: radial-gradient(circle at 70% 85%, #FFD36A 0 26px, transparent 27px), linear-gradient(#FFB37A, #F28CA8 55%, #A77BD6); }
+[data-wall="pared_tropical"] .bar, [data-wall="pared_tropical"].scene-wall { background: radial-gradient(ellipse 14px 26px at 20% 30%, #4FA35B 0 98%, transparent 100%) 0 0 / 60px 60px, radial-gradient(ellipse 12px 22px at 70% 70%, #3E8E4A 0 98%, transparent 100%) 0 0 / 60px 60px, #E6F4E8; }
+[data-wall="pared_estrellas"] .bar, [data-wall="pared_estrellas"].scene-wall { background: radial-gradient(circle at 20% 30%, #fff 0 1.5px, transparent 2px) 0 0 / 40px 40px, radial-gradient(circle at 70% 60%, #FFE08A 0 1.2px, transparent 1.8px) 0 0 / 52px 52px, radial-gradient(circle at 85% 20%, #FFD36A 0 16px, transparent 17px), linear-gradient(#1D2552, #3B2F6E); }
+[data-counter="barra_bambu"] .bar__counter { background: repeating-linear-gradient(90deg, #C9B45A 0 16px, #A99640 16px 18px), #C9B45A; }
+[data-counter="barra_neon"] .bar__counter { background: linear-gradient(#2A170D, #120A05); box-shadow: inset 0 3px 0 #FF7AB6, 0 -2px 12px rgba(255,122,182,.7); }
+[data-counter="barra_oro"] .bar__counter { background: linear-gradient(100deg, #B7791F, #FFE08A 30%, #D4A12A 60%, #FFF1B8 80%, #B7791F); }
+[data-awning="toldo_arcoiris"] .wall, [data-awning="toldo_arcoiris"] .scene-awning, [data-awning="toldo_arcoiris"].sw--awning { background: repeating-linear-gradient(90deg, #E2394B 0 26px, #F28C3D 26px 52px, #F2C200 52px 78px, #4FA35B 78px 104px, #4FA9DE 104px 130px, #6A3FC2 130px 156px); }
+.lanterns { position: absolute; top: 0; left: 8px; right: 8px; display: flex; justify-content: space-around; pointer-events: none; z-index: 0; }
+.lanterns span { display: flex; flex-direction: column; align-items: center; transform-origin: top center; animation: sway 3s ease-in-out infinite; animation-delay: var(--d); }
+.lanterns i { width: 2px; height: 10px; background: #6B5444; }
+.lanterns b { width: 24px; height: 30px; border-radius: 45%; background: radial-gradient(circle at 50% 40%, #FFF1B8 0 20%, var(--c) 60%); box-shadow: 0 0 14px color-mix(in srgb, var(--c) 60%, transparent), inset 0 0 0 2px rgba(0,0,0,.12); }
+.candles { position: absolute; left: 10%; right: 10%; bottom: 26px; display: flex; justify-content: space-between; pointer-events: none; z-index: 0; }
+.candles span { width: 8px; height: 18px; border-radius: 2px; background: #FFF8EE; box-shadow: inset 0 0 0 1.5px #E3C8A6; position: relative; }
+.candles i { position: absolute; left: 50%; top: -11px; width: 8px; height: 12px; margin-left: -4px; border-radius: 50% 50% 50% 50% / 60% 60% 40% 40%; background: radial-gradient(circle at 50% 70%, #FFF1B8, #FFB020 60%, #E2394B); box-shadow: 0 0 12px 4px rgba(255,190,80,.5); animation: flicker .25s ease-in-out infinite alternate; animation-delay: var(--d); }
+@keyframes flicker { from { transform: scale(1) rotate(-3deg); } to { transform: scale(1.12, .92) rotate(3deg); } }
+.disco { position: absolute; top: 0; left: 50%; width: 0; pointer-events: none; z-index: 0; }
+.disco i { position: absolute; left: -16px; top: 6px; width: 32px; height: 32px; border-radius: 50%; background: conic-gradient(#fff, #9FD3F0, #fff, #F28CA8, #fff, #FFE08A, #fff); box-shadow: inset 0 0 0 2px rgba(0,0,0,.15), 0 0 18px rgba(255,255,255,.8); animation: spin 3s linear infinite; }
+.disco i::before { content: ''; position: absolute; left: 50%; top: -6px; width: 2px; height: 6px; background: #6B5444; }
+.disco b { position: absolute; top: 30px; width: 12px; height: 12px; border-radius: 50%; background: radial-gradient(circle, rgba(255,255,255,.85), transparent 70%); animation: disco-dot 2.4s linear infinite; }
+.disco b:nth-child(2) { left: -90px; } .disco b:nth-child(3) { left: 60px; animation-delay: -.8s; } .disco b:nth-child(4) { left: -20px; animation-delay: -1.6s; }
+@keyframes disco-dot { 0% { transform: translate(0, 0); opacity: 0; } 20% { opacity: 1; } 100% { transform: translate(40px, 70px); opacity: 0; } }
+.deco svg { display: block; width: 100%; height: 100%; overflow: visible; }
+.deco--reloj { left: 16px; top: 30px; width: 34px; height: 34px; }
+.clock-h, .clock-m { transform-origin: 20px 20px; }
+.clock-m { animation: spin 6s linear infinite; }
+.clock-h { animation: spin 72s linear infinite; }
+.deco--ventilador { left: 50%; top: -2px; width: 76px; height: 32px; margin-left: -38px; }
+.fan-blades { transform-origin: 35px 14px; animation: fan 0.6s linear infinite; }
+@keyframes fan { from { transform: scaleX(1); } 50% { transform: scaleX(-1); } to { transform: scaleX(1); } }
+.deco--guacamaya { left: 54px; top: 0; width: 34px; height: 50px; }
+.parrot { transform-origin: 22px 12px; animation: sway 2.6s ease-in-out infinite; }
+.deco--pinata { right: 74px; top: 0; width: 32px; height: 46px; transform-origin: top center; animation: sway 2.2s ease-in-out infinite; }
+.deco--mariposas { inset: 0; }
+.deco--mariposas i { position: absolute; left: -20px; top: var(--y); width: 16px; height: 12px; animation: flutter-path 7s linear infinite; animation-delay: var(--d); }
+.deco--mariposas b { position: absolute; top: 0; width: 8px; height: 11px; border-radius: 60% 40% 50% 50%; background: var(--c); box-shadow: inset 0 0 0 1px rgba(0,0,0,.2); animation: wing .18s ease-in-out infinite alternate; }
+.deco--mariposas b:first-child { left: 0; transform-origin: right center; }
+.deco--mariposas b:last-child { right: 0; transform-origin: left center; }
+@keyframes wing { to { transform: scaleX(.3); } }
+@keyframes flutter-path { 0% { transform: translate(0, 0); } 25% { transform: translate(110px, -10px); } 50% { transform: translate(200px, 8px); } 75% { transform: translate(300px, -8px); } 100% { transform: translate(440px, 4px); } }
+.deco--gato { left: 38px; bottom: 22px; width: 34px; height: 40px; }
+.cat-paw { transform-origin: 33px 30px; animation: paw 1s ease-in-out infinite alternate; }
+@keyframes paw { from { transform: rotate(0); } to { transform: rotate(-22deg); } }
+.deco--pecera { right: 38px; bottom: 22px; width: 40px; height: 38px; }
+.fish { animation: fish 3s ease-in-out infinite alternate; }
+@keyframes fish { from { transform: translateX(-3px); } to { transform: translateX(5px); } }
+.bub { animation: bub 2s ease-in infinite; } .bub2 { animation-delay: -1s; }
+@keyframes bub { from { transform: translateY(0); opacity: 1; } to { transform: translateY(-12px); opacity: 0; } }
+.deco--rocola { right: 4px; bottom: 22px; width: 30px; height: 44px; }
+.juke-lights { animation: juke 1.2s steps(2) infinite; }
+@keyframes juke { 50% { stroke: #FF7AB6; filter: hue-rotate(120deg); } }
+.deco--rocola .notes { position: absolute; left: 50%; top: -6px; }
+.deco--rocola .notes i { position: absolute; font-style: normal; font-weight: 900; font-size: 13px; color: #8E2433; animation: note 2s ease-out infinite; }
+.deco--rocola .notes i:last-child { animation-delay: -1s; left: 8px; }
+@keyframes note { from { transform: translate(0, 0); opacity: 1; } to { transform: translate(10px, -26px); opacity: 0; } }
+/* Muestras de Mi local: cada adorno centrado en su recuadro. */
+.sw--deco .deco--reloj, .sw--deco .deco--gato, .sw--deco .deco--pecera, .sw--deco .deco--rocola, .sw--deco .deco--pinata, .sw--deco .deco--guacamaya { left: 50% !important; right: auto !important; top: 50% !important; bottom: auto !important; transform: translate(-50%, -50%) scale(.85); }
+.sw--deco .deco--ventilador { top: 6px; transform: scale(.8); }
+.sw--deco .deco--pinata { animation: none; }
+.sw--lights .lanterns b { width: 14px; height: 18px; }
+.sw--lights .candles { bottom: 4px; }
+.sw--lights .disco i { top: 4px; }
+.bar__counter { z-index: 2; height: 40px; }
 .decor-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
 .decor-item { border: 0; border-radius: 22px; padding: 10px 6px 8px; min-height: 108px; background: var(--card); box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--line); display: flex; flex-direction: column; align-items: center; gap: 5px; font: inherit; color: inherit; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 .decor-item.is-on { box-shadow: 0 4px 0 var(--brand-deep), inset 0 0 0 3px var(--brand); background: var(--brand-soft); }

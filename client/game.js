@@ -9,7 +9,7 @@ import {
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
 import { sfx, music, vibrate } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
-import { lightsHtml, decoHtml, decorAttrs } from './decor-art.js';
+import { lightsHtml, decoHtml, decorAttrs, awningStyle } from './decor-art.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
@@ -66,7 +66,7 @@ export class Kitchen {
   mount() {
     this.host.innerHTML = `
       <div class="game" role="application" aria-label="Cocina">
-        <div class="game__inner" data-station-rows="${this.#stationRows().length}" ${decorAttrs(this.decor)}>
+        <div class="game__inner" data-station-rows="${this.#stationRows().length}" ${decorAttrs(this.decor)} style="${awningStyle(this.decor.toldo)}">
           <div class="wall">
             <div class="hud">
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>

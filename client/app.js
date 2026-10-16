@@ -60,13 +60,7 @@ function applyTheme(restaurantId) {
   r.setProperty('--brand-deep', t.deep);
   r.setProperty('--brand-soft', t.soft);
   r.setProperty('--ground', t.ground);
-  // Toldo elegido en «Mi local» (o el del restaurante).
-  const toldo = DECOR_BY_ID[app.profile ? decorOf(app.profile.state).equipped.toldo : 'toldo_local'];
-  const [a, b, deep] = toldo?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 82%, #fff)`, t.deep];
-  r.setProperty('--aw-a', a);
-  r.setProperty('--aw-b', b);
-  r.setProperty('--aw-deep', deep);
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', toldo?.colors?.[0] ?? t.primary);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', t.primary);
 }
 
 function setProfile(next) {
@@ -797,7 +791,7 @@ function awningVars(id) {
 
 function decorSwatch(item) {
   switch (item.slot) {
-    case 'toldo': return `<span class="sw sw--awning" style="${awningVars(item.id)}"></span>`;
+    case 'toldo': return `<span class="sw sw--awning" data-awning="${item.id}" style="${awningVars(item.id)}"></span>`;
     case 'pared': return `<span class="sw scene-wall" data-wall="${item.id}"></span>`;
     case 'barra': return `<span class="sw sw--counter" data-counter="${item.id}"><span class="bar__counter"></span></span>`;
     case 'luces': return `<span class="sw sw--lights">${lightsHtml(item.id)}</span>`;
@@ -826,7 +820,7 @@ function renderDecor() {
   const screen = document.getElementById('screen');
   screen.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
-      <section class="scene" data-counter="${look.barra}" aria-label="Vista previa del local" style="${awningVars(look.toldo)}">
+      <section class="scene" data-counter="${look.barra}" data-awning="${look.toldo}" aria-label="Vista previa del local" style="${awningVars(look.toldo)}">
         <div class="scene-wall" data-wall="${look.pared}"></div>
         <div class="scene-awning"></div>
         <div class="scene-stage">${lightsHtml(look.luces)}${decoHtml(lookDeco)}</div>
@@ -860,7 +854,7 @@ function renderDecor() {
     if (decorOwned(st(), x.id)) {
       // Lo tuyo se pone (o en Adornos, se quita) al instante.
       app.decorPreview = {};
-      try { const res = await app.api.equipDecor(x.id); setProfile(res.profile); applyTheme(app.restaurantId); } catch (err) { errorToast(err); }
+      try { const res = await app.api.equipDecor(x.id); setProfile(res.profile); } catch (err) { errorToast(err); }
       renderDecor();
       return;
     }
@@ -876,7 +870,6 @@ function renderDecor() {
       const res = await app.api.buyDecor(pv.id);
       app.decorPreview = {};
       setProfile(res.profile);
-      applyTheme(app.restaurantId);
       sfx.buy();
       confetti(document.body, ['#FFC23D', '#fff', RESTAURANT_BY_ID[app.restaurantId].theme.primary]);
       toast(`¡${pv.name} en tu local!`, 'good');
