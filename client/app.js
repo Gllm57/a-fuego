@@ -7,7 +7,8 @@ import {
 } from './shared/index.js';
 import { createApi, ApiError, SANDBOX } from './api.js';
 import { Kitchen } from './game.js';
-import { sfx, getPrefs, setPref } from './audio.js';
+import { sfx } from './audio.js';
+import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
 import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
 import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
 
@@ -846,7 +847,6 @@ async function renderRanking() {
 // ── Perfil y ajustes ────────────────────────────────────────
 function openProfile() {
   const p = app.profile;
-  const prefs = getPrefs();
   const online = app.api.mode === 'online';
   openSheet(`
     <div class="sheet__head"><h2>Tu chef</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
@@ -859,20 +859,11 @@ function openProfile() {
         <div class="note" style="font-size:11px;margin-top:3px">${fmt(p.level.current)} / ${fmt(p.level.needed)} XP para nivel ${p.level.level + 1}</div>
       </div>
     </div>
-    <div class="card">
-      <div class="switch-row"><span>Sonido</span><button class="switch" role="switch" data-pref="sound" aria-checked="${prefs.sound}" aria-label="Sonido"></button></div>
-      <div class="switch-row"><span>Música en el servicio</span><button class="switch" role="switch" data-pref="music" aria-checked="${prefs.music}" aria-label="Música"></button></div>
-      <div class="switch-row"><span>Vibración</span><button class="switch" role="switch" data-pref="haptics" aria-checked="${prefs.haptics}" aria-label="Vibración"></button></div>
-    </div>
+    ${prefTilesHtml()}
     <button class="btn btn--ghost btn--wide" data-act="ledger">${icon('refresh')} Historial de monedas</button>
     ${online ? accountSection(p) : `<div class="card"><p class="note" style="margin:0 0 10px">Tu progreso se guarda en este celular.</p><button class="btn btn--ghost btn--wide" data-act="reset">Borrar progreso</button></div>`}
   `, (sheet, close) => {
-    sheet.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => {
-      const v = b.getAttribute('aria-checked') !== 'true';
-      b.setAttribute('aria-checked', String(v));
-      setPref(b.dataset.pref, v);
-      if (v) sfx.tap();
-    }));
+    bindPrefTiles(sheet);
     sheet.querySelector('[data-act="ledger"]').addEventListener('click', () => { close(); openLedger(); });
     sheet.querySelector('[data-act="reset"]')?.addEventListener('click', async (e) => {
       const b = e.currentTarget;

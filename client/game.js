@@ -7,7 +7,8 @@ import {
   EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS, STAFF_BY_ID, STAFF_RANKS, rankName, SERVICE_LIVES
 } from './shared/index.js';
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
-import { sfx, music, vibrate, getPrefs, setPref } from './audio.js';
+import { sfx, music, vibrate } from './audio.js';
+import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
@@ -170,81 +171,113 @@ export class Kitchen {
     const recipe = this.orders[0]?.recipe ?? RECIPE_BY_ID[this.config.menu[0]];
     const ing = recipe.components[0].ingredient;
     const timed = recipe.components.find((c) => PROCESSES[c.process].kind !== 'raw') ?? recipe.components[0];
+    const second = recipe.components[1]?.ingredient ?? ing;
+    const face = (look, mood, vip = false) => customerSvg(look, mood, '', vip);
     const slides = [
       {
+        icon: 'hand',
         title: 'Elige a un cliente',
-        text: 'Toca a un cliente para ver su comanda. El anillo de color es su paciencia: si se vacía, se va enojado, pierdes el combo y una vida.',
+        text: 'Toca a un cliente para ver su comanda. El <b>anillo de color es su paciencia</b>: si se vacía, se va enojado, pierdes el combo y una vida.',
         art: `<div class="tuto-art tuto-art--customer">
           <div class="customer is-selected" style="animation:none">
             <span class="bubble"><span class="bubble__dish">${recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span><span class="bubble__name">${escapeHtml(recipe.name)}</span></span>
-            <span class="avatar" style="--p:70"><span class="avatar__face">${customerSvg(1, 'happy', '')}</span></span>
+            <span class="avatar tuto-drain"><span class="avatar__face">${face(1, 'happy')}</span></span>
           </div>
-          <span class="tuto-hand" aria-hidden="true">${icon('hand')}</span>
+          <div class="customer" style="animation:none;opacity:.75"><span class="avatar" style="--p:90"><span class="avatar__face">${face(5, 'happy')}</span></span></div>
+          <span class="tuto-hand tuto-hand--tap" aria-hidden="true">${icon('hand')}</span>
         </div>`
       },
       {
+        icon: 'market',
         title: 'Saca de la despensa',
-        text: 'Los frascos que brillan son lo que pide. El número es cuánto te queda; si se agota, tócalo para un pedido urgente al doble de precio.',
+        text: 'Los frascos que <b>brillan</b> son lo que pide. El número es cuánto te queda; si se agota, tócalo para un <b>pedido urgente</b> al doble de precio.',
         art: `<div class="tuto-art tuto-art--jars">
-          <span class="jar is-needed" data-level="ok" style="--lvl:.8;--jar:70px"><span class="jar__glass">${ingredientSvg(ing, { title: '' })}</span><span class="jar__qty">7</span></span>
-          <span class="jar is-want" data-level="out" style="--lvl:0;--jar:56px"><span class="jar__glass">${ingredientSvg(recipe.components[1]?.ingredient ?? ing, { title: '' })}</span><span class="jar__qty">0</span></span>
-          <span class="tuto-hand" aria-hidden="true">${icon('hand')}</span>
+          <span class="jar is-needed" data-level="ok" style="--lvl:.8;--jar:68px"><span class="jar__glass">${ingredientSvg(ing, { title: '' })}</span><span class="jar__qty">7</span></span>
+          <span class="tuto-fly" aria-hidden="true">${ingredientSvg(ing, { title: '' })}</span>
+          <span class="tuto-plate"></span>
+          <span class="jar is-want" data-level="out" style="--lvl:0;--jar:54px"><span class="jar__glass">${ingredientSvg(second, { title: '' })}</span><span class="jar__qty">0</span></span>
+          <span class="tuto-hand tuto-hand--jar" aria-hidden="true">${icon('hand')}</span>
         </div>`
       },
       {
+        icon: 'fire',
         title: 'Cocina en los fogones',
-        text: 'Cortar y batir: toca el fogón varias veces. Freír, hornear y hervir se cocinan solos. La carne y el pollo hay que voltearlos a la mitad. Recoge al ver el anillo verde para un ¡Perfecto!',
+        text: '<b>Cortar y batir:</b> toca el fogón varias veces. <b>Freír, hornear y hervir</b> se cocinan solos; la carne hay que voltearla. Recógelo con el anillo verde para un <b>¡Perfecto!</b>',
         art: `<div class="tuto-art tuto-art--stations">
           <span class="station is-working" style="--p:.5"><span class="station__ring"><span class="station__disc">${STATION_ART.tabla}<span class="station__slot">${ingredientSvg(ing, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Corta!</span></span>
-          <span class="station is-ready" style="--p:1"><span class="station__ring"><span class="station__disc">${STATION_ART[PROCESSES[timed.process].station ?? 'sarten']}<span class="station__slot">${ingredientSvg(timed.ingredient, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Listo!</span></span>
+          <span class="station is-ready" style="--p:1"><span class="station__ring"><span class="station__disc">${STATION_ART[PROCESSES[timed.process].station ?? 'sarten']}<span class="station__slot">${ingredientSvg(timed.ingredient, { className: 'station__item', title: '' })}</span></span></span><span class="station__status">¡Perfecto!</span></span>
           <span class="station is-fire" style="--p:.3"><span class="station__ring"><span class="station__disc">${STATION_ART.sarten}<span class="station__slot"><span class="flames"><i></i><i></i><i></i></span></span></span></span><span class="station__status">¡Apaga!</span></span>
         </div>`
       },
       {
+        icon: 'sparkle',
         title: 'Sirve y cobra',
-        text: 'Cuando el plato está completo se sirve solo. Sirve seguido para subir el combo. Los críticos con boina pagan el doble.',
+        text: 'Con el plato completo se <b>sirve solo</b>. Sirve seguido para subir el <b>combo</b> hasta ×1.5. Los críticos con boina pagan el doble.',
         art: `<div class="tuto-art tuto-art--serve">
-          <div class="plate" style="width:96px;height:96px"><div class="plate__dish"></div><div class="plate__items">${recipe.components.map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</div></div>
-          <span class="tuto-coin">${coinSvg()}<b>+${recipe.price}</b></span>
-          <span class="combo is-on" style="position:static">Combo ×1.3</span>
-          <span class="avatar" style="--p:100;width:64px;height:64px"><span class="avatar__face" style="width:56px;height:56px">${customerSvg(2, 'happy', '', true)}</span></span>
+          <span class="tuto-serve-plate"><span class="tuto-serve-items">${recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span></span>
+          <span class="avatar" style="--p:100;width:70px;height:70px"><span class="avatar__face" style="width:60px;height:60px">${face(2, 'happy', true)}</span></span>
+          <span class="tuto-coin tuto-coin--pop">${coinSvg()}<b>+${recipe.price}</b></span>
+          <span class="combo is-on tuto-combo">${icon('fire')}<b>×1.3</b></span>
         </div>`
       },
       {
+        icon: 'heart',
         title: 'Cuidado: puedes perder',
-        text: `Tienes ${SERVICE_LIVES} vidas por servicio: cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina. Y al cerrar siempre pagas los gastos del local: si vendes menos, pierdes dinero.`,
+        text: `Tienes <b>${SERVICE_LIVES} vidas</b>: cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, <b>cierran la cocina</b>. Y al cerrar pagas los gastos: si vendes menos, <b>pierdes dinero</b>.`,
         art: `<div class="tuto-art tuto-art--lose">
-          <span class="avatar" style="--p:8;--fill:var(--bad);width:64px;height:64px"><span class="avatar__face" style="width:56px;height:56px">${customerSvg(4, 'angry', '')}</span></span>
+          <span class="avatar tuto-drain tuto-drain--fast"><span class="avatar__face tuto-swap"><span class="tuto-swap__a">${face(4, 'worried')}</span><span class="tuto-swap__b">${face(4, 'angry')}</span></span></span>
           <span class="tuto-lives"><span class="life">${icon('heart')}</span><span class="life">${icon('heart')}</span><span class="life is-lost is-breaking">${icon('heart')}</span></span>
           <span class="tuto-coin tuto-coin--bad">${coinSvg()}<b>−${fmt(this.config.upkeep ?? 0)}</b></span>
         </div>`
       }
     ];
     let idx = 0;
+    let dir = 'next';
     const ov = document.createElement('div');
     ov.className = 'overlay overlay--tuto';
+    const go = (to) => {
+      if (to < 0 || to >= slides.length) return;
+      dir = to > idx ? 'next' : 'prev';
+      idx = to;
+      sfx.tap();
+      draw();
+    };
     const draw = () => {
       const s = slides[idx];
+      const last = idx === slides.length - 1;
       ov.innerHTML = `
         <div class="tuto" role="dialog" aria-label="Cómo se juega">
-          <button class="card-x" data-act="close" aria-label="Cerrar">${icon('close')}</button>
-          <div class="tuto__step">PASO ${idx + 1} DE ${slides.length}</div>
-          <div class="tuto__stage" key="${idx}">${s.art}</div>
-          <h2>${s.title}</h2>
+          <div class="tuto__top">
+            <div class="tuto__bar" aria-label="Paso ${idx + 1} de ${slides.length}">${slides.map((_, k) => `<i class="${k < idx ? 'is-done' : k === idx ? 'is-on' : ''}"></i>`).join('')}</div>
+            <button class="card-x" data-act="close" aria-label="Cerrar">${icon('close')}</button>
+          </div>
+          <div class="tuto__stage tuto__stage--${dir}" style="--theme:${this.restaurant.theme.primary}">
+            <span class="tuto__wall" aria-hidden="true"></span><span class="tuto__counter" aria-hidden="true"></span>
+            ${s.art}
+          </div>
+          <div class="tuto__head"><span class="tuto__icon">${icon(s.icon)}</span><div><small>PASO ${idx + 1} DE ${slides.length}</small><h2>${s.title}</h2></div></div>
           <p>${s.text}</p>
-          <div class="tuto__dots">${slides.map((_, k) => `<i class="${k === idx ? 'is-on' : ''}"></i>`).join('')}</div>
           <div class="tuto__actions">
-            <button class="btn btn--ghost btn--sm" data-act="skip">Saltar</button>
-            <button class="btn btn--gold" data-act="next">${idx === slides.length - 1 ? '¡Entendido!' : 'Siguiente'} ${icon('arrow')}</button>
+            ${idx === 0 ? `<button class="btn btn--ghost btn--sm" data-act="skip">Saltar</button>` : `<button class="btn btn--ghost btn--sm" data-act="prev" aria-label="Atrás">${icon('back')}</button>`}
+            <button class="btn btn--gold" data-act="next">${last ? '¡A cocinar!' : 'Siguiente'} ${icon(last ? 'fire' : 'arrow')}</button>
           </div>
         </div>`;
       ov.querySelector('[data-act="next"]').addEventListener('click', () => {
-        sfx.tap();
-        if (idx < slides.length - 1) { idx++; draw(); } else { ov.remove(); done(); }
+        if (!last) go(idx + 1); else { sfx.tap(); ov.remove(); done(); }
       });
-      ov.querySelector('[data-act="skip"]').addEventListener('click', () => { ov.remove(); done(); });
+      ov.querySelector('[data-act="prev"]')?.addEventListener('click', () => go(idx - 1));
+      ov.querySelector('[data-act="skip"]')?.addEventListener('click', () => { ov.remove(); done(); });
       ov.querySelector('[data-act="close"]').addEventListener('click', () => { sfx.tap(); ov.remove(); done(); });
     };
+    // Deslizar el dedo para cambiar de paso.
+    let startX = null;
+    ov.addEventListener('pointerdown', (e) => { startX = e.clientX; });
+    ov.addEventListener('pointerup', (e) => {
+      if (startX === null) return;
+      const dx = e.clientX - startX;
+      startX = null;
+      if (Math.abs(dx) > 50) go(idx + (dx < 0 ? 1 : -1));
+    });
     draw();
     this.el.root.appendChild(ov);
   }
@@ -326,24 +359,16 @@ export class Kitchen {
     if (!this.running || this.paused) return;
     this.paused = true;
     music.pause();
-    const prefs = getPrefs();
     const ov = document.createElement('div');
     ov.className = 'overlay';
     ov.innerHTML = `
       <h2>Pausa</h2>
       <p>Los clientes esperan. Si sales, este servicio no cuenta, pero los ingredientes que ya usaste se quedan en tu despensa.</p>
-      <div class="pause-prefs">${[['sound', 'Sonido'], ['music', 'Música'], ['haptics', 'Vibración']].map(([k, label]) =>
-        `<button class="pause-pref" data-pref="${k}" aria-pressed="${prefs[k]}">${label}</button>`).join('')}</div>
+      ${prefTilesHtml('pref-tiles--dark')}
       <button class="btn btn--gold btn--xl" data-act="resume">Continuar</button>
       <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
       <button class="btn btn--ghost" data-act="quit">Salir del servicio</button>`;
-    ov.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => {
-      const v = b.getAttribute('aria-pressed') !== 'true';
-      b.setAttribute('aria-pressed', String(v));
-      setPref(b.dataset.pref, v);
-      if (b.dataset.pref === 'haptics' && v) vibrate(30);
-      else if (v) sfx.tap();
-    }));
+    bindPrefTiles(ov);
     ov.querySelector('[data-act="resume"]').addEventListener('click', () => {
       ov.remove(); this.paused = false; this.last = performance.now(); music.resume();
     });
@@ -643,6 +668,8 @@ export class Kitchen {
       const el = document.createElement('button');
       el.className = `customer ${o.vip ? 'is-vip' : ''} ${o.group != null ? 'is-group' : ''}`;
       el.dataset.order = o.id;
+      // Cada cliente parpadea y se mueve a su propio ritmo.
+      el.style.setProperty('--d', `${-((o.id * 0.77) % 3).toFixed(2)}s`);
       if (o.group != null) el.style.setProperty('--group-hue', String((o.group * 67) % 360));
       el.dataset.mood = 'happy';
       el.setAttribute('aria-label', `${o.vip ? 'Crítico gastronómico' : 'Cliente'} pide ${o.recipe.name}`);

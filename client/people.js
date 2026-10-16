@@ -56,7 +56,7 @@ function eyes(mood, glasses) {
       ? `<path d="M22 26l6-2M42 26l-6-2" stroke="${OUT}" stroke-width="2" stroke-linecap="round"/>`
       : `<path d="M22 25.5c2-1.5 5-1.5 7 0M35 25.5c2-1.5 5-1.5 7 0" stroke="${OUT}" stroke-width="1.8" fill="none" stroke-linecap="round"/>`;
   const g = glasses ? `<circle cx="26" cy="31" r="5.2" fill="rgba(255,255,255,.18)" stroke="${OUT}" stroke-width="1.8"/><circle cx="38" cy="31" r="5.2" fill="rgba(255,255,255,.18)" stroke="${OUT}" stroke-width="1.8"/><path d="M31.2 31h1.6M20.8 30l-3-1M43.2 30l3-1" stroke="${OUT}" stroke-width="1.6"/>` : '';
-  return e + brows + g;
+  return `<g class="cf-eyes">${e}</g>` + brows + g;
 }
 
 function mouth(mood) {
@@ -97,11 +97,11 @@ export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vi
     ${eyes(mood, L.glasses && !vip)}
     <path d="M31 33c-1 2-1 3 1 3.5" stroke="${skinDark}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
     ${L.beard && !vip ? `<path d="M19 34c1 9 6 12 13 12s12-3 13-12c-3 3-6 4-8 3-1 2-3 3-5 3s-4-1-5-3c-2 1-5 0-8-3z" fill="${L.hair}" ${K}/>` : ''}
-    ${mouth(mood)}
+    <g class="cf-mouth">${mouth(mood)}</g>
     ${(L.mustache || vip) ? `<path d="M25 36.5c2-2 5-2 7 0 2-2 5-2 7 0-2 1.5-5 1.5-7 .5-2 1-5 1-7-.5z" fill="${vip ? '#2A170D' : L.hair}" ${K}/>` : ''}
     ${HAIR_FRONT[style]?.(hair) ?? ''}
     ${vip ? `<path d="M14 18c2-8 10-12 19-11 9 1 15 5 16 10-8-2-21-2-35 1z" fill="#B3264A" ${K}/><circle cx="33" cy="6.5" r="2.2" fill="#B3264A" ${K}/><circle cx="38" cy="31" r="5.4" fill="rgba(255,255,255,.2)" stroke="#B7791F" stroke-width="1.8"/><path d="M43 33l3 9" stroke="#B7791F" stroke-width="1.2"/>` : ''}
-    ${mood === 'worried' ? `<path d="M48 18c2 3 3 5 1.5 6.5S46 25 46.5 22.5 48 18 48 18z" fill="#7FC4F0" ${K}/>` : ''}
-    ${mood === 'angry' ? `<path d="M50 12c2-2 5-1 5 1 2-1 4 1 3 3 2 1 1 4-1 4M8 14c-2-1-1-4 1-4 0-2 3-3 4-1" fill="none" stroke="#D2362A" stroke-width="2" stroke-linecap="round"/>` : ''}
+    ${mood === 'worried' ? `<g class="cf-sweat"><path d="M48 18c2 3 3 5 1.5 6.5S46 25 46.5 22.5 48 18 48 18z" fill="#7FC4F0" ${K}/></g>` : ''}
+    ${mood === 'angry' ? `<g class="cf-steam"><path d="M50 12c2-2 5-1 5 1 2-1 4 1 3 3 2 1 1 4-1 4M8 14c-2-1-1-4 1-4 0-2 3-3 4-1" fill="none" stroke="#D2362A" stroke-width="2" stroke-linecap="round"/></g>` : ''}
   </svg>`;
 }
