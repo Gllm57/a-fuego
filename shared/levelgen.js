@@ -3,7 +3,7 @@
 
 import { RECIPE_BY_ID } from './data/catalog.js';
 import { createRng } from './rng.js';
-import { patienceMs } from './rules.js';
+import { patienceMs, TIER_PACE, tierValue } from './rules.js';
 
 // Ventana de hora pico: los clientes llegan mucho más seguido.
 export function rushWindow(seed, durationMs) {
@@ -16,7 +16,9 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
   if (!Array.isArray(menu) || menu.length === 0) throw new Error('El menú está vacío');
   const rng = createRng(`${seed}:orders`);
   const rush = rushWindow(seed, durationMs);
-  const pace = (mode === 'daily' ? 0.85 : 1) * (1 - 0.06 * tier);
+  const pace = (mode === 'daily' ? 0.85 : 1) * tierValue(TIER_PACE, tier);
+  // Los grupos sólo aparecen en locales con 4 mesas o más.
+  const groups = (stats.slots ?? 3) >= 4;
   const orders = [];
   let t = 1500;
   let prev = null;
@@ -34,10 +36,29 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
       vip,
       look: Math.floor(rng() * 8)
     });
+    let extra = 0;
+    // A veces llega un amigo con él: se sienta al lado y pide otro plato.
+    if (groups && !vip && orders.length >= 2 && rng() < 0.16) {
+      const first = orders[orders.length - 1];
+      const friendId = menu.length > 1 ? menu.filter((id) => id !== recipeId)[Math.floor(rng() * (menu.length - 1))] : recipeId;
+      const friend = RECIPE_BY_ID[friendId];
+      first.group = first.id;
+      orders.push({
+        id: orders.length,
+        recipeId: friendId,
+        arriveAt: first.arriveAt + 400,
+        patienceMs: patienceMs(stats, friend, { tier }),
+        vip: false,
+        look: (first.look + 1 + Math.floor(rng() * 7)) % 8,
+        group: first.id
+      });
+      prev = friendId;
+      extra = 0.6;
+    }
     const progress = t / durationMs;
     const inRush = t >= rush.from && t < rush.to;
     const gap = (8500 - 3500 * progress) * pace * (inRush ? 0.55 : 1) * (0.75 + rng() * 0.5);
-    t += gap + 800 * (recipe.components.length - 2);
+    t += gap * (1 + extra) + 800 * (recipe.components.length - 2);
   }
   return orders;
 }

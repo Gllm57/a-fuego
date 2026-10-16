@@ -6,7 +6,8 @@
 import { RECIPE_BY_ID, PROCESSES } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { generateOrders } from './levelgen.js';
-import { minPrepMs, stationLoadMs, recipeIngredients, stationCount, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS } from './rules.js';
+import { minPrepMs, stationLoadMs, recipeIngredients, stationCount, VIP_PRICE_MULT, EMERGENCY_MAX_UNITS, GROUP_WINDOW_MS, GROUP_BONUS } from './rules.js';
+import { generateEvents } from './levelgen.js';
 
 export const MAX_COMBO_STEPS = 5;
 export const TIP_RATE = 0.3;
@@ -32,14 +33,31 @@ export function ordersForConfig(config) {
   });
 }
 
-// Pago de un plato: precio + propina por rapidez + bono por perfectos, por el combo.
-export function plateEarnings(order, recipe, servedAt, perfects, combo, stats) {
+// Pago de un plato: precio + propina por rapidez + bono por perfectos (+ bono de grupo), por el combo.
+export function plateEarnings(order, recipe, servedAt, perfects, combo, stats, together = false) {
   const price = recipe.price * (order.vip ? VIP_PRICE_MULT : 1);
   const patienceLeft = Math.max(0, 1 - (servedAt - order.arriveAt) / order.patienceMs);
   const tip = price * TIP_RATE * patienceLeft * (1 + stats.tipBonus);
   const perfectBonus = price * 0.05 * perfects;
+  const groupBonus = together ? price * GROUP_BONUS : 0;
   const mult = 1 + 0.1 * Math.min(combo - 1, MAX_COMBO_STEPS);
-  return { price, tip, perfectBonus, mult, earned: Math.round((price + tip + perfectBonus) * mult) };
+  return { price, tip, perfectBonus, groupBonus, mult, earned: Math.round((price + tip + perfectBonus + groupBonus) * mult) };
+}
+
+// Un grupo "comió junto" si sus dos platos salieron con menos de GROUP_WINDOW_MS de diferencia.
+export function groupsTogether(orders, servedAtById) {
+  const byGroup = new Map();
+  for (const o of orders) if (o.group != null) byGroup.set(o.group, [...(byGroup.get(o.group) ?? []), o.id]);
+  const together = new Set();
+  let count = 0;
+  for (const ids of byGroup.values()) {
+    if (ids.length < 2 || !ids.every((id) => servedAtById.has(id))) continue;
+    const times = ids.map((id) => servedAtById.get(id));
+    if (Math.max(...times) - Math.min(...times) > GROUP_WINDOW_MS) continue;
+    ids.forEach((id) => together.add(id));
+    count += 1;
+  }
+  return { together, count };
 }
 
 export function scoreRun(config, submission) {
@@ -136,6 +154,13 @@ export function scoreRun(config, submission) {
     .map((o) => o.arriveAt + o.patienceMs)
     .sort((a, b) => a - b);
 
+  const groups = groupsTogether(orders, servedAtById);
+  // Fuegos apagados (sólo cuentan para logros): no puede haber más que los que hubo.
+  const firesOut = Math.max(0, Math.min(
+    Number.isInteger(submission.firesOut) ? submission.firesOut : 0,
+    generateEvents({ seed: config.seed, durationMs, tier: config.tier ?? 0 }).length
+  ));
+
   let combo = 0;
   let bestCombo = 0;
   let d = 0;
@@ -150,12 +175,12 @@ export function scoreRun(config, submission) {
     bestCombo = Math.max(bestCombo, combo);
     const order = orders[s.orderId];
     const recipe = RECIPE_BY_ID[order.recipeId];
-    const e = plateEarnings(order, recipe, s.servedAt, s.perfects, combo, stats);
+    const e = plateEarnings(order, recipe, s.servedAt, s.perfects, combo, stats, groups.together.has(s.orderId));
     gross += e.earned;
     tips += Math.round(e.tip * e.mult);
     perfectsTotal += s.perfects;
     if (order.vip) vipServed += 1;
-    breakdown.push({ orderId: s.orderId, recipeId: recipe.id, vip: order.vip, base: e.price, tip: Math.round(e.tip), mult: e.mult, earned: e.earned });
+    breakdown.push({ orderId: s.orderId, recipeId: recipe.id, vip: order.vip, together: groups.together.has(s.orderId), base: e.price, tip: Math.round(e.tip), mult: e.mult, earned: e.earned });
   }
 
   const upkeep = config.upkeep ?? 0;
@@ -175,6 +200,9 @@ export function scoreRun(config, submission) {
     vipTotal: orders.filter((o) => o.vip).length,
     bestCombo,
     perfects: perfectsTotal,
+    groupsServed: groups.count,
+    groupsTotal: new Set(orders.filter((o) => o.group != null).map((o) => o.group)).size,
+    firesOut,
     gross,
     tips,
     upkeep,

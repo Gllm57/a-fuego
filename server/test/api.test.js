@@ -63,7 +63,13 @@ test('partida completa: valida, paga, es idempotente y aparece en el ranking', a
   const done = await call('POST', `/api/v1/runs/${runId}/complete`, { token, body: { serves } });
   assert.equal(done.status, 200, JSON.stringify(done.body));
   assert.ok(done.body.result.coins > 0);
-  assert.equal(done.body.profile.state.coins, 200 + done.body.result.coins);
+  // Primer servicio: se cobran los logros cumplidos (al menos «Primer servicio»).
+  const logros = done.body.rewards.achievements;
+  assert.ok(logros.some((x) => x.id === 'primer_servicio'));
+  const premio = logros.reduce((a, x) => a + x.reward, 0);
+  assert.equal(done.body.profile.state.coins, 200 + done.body.result.coins + premio);
+  assert.equal(done.body.profile.state.stats.runs, 1);
+  assert.deepEqual(done.body.profile.state.achievements, logros.map((x) => x.id));
   // La despensa se descontó.
   const used = done.body.result.used;
   for (const [ing, n] of Object.entries(used)) assert.equal(done.body.profile.state.inventory[ing] ?? 0, config.stock[ing] - n);

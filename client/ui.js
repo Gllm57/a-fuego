@@ -40,6 +40,29 @@ export function flyIcon(from, to, svg) {
   setTimeout(() => n.remove(), 480);
 }
 
+// Plato que vuela en arco desde la comanda hasta el cliente.
+export function flyPlate(from, to, html, onLand) {
+  if (!from || !to) { onLand?.(); return; }
+  const a = centerOf(from), b = centerOf(to);
+  const n = document.createElement('div');
+  n.className = 'plate-fly';
+  n.innerHTML = `<span class="plate-fly__dish">${html}</span>`;
+  n.style.left = `${a.x}px`;
+  n.style.top = `${a.y}px`;
+  document.body.appendChild(n);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const lift = Math.min(-60, dy - 70);
+  const anim = n.animate([
+    { transform: 'translate(-50%, -50%) scale(.9) rotate(0deg)', opacity: 1 },
+    { transform: `translate(calc(-50% + ${dx * 0.5}px), calc(-50% + ${lift}px)) scale(1.1) rotate(-8deg)`, opacity: 1, offset: 0.5 },
+    { transform: `translate(calc(-50% + ${dx}px), calc(-50% + ${dy}px)) scale(.55) rotate(6deg)`, opacity: 0.9 }
+  ], { duration: 460, easing: 'cubic-bezier(.4,0,.3,1)' });
+  let done = false;
+  const land = () => { if (done) return; done = true; n.remove(); onLand?.(); };
+  anim.onfinish = land;
+  setTimeout(land, 700);
+}
+
 let toastBox;
 export function toast(message, variant = '') {
   if (!toastBox) {

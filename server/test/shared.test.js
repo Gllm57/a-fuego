@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -227,4 +227,49 @@ test('las mesas extra ya no se venden y se reembolsan', () => {
   assert.equal(UPGRADE_BY_ID.mesas, undefined);
   assert.equal(retiredRefund('mesas', 2), 6500);
   assert.equal(retiredRefund('mesas', 0), 0);
+});
+
+test('grupos: llegan juntos en locales de 4+ mesas y pagan bono si comen a la vez', () => {
+  const s = newPlayerState();
+  s.restaurants = ['taqueria', 'diner'];
+  s.recipes = RECIPES.filter((r) => r.restaurant === 'diner').map((r) => r.id);
+  s.xp = 1e6;
+  s.inventory = { pan: 20, carne_res: 20 };
+  let found = null;
+  for (let i = 0; i < 40 && !found; i++) {
+    const cfg = buildRunConfig(s, { restaurantId: 'diner', randomSeed: `g${i}`, day: '2026-10-16' });
+    const orders = ordersForConfig(cfg);
+    const g = orders.find((o) => o.group != null && o.group !== o.id);
+    if (g) found = { cfg, orders, a: orders[g.group], b: g };
+  }
+  assert.ok(found, 'debería haber algún grupo');
+  assert.equal(found.b.arriveAt - found.a.arriveAt, 400);
+  const taq = buildRunConfig({ ...s, restaurants: ['taqueria'], recipes: newPlayerState().recipes, inventory: newPlayerState().inventory }, { restaurantId: 'taqueria', randomSeed: 'g1', day: '2026-10-16' });
+  assert.ok(ordersForConfig(taq).every((o) => o.group == null), 'la taquería (3 mesas) no tiene grupos');
+
+  const { a, b } = found;
+  const both = new Map([[a.id, 30_000], [b.id, 35_000]]);
+  assert.equal(groupsTogether(found.orders, both).count, 1);
+  const apart = new Map([[a.id, 30_000], [b.id, 30_000 + GROUP_WINDOW_MS + 1]]);
+  assert.equal(groupsTogether(found.orders, apart).count, 0);
+  const rec = RECIPE_BY_ID[a.recipeId];
+  const solo = plateEarnings(a, rec, a.arriveAt + 5000, 0, 1, found.cfg.stats, false).earned;
+  const juntos = plateEarnings(a, rec, a.arriveAt + 5000, 0, 1, found.cfg.stats, true).earned;
+  assert.ok(juntos > solo);
+});
+
+test('el diner es más exigente que la taquería', () => {
+  assert.ok(TIER_PATIENCE[1] <= 0.9);
+  assert.ok(TIER_PACE[1] < 0.94);
+});
+
+test('logros: contadores y cobro una sola vez', () => {
+  const s = newPlayerState();
+  const result = { served: 12, vipServed: 1, firesOut: 2, groupsServed: 1, perfects: 5, stars: 3, missed: 0, bestCombo: 9 };
+  s.stats = addRunToStats(s.stats, result);
+  const ids = pendingAchievements(s).map((x) => x.id);
+  assert.deepEqual(ids.sort(), ['combo_8', 'primer_servicio', 'sin_enojos', 'tres_estrellas'].sort());
+  s.achievements = ids;
+  assert.equal(pendingAchievements(s).length, 0);
+  assert.equal(achievementProgress(s).find((x) => x.id === 'platos_50').value, 12);
 });

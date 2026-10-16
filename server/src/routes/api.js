@@ -132,7 +132,8 @@ export default async function api(app, { service, config }) {
             type: 'object', maxProperties: 40,
             propertyNames: { pattern: '^[a-z_]{2,20}$' },
             additionalProperties: { type: 'integer', minimum: 0, maximum: 999 }
-          }
+          },
+          firesOut: { type: 'integer', minimum: 0, maximum: 20 }
         }
       }
     }

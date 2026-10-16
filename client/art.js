@@ -82,6 +82,8 @@ export const ICONS = {
   fire: `<path d="M12 22c4 0 7-3 7-7 0-5-5-7-4-12-3 1-6 5-6 8-1-1-2-2-2-4-2 2-2 5-2 8 0 4 3 7 7 7z" fill="currentColor" stroke="none"/><path d="M12 22c-2 0-3-1.5-3-3.5S11 15 11 13c2 1 4 3 4 5.5S14 22 12 22z" fill="#FFE066" stroke="none"/>`,
   basket: `<path d="M4 10h16l-2 10H6z"/><path d="M8 10l3-6M16 10l-3-6M9 14v3M12 14v3M15 14v3"/>`,
   crown: `<path d="M3 8l4 4 5-7 5 7 4-4-2 11H5z"/>`,
+  people: `<circle cx="8" cy="8" r="3"/><circle cx="16.5" cy="9" r="2.6"/><path d="M2.5 20c0-3.6 2.5-6 5.5-6s5.5 2.4 5.5 6"/><path d="M13.5 15.2c.9-.8 1.9-1.2 3-1.2 2.6 0 4.5 2.2 4.5 5.5"/>`,
+  medal: `<path d="M8 3l2.5 6M16 3l-2.5 6"/><circle cx="12" cy="15" r="6"/><path d="M12 12l1 2.1 2.3.3-1.7 1.6.4 2.3-2-1.1-2 1.1.4-2.3-1.7-1.6 2.3-.3z"/>`,
   up: `<path d="M12 19V5M6 11l6-6 6 6"/>`,
   down: `<path d="M12 5v14M6 13l6 6 6-6"/>`,
   chart: `<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>`,

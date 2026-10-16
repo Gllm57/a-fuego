@@ -4,11 +4,11 @@
 import {
   RECIPE_BY_ID, PROCESSES, STATIONS, STATION_IDS, INGREDIENTS, ordersForConfig, plateEarnings,
   rushWindow, generateEvents, PERFECT_WINDOW_MS, MAX_COMBO_STEPS, MIN_TAP_MS, FIRE_TAPS,
-  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS
+  EMERGENCY_MAX_UNITS, EMERGENCY_DELAY_MS, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon } from './art.js';
-import { sfx } from './audio.js';
-import { floatText, flyIcon, escapeHtml, fmt } from './ui.js';
+import { sfx, music, vibrate, getPrefs, setPref } from './audio.js';
+import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
 
@@ -44,6 +44,8 @@ export class Kitchen {
     this.serves = [];
     this.combo = 0;
     this.coins = 0;
+    this.firesOut = 0;
+    this.groupSeen = false;
     this.itemSeq = 0;
     this.custEls = new Map();
     this.sig = { order: '', stations: {}, pantry: '' };
@@ -130,6 +132,7 @@ export class Kitchen {
 
   destroy() {
     this.running = false;
+    music.stop();
     cancelAnimationFrame(this.raf);
     document.removeEventListener('visibilitychange', this.onVisibility);
     this.host.innerHTML = '';
@@ -271,6 +274,7 @@ export class Kitchen {
 
   start() {
     this.running = true;
+    music.start(this.restaurant.id);
     this.last = performance.now();
     this.raf = requestAnimationFrame(this.frame);
   }
@@ -278,16 +282,27 @@ export class Kitchen {
   pause() {
     if (!this.running || this.paused) return;
     this.paused = true;
+    music.pause();
+    const prefs = getPrefs();
     const ov = document.createElement('div');
     ov.className = 'overlay';
     ov.innerHTML = `
       <h2>Pausa</h2>
       <p>Los clientes esperan. Si sales, este servicio no cuenta, pero los ingredientes que ya usaste se quedan en tu despensa.</p>
+      <div class="pause-prefs">${[['sound', 'Sonido'], ['music', 'Música'], ['haptics', 'Vibración']].map(([k, label]) =>
+        `<button class="pause-pref" data-pref="${k}" aria-pressed="${prefs[k]}">${label}</button>`).join('')}</div>
       <button class="btn btn--gold btn--xl" data-act="resume">Continuar</button>
       <button class="btn btn--ghost btn--sm" data-act="howto">Cómo se juega</button>
       <button class="btn btn--ghost" data-act="quit">Salir del servicio</button>`;
+    ov.querySelectorAll('[data-pref]').forEach((b) => b.addEventListener('click', () => {
+      const v = b.getAttribute('aria-pressed') !== 'true';
+      b.setAttribute('aria-pressed', String(v));
+      setPref(b.dataset.pref, v);
+      if (b.dataset.pref === 'haptics' && v) vibrate(30);
+      else if (v) sfx.tap();
+    }));
     ov.querySelector('[data-act="resume"]').addEventListener('click', () => {
-      ov.remove(); this.paused = false; this.last = performance.now();
+      ov.remove(); this.paused = false; this.last = performance.now(); music.resume();
     });
     ov.querySelector('[data-act="quit"]').addEventListener('click', () => { this.destroy(); this.onQuit(); });
     ov.querySelector('[data-act="howto"]').addEventListener('click', () => { ov.style.display = 'none'; this.#tutorial(() => { ov.style.display = ''; }); });
@@ -320,9 +335,15 @@ export class Kitchen {
         o.status = 'seated';
         changed = true;
         if (o.vip) this.#ribbon('¡Crítico gastronómico!', 'Paga el doble pero tiene poca paciencia');
+        if (o.group === o.id) {
+          sfx.group();
+          if (!this.groupSeen) this.#ribbon('¡Llegó un grupo!', `Sírvelos casi a la vez: +${Math.round(GROUP_BONUS * 100)}% a los dos`, 'group');
+          this.groupSeen = true;
+        }
       } else if (o.status === 'seated' && t > o.arriveAt + o.patienceMs) {
         o.status = 'left';
         changed = true;
+        if (this.combo >= 3) this.#comboLost();
         this.combo = 0;
         this.#comboUi();
         sfx.angry();
@@ -379,9 +400,11 @@ export class Kitchen {
       this.rushGlow = document.createElement('div');
       this.rushGlow.className = 'rush-glow';
       this.el.root.appendChild(this.rushGlow);
+      music.setRush(true);
     } else if (this.rushState === 'on' && t >= this.rush.to) {
       this.rushState = 'after';
       this.rushGlow?.remove();
+      music.setRush(false);
     }
     for (const st of this.stationKeys) {
       const item = this.stations[st];
@@ -413,12 +436,26 @@ export class Kitchen {
     }
   }
 
+  // Avisos grandes en fila: nunca se enciman dos a la vez.
   #ribbon(title, sub, variant = '') {
+    this.ribbonQueue ??= [];
+    this.ribbonQueue.push({ title, sub, variant });
+    if (!this.ribbonBusy) this.#nextRibbon();
+  }
+
+  #nextRibbon() {
+    const next = this.ribbonQueue.shift();
+    if (!next || !this.el) { this.ribbonBusy = false; return; }
+    this.ribbonBusy = true;
+    this.ribbonEl?.remove();
     const r = document.createElement('div');
-    r.className = `ribbon ${variant ? `ribbon--${variant}` : ''}`;
-    r.innerHTML = `${escapeHtml(title)}${sub ? `<small>${escapeHtml(sub)}</small>` : ''}`;
+    this.ribbonEl = r;
+    r.className = `ribbon ${next.variant ? `ribbon--${next.variant}` : ''}`;
+    r.innerHTML = `${escapeHtml(next.title)}${next.sub ? `<small>${escapeHtml(next.sub)}</small>` : ''}`;
     this.el.root.appendChild(r);
     setTimeout(() => r.remove(), 2300);
+    // Si hay otro esperando, el actual se acorta un poco.
+    setTimeout(() => this.#nextRibbon(), this.ribbonQueue.length ? 1500 : 2300);
   }
 
   #visible() {
@@ -497,16 +534,19 @@ export class Kitchen {
       const pr = box.getBoundingClientRect();
       Object.assign(el.style, { position: 'absolute', left: `${r.left - pr.left}px`, top: `${r.top - pr.top}px`, width: `${r.width}px`, zIndex: 2 });
       el.classList.remove('is-selected');
+      // Al servido se le deja un momento para que reciba el plato antes de irse.
+      if (o.status === 'served') el.style.animationDelay = '.45s';
       el.classList.add(o.status === 'served' ? 'is-served' : 'is-leaving');
-      setTimeout(() => el.remove(), 800);
+      setTimeout(() => el.remove(), o.status === 'served' ? 1300 : 800);
       this.custEls.delete(id);
     }
     box.querySelectorAll('.seat-empty, .queue-badge').forEach((n) => n.remove());
     for (const o of visible) {
       if (this.custEls.has(o.id)) continue;
       const el = document.createElement('button');
-      el.className = `customer ${o.vip ? 'is-vip' : ''}`;
+      el.className = `customer ${o.vip ? 'is-vip' : ''} ${o.group != null ? 'is-group' : ''}`;
       el.dataset.order = o.id;
+      if (o.group != null) el.style.setProperty('--group-hue', String((o.group * 67) % 360));
       el.dataset.mood = 'happy';
       el.setAttribute('aria-label', `${o.vip ? 'Crítico gastronómico' : 'Cliente'} pide ${o.recipe.name}`);
       el.innerHTML = `
@@ -514,7 +554,7 @@ export class Kitchen {
           <span class="bubble__dish">${o.recipe.components.slice(0, 4).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('')}</span>
           <span class="bubble__name">${escapeHtml(o.recipe.name)}</span>
         </span>
-        <span class="avatar" style="--p:100"><span class="avatar__face">${customerSvg(o.look, 'happy', '', o.vip)}</span>${o.vip ? '<span class="vip-tag">VIP</span>' : ''}</span>`;
+        <span class="avatar" style="--p:100"><span class="avatar__face">${customerSvg(o.look, 'happy', '', o.vip)}</span>${o.vip ? '<span class="vip-tag">VIP</span>' : ''}${o.group != null ? `<span class="group-tag" title="Vienen juntos">${icon('people')}</span>` : ''}</span>`;
       el.addEventListener('animationend', (e) => { if (e.animationName === 'customer-in') el.style.animation = 'none'; });
       box.appendChild(el);
       this.custEls.set(o.id, el);
@@ -821,6 +861,7 @@ export class Kitchen {
       sfx.whisk();
       if (fire.taps <= 0) {
         delete this.fires[st];
+        this.firesOut += 1;
         floatText(el, '¡Apagado!', 'good');
         sfx.ready();
       }
@@ -887,28 +928,75 @@ export class Kitchen {
     const servedAt = Math.round(this.t);
     this.serves.push({ orderId: o.id, recipeId: o.recipeId, servedAt, perfects: o.perfects });
     this.combo += 1;
+    o.servedAt = servedAt;
+    // Grupo: si su amigo comió hace poco, los dos cobran el bono.
+    const partner = o.group != null ? this.orders.find((x) => x.group === o.group && x.id !== o.id) : null;
+    const together = Boolean(partner?.servedAt != null && servedAt - partner.servedAt <= GROUP_WINDOW_MS);
     // Estimación en vivo con la misma fórmula que usa el servidor.
-    const { earned } = plateEarnings(o, o.recipe, servedAt, o.perfects, this.combo, this.stats);
-    this.coins += earned;
+    const { earned, mult } = plateEarnings(o, o.recipe, servedAt, o.perfects, this.combo, this.stats, together);
+    const partnerBonus = together ? Math.round(partner.recipe.price * GROUP_BONUS * mult) : 0;
     const el = this.custEls.get(o.id);
-    if (el) floatText(el, `+${earned}`, 'gold big');
-    sfx.serve();
-    setTimeout(() => sfx.coin(), 220);
-    this.el.coinNum.textContent = fmt(this.coins);
-    this.el.coins.classList.remove('is-bump'); void this.el.coins.offsetWidth; this.el.coins.classList.add('is-bump');
+    this.#serveFx(o, el, earned + partnerBonus);
+    if (together) {
+      sfx.together();
+      if (el) setTimeout(() => floatText(el, '¡Comieron juntos!', 'good'), 450);
+    } else if (partner && partner.status === 'seated') {
+      const pel = this.custEls.get(partner.id);
+      if (pel) { pel.classList.add('is-waiting-friend'); floatText(pel, '¡Ahora yo!', ''); }
+    }
     this.#comboUi(true);
     const visible = this.#visible();
     if (this.selected === o.id) this.selected = visible[0]?.id ?? null;
     this.#renderCustomers();
   }
 
+  // Animación al servir: el plato vuela al cliente y las monedas suben al contador.
+  #serveFx(o, el, amount) {
+    const from = this.el.order.querySelector('.order__plate') ?? this.el.order;
+    const dish = o.recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('');
+    sfx.serve();
+    flyPlate(from, el ?? this.el.customers, dish, () => {
+      if (el) {
+        el.classList.add('is-eating');
+        floatText(el, `+${amount}`, 'gold big');
+        for (let i = 0; i < 3; i++) {
+          setTimeout(() => { flyIcon(el, this.el.coins, coinSvg()); }, 90 * i);
+        }
+      }
+      setTimeout(() => {
+        sfx.coin();
+        this.coins += amount;
+        this.el.coinNum.textContent = fmt(this.coins);
+        this.el.coins.classList.remove('is-bump'); void this.el.coins.offsetWidth; this.el.coins.classList.add('is-bump');
+      }, 420);
+    });
+  }
+
   #comboUi(bump = false) {
     const c = this.el.combo;
+    const step = Math.min(this.combo - 1, MAX_COMBO_STEPS);
     c.classList.toggle('is-on', this.combo >= 2);
+    c.classList.toggle('is-max', step >= MAX_COMBO_STEPS);
+    this.el.root.classList.toggle('is-hot', step >= MAX_COMBO_STEPS);
     if (this.combo >= 2) {
-      c.textContent = `Combo ×${(1 + 0.1 * Math.min(this.combo - 1, MAX_COMBO_STEPS)).toFixed(1)}`;
-      if (bump) { c.classList.remove('is-bump'); void c.offsetWidth; c.classList.add('is-bump'); }
+      c.classList.remove('is-broken');
+      c.style.setProperty('--heat', String(step / MAX_COMBO_STEPS));
+      c.innerHTML = `${icon('fire')}<b>×${(1 + 0.1 * step).toFixed(1)}</b><span class="combo__pips">${Array.from({ length: MAX_COMBO_STEPS }, (_, i) => `<i class="${i < step ? 'is-on' : ''}"></i>`).join('')}</span>`;
+      if (bump) {
+        c.classList.remove('is-bump'); void c.offsetWidth; c.classList.add('is-bump');
+        if (step === MAX_COMBO_STEPS && this.combo === MAX_COMBO_STEPS + 1) {
+          this.#ribbon('¡En llamas!', 'Combo máximo ×1.5', 'fire');
+          sfx.comboMax();
+        }
+      }
     }
+  }
+
+  #comboLost() {
+    const c = this.el.combo;
+    floatText(c, 'Combo perdido', 'bad');
+    sfx.comboLost();
+    c.classList.remove('is-broken'); void c.offsetWidth; c.classList.add('is-broken');
   }
 
   #finish() {
@@ -926,7 +1014,9 @@ export class Kitchen {
     ov.innerHTML = `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
     this.el.root.appendChild(ov);
     sfx.count(true);
-    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, estimate: this.coins }), 1100);
+    music.stop();
+    this.el.root.classList.remove('is-hot');
+    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, firesOut: this.firesOut, estimate: this.coins }), 1100);
   }
 }
 

@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -121,8 +121,15 @@ export class GameService {
       upgrades: Object.fromEntries(unlocks.filter((u) => u.kind === 'upgrade').map((u) => [u.item_id, u.level])),
       inventory,
       dailyClaimed: p.daily_claimed,
-      basketClaimed: p.basket_claimed
+      basketClaimed: p.basket_claimed,
+      ...this.#progress(p)
     };
+  }
+
+  #progress(p) {
+    let saved = {};
+    try { saved = JSON.parse(p.progress_json ?? '{}'); } catch { /* vacío */ }
+    return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [] };
   }
 
   profile(playerId) {
@@ -305,10 +312,17 @@ export class GameService {
         }
       }
 
+      // Logros: se suman los contadores del servicio y se cobran los que se cumplieron.
+      const stats = addRunToStats(before.stats, result);
+      const unlocked = pendingAchievements({ ...before, stats });
+      for (const x of unlocked) this.#credit(playerId, x.reward, 'logro', x.id);
+      this.db.run('UPDATE players SET progress_json = ? WHERE id = ?',
+        JSON.stringify({ stats, achievements: [...before.achievements, ...unlocked.map((x) => x.id)] }), playerId);
+
       const after = this.profile(playerId);
       const response = {
         result,
-        rewards: { coins: result.coins, dailyBonus, xp: result.xp },
+        rewards: { coins: result.coins, dailyBonus, xp: result.xp, achievements: unlocked.map(({ id, name, reward }) => ({ id, name, reward })) },
         levelUp: after.level.level > levelBefore ? after.level.level : null,
         profile: after
       };

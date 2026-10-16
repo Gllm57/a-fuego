@@ -16,7 +16,12 @@ usa las propinas para construir tu cadena de restaurantes.
 - **Eventos dentro del servicio:** ¡fuego en la sartén o el horno! (tócalo rápido para
   apagarlo; lo que había se pierde), **hora pico** (llegan clientes sin parar) y
   **críticos gastronómicos** con boina: pagan el doble y tienen poca paciencia.
-- **Combos** hasta ×1.5 si nadie se va enojado.
+- **Combos** hasta ×1.5 si nadie se va enojado: la flama del combo crece con cada plato y al
+  máximo la cocina se enciende («¡En llamas!»). Al servir, el plato vuela al cliente y las monedas al contador.
+- **Grupos de amigos** (desde el Diner, con 4+ mesas): llegan dos juntos; si sus platos salen
+  con menos de 10 s de diferencia, los dos pagan +25 %.
+- **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
+  desde la pausa o el perfil.
 - **40 recetas** en 5 restaurantes (mexicana, americana, italiana, japonesa y peruana).
 
 ### Economía (difícil a propósito)
@@ -43,6 +48,7 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
 | Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, despensa más grande |
 | Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 en la Izakaya y la Cevichería |
+| Logros (12) | Metas cortas con premio: primer servicio, combos, 3 estrellas, fuegos apagados, grupos, críticos… (50 → 2.000) |
 | Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
 
 ### Pantallas
@@ -50,7 +56,7 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 Antes de cada servicio: tutorial ilustrado (la primera vez) y **parte del día** con una línea
 de tiempo de la hora pico, los incendios y los críticos. Inicio (imperio, siguiente meta,
 restaurantes en arco, reto del día) · **Mercado** ·
-Recetario · Mejoras · **Diario de caja** (ganancias y gastos de cada servicio) · Ranking
+Recetario · Mejoras · **Diario de caja** (logros, ganancias y gastos de cada servicio) · Ranking
 semanal · Cocina · Cierre de caja.
 
 ## Arquitectura
@@ -62,6 +68,7 @@ shared/   Reglas del juego (JS puro, sin dependencias). Lo usan servidor y clien
   levelgen.js        Generación determinista de clientes a partir de una semilla
   scoring.js         Validación anti-trampas y cálculo de monedas/estrellas/XP
   economy.js         Compras, niveles, progreso del imperio, reto diario
+  achievements.js    Logros y contadores de juego
 server/   API REST (Fastify + SQLite integrado en Node)
 client/   Juego web para celular (HTML/CSS/JS sin framework ni build)
 ```

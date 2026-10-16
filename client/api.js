@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta
@@ -86,7 +86,7 @@ class HttpApi {
   }
   startRun(restaurantId, mode) { return this.#req('POST', '/runs', { restaurantId, mode }); }
   // Reintenta el envío: el servidor es idempotente para la misma partida.
-  completeRun(runId, serves, waste = {}, emergency = {}) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste, emergency }); }
+  completeRun(runId, serves, waste = {}, emergency = {}, firesOut = 0) { return this.#req('POST', `/runs/${runId}/complete`, { serves, waste, emergency, firesOut }); }
   market() { return this.#req('GET', '/market'); }
   marketBuy(items) {
     const key = `mercado:${crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)}`;
@@ -115,9 +115,20 @@ class LocalApi {
         const data = JSON.parse(raw);
         // Partidas guardadas antes del mercado: se completan los campos nuevos.
         const base = newPlayerState();
+        const legacy = !Array.isArray(data.state.achievements);
         data.state = { ...base, ...data.state, inventory: data.state.inventory ?? base.inventory };
         data.history ??= [];
         data.ledger ??= [];
+        // Partidas guardadas antes de los logros: se reconstruyen los contadores con el diario.
+        data.state.stats = { ...emptyStats(), ...data.state.stats };
+        if (legacy) {
+          for (const h of data.history) {
+            data.state.stats.runs += 1;
+            data.state.stats.served += h.served ?? 0;
+            data.state.stats.vipServed += h.vipServed ?? 0;
+            if (h.stars >= 3) data.state.stats.threeStars += 1;
+          }
+        }
         for (const id of Object.keys(RETIRED_UPGRADES)) {
           const amount = retiredRefund(id, data.state.upgrades?.[id] ?? 0);
           if (data.state.upgrades) delete data.state.upgrades[id];
@@ -172,12 +183,12 @@ class LocalApi {
     }
   }
 
-  async completeRun(runId, serves, waste = {}, emergency = {}) {
+  async completeRun(runId, serves, waste = {}, emergency = {}, firesOut = 0) {
     const run = this.runs.get(runId);
     if (!run) throw new ApiError(404, 'no_encontrado', 'Partida no encontrada');
     if (run.response) return run.response;
     let result;
-    try { result = scoreRun(run.config, { serves, waste, emergency }); }
+    try { result = scoreRun(run.config, { serves, waste, emergency, firesOut }); }
     catch (err) {
       if (err instanceof RunValidationError) throw new ApiError(422, 'partida_rechazada', 'La partida no pasó la validación', { reason: err.reason });
       throw err;
@@ -195,6 +206,13 @@ class LocalApi {
         this.#log(dailyBonus, 'reto_diario');
       }
     }
+    s.stats = addRunToStats(s.stats, result);
+    const unlocked = pendingAchievements(s);
+    for (const x of unlocked) {
+      s.coins += x.reward;
+      s.achievements = [...s.achievements, x.id];
+      this.#log(x.reward, 'logro');
+    }
     const rid = run.config.restaurantId;
     this.data.bests[rid] = Math.max(this.data.bests[rid] ?? 0, result.score);
     this.data.history.unshift({
@@ -205,7 +223,7 @@ class LocalApi {
     this.data.history = this.data.history.slice(0, 30);
     this.#save();
     const profile = this.#profile();
-    run.response = { result, rewards: { coins: result.coins, dailyBonus, xp: result.xp }, levelUp: profile.level.level > levelBefore ? profile.level.level : null, profile };
+    run.response = { result, rewards: { coins: result.coins, dailyBonus, xp: result.xp, achievements: unlocked.map(({ id, name, reward }) => ({ id, name, reward })) }, levelUp: profile.level.level > levelBefore ? profile.level.level : null, profile };
     return run.response;
   }
 

@@ -3,7 +3,7 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress
 } from './shared/index.js';
 import { createApi, ApiError } from './api.js';
 import { Kitchen } from './game.js';
@@ -105,7 +105,7 @@ const PAGES = {
   market: { title: 'Mercado', sub: 'Precios de hoy · cambian cada día' },
   recipes: { title: 'Recetario', sub: '40 recetas de 5 cocinas del mundo' },
   upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
-  diary: { title: 'Diario de caja', sub: 'Ganancias y gastos de tus servicios', back: 'home' },
+  diary: { title: 'Diario de caja', sub: 'Logros, ganancias y gastos de tus servicios', back: 'home' },
   ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' }
 };
 
@@ -251,8 +251,8 @@ function renderHome() {
         </button>
         <button class="tile" data-act="diary">
           <span class="tile__icon">${icon('journal')}</span>
-          <b>Diario de caja</b>
-          <span>Ganancias por servicio</span>
+          <b>Diario y logros</b>
+          <span>${achievementProgress(s).filter((x) => x.done).length}/${ACHIEVEMENTS.length} logros</span>
         </button>
         <button class="tile" data-act="ranking">
           <span class="tile__icon">${icon('trophy')}</span>
@@ -636,13 +636,16 @@ async function renderDiary() {
   let entries = [];
   try { entries = (await app.api.history()).entries; } catch (err) { errorToast(err); return; }
   if (app.tab !== 'diary') return;
+  const medals = achievementsCard(st());
   if (!entries.length) {
-    screen.innerHTML = `<div class="card empty">${icon('journal')}<span>Aún no hay servicios. Cada servicio que cierres aparecerá aquí con sus ganancias y gastos.</span></div>`;
+    screen.innerHTML = `${medals}<div class="card empty">${icon('journal')}<span>Aún no hay servicios. Cada servicio que cierres aparecerá aquí con sus ganancias y gastos.</span></div>`;
+    bindAchievements(screen);
     return;
   }
   const net = entries.reduce((a, e) => a + e.net, 0);
   const avg = entries.reduce((a, e) => a + e.stars, 0) / entries.length;
   screen.innerHTML = `
+    ${medals}
     <div class="summary">
       <div><b>${fmt(net)}</b><span>ganancia</span></div>
       <div><b>${entries.length}</b><span>servicios</span></div>
@@ -663,6 +666,40 @@ async function renderDiary() {
         <div class="ticket__row"><span class="note">Ingredientes usados (pagados en el mercado)</span><b class="note">~${fmt(e.ingredientCost)}</b></div>
       </article>`;
     }).join('')}</div>`;
+  bindAchievements(screen);
+}
+
+// Logros: tarjeta plegable con el progreso de cada uno.
+function achievementsCard(s) {
+  const list = achievementProgress(s);
+  const done = list.filter((x) => x.done).length;
+  const open = app.medalsOpen ?? false;
+  const next = list.filter((x) => !x.done).sort((a, b) => b.value / b.goal - a.value / a.goal)[0];
+  return `<section class="card medals ${open ? 'is-open' : ''}">
+    <button class="medals__head" data-act="medals" aria-expanded="${open}">
+      <span class="medals__icon">${icon('medal')}</span>
+      <span style="flex:1;min-width:0;text-align:left"><b>Logros ${done}/${list.length}</b>
+        <small>${next ? `Siguiente: ${escapeHtml(next.name)} · ${fmt(next.value)}/${fmt(next.goal)}` : '¡Los tienes todos!'}</small></span>
+      <span class="medals__chev">${icon('down')}</span>
+    </button>
+    <div class="medals__list">${list.map((x) => `
+      <div class="ach-row ${x.done ? 'is-done' : ''}">
+        <span class="ach-row__badge">${x.done ? icon('check') : icon('medal')}</span>
+        <div class="ach-row__body"><b>${escapeHtml(x.name)}</b><small>${escapeHtml(x.desc)}</small>
+          ${x.done ? '' : `<div class="progress"><div class="progress__fill" style="width:${Math.round(x.value / x.goal * 100)}%"></div></div>`}</div>
+        <span class="ach-row__reward">${x.done ? 'Cobrado' : `${coinSvg()} ${fmt(x.reward)}`}</span>
+      </div>`).join('')}</div>
+  </section>`;
+}
+
+function bindAchievements(screen) {
+  screen.querySelector('[data-act="medals"]')?.addEventListener('click', (e) => {
+    app.medalsOpen = !app.medalsOpen;
+    const card = e.currentTarget.closest('.medals');
+    card.classList.toggle('is-open', app.medalsOpen);
+    e.currentTarget.setAttribute('aria-expanded', String(app.medalsOpen));
+    sfx.tap();
+  });
 }
 
 // ── Ranking ─────────────────────────────────────────────────
@@ -714,6 +751,7 @@ function openProfile() {
     </div>
     <div class="card">
       <div class="switch-row"><span>Sonido</span><button class="switch" role="switch" data-pref="sound" aria-checked="${prefs.sound}" aria-label="Sonido"></button></div>
+      <div class="switch-row"><span>Música en el servicio</span><button class="switch" role="switch" data-pref="music" aria-checked="${prefs.music}" aria-label="Música"></button></div>
       <div class="switch-row"><span>Vibración</span><button class="switch" role="switch" data-pref="haptics" aria-checked="${prefs.haptics}" aria-label="Vibración"></button></div>
     </div>
     <button class="btn btn--ghost btn--wide" data-act="ledger">${icon('refresh')} Historial de monedas</button>
@@ -776,7 +814,7 @@ function accountSection(p) {
 
 const REASONS = {
   bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', reto_diario: 'Reto del día', mercado: 'Mercado',
-  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra'
+  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro'
 };
 
 async function openLedger() {
@@ -829,7 +867,7 @@ async function play(restaurantId, mode) {
 
 async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   try {
-    const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste, outcome.emergency);
+    const res = await app.api.completeRun(run.runId, outcome.serves, outcome.waste, outcome.emergency, outcome.firesOut);
     kitchen.destroy();
     app.market = null;
     showResults(host, run, res);
@@ -858,6 +896,7 @@ function showResults(host, run, res) {
   const quote = REVIEWS[result.stars][Math.floor(Math.random() * 2)];
   const goal = profile.nextGoal;
   const wasted = Object.values(result.waste ?? {}).reduce((a, n) => a + n, 0);
+  const achievementCoins = (rewards.achievements ?? []).reduce((a, x) => a + x.reward, 0);
   host.innerHTML = `
     <div class="game"><div class="game__inner" style="display:flex">
       <div class="results">
@@ -867,18 +906,21 @@ function showResults(host, run, res) {
         <div class="results__coins">${coinSvg()}<span data-count>0</span></div>
         <div class="results__label">GANANCIA NETA</div>
         ${rewards.dailyBonus ? `<div class="bonus-line">${icon('sparkle')} Reto del día: +${fmt(rewards.dailyBonus)}</div>` : ''}
+        ${(rewards.achievements ?? []).map((x, i) => `<div class="achievement-pop" style="animation-delay:${0.6 + i * 0.35}s">${icon('medal')}<span><small>¡Logro desbloqueado!</small>${escapeHtml(x.name)}</span><b>+${fmt(x.reward)}</b></div>`).join('')}
         <div class="bubbles">
           <div><b>${result.served}/${result.totalOrders}</b><span>clientes</span></div>
           <div><b>${result.vipServed}/${result.vipTotal}</b><span>críticos</span></div>
           <div><b>×${result.bestCombo}</b><span>combo</span></div>
           <div><b>${result.perfects}</b><span>perfectos</span></div>
+          ${result.groupsTotal ? `<div><b>${result.groupsServed}/${result.groupsTotal}</b><span>grupos</span></div>` : ''}
         </div>
         <div class="ticket">
           <div class="ticket__row"><span>Ventas y propinas</span><b class="pos">+${fmt(result.gross)}</b></div>
           <div class="ticket__row"><span>Gastos del local</span><b class="neg">−${fmt(result.upkeep)}</b></div>
           ${result.emergencyCost ? `<div class="ticket__row"><span>Pedidos urgentes</span><b class="neg">−${fmt(result.emergencyCost)}</b></div>` : ''}
           ${rewards.dailyBonus ? `<div class="ticket__row"><span>Bono reto del día</span><b class="pos">+${fmt(rewards.dailyBonus)}</b></div>` : ''}
-          <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(result.coins + rewards.dailyBonus)}</b></div>
+          ${achievementCoins ? `<div class="ticket__row"><span>Premios por logros</span><b class="pos">+${fmt(achievementCoins)}</b></div>` : ''}
+          <div class="ticket__row is-total"><span>Ganancia</span><b>${fmt(result.coins + rewards.dailyBonus + achievementCoins)}</b></div>
           <div class="ticket__row"><span class="note">Ingredientes usados${wasted ? `, ${wasted} desperdiciados` : ''} (ya pagados en el mercado)</span><b class="note">~${fmt(result.ingredientCost)}</b></div>
         </div>
         ${levelUp ? `<div class="levelup">${starSvg('')} ¡Subiste a nivel ${levelUp}! Hay recetas y locales nuevos.</div>` : ''}
@@ -891,9 +933,10 @@ function showResults(host, run, res) {
         </div>
       </div>
     </div></div>`;
-  countUp(host.querySelector('[data-count]'), rewards.coins + rewards.dailyBonus, { ms: 1400 });
+  countUp(host.querySelector('[data-count]'), rewards.coins + rewards.dailyBonus + achievementCoins, { ms: 1400 });
+  (rewards.achievements ?? []).forEach((_, i) => setTimeout(() => sfx.logro(), 600 + i * 350));
   for (let i = 0; i < result.stars; i++) setTimeout(() => sfx.star(i), 350 * i + 100);
-  if (result.stars === 3 || levelUp) confetti(host.querySelector('.results'), [rest.theme.primary, '#FFC23D', '#fff']);
+  if (result.stars === 3 || levelUp || achievementCoins) confetti(host.querySelector('.results'), [rest.theme.primary, '#FFC23D', '#fff']);
   const close = (tab) => { host.remove(); applyTheme(app.restaurantId); go(tab); };
   host.querySelector('[data-act="again"]').addEventListener('click', () => { host.remove(); play(run.config.restaurantId, 'normal'); });
   host.querySelector('[data-act="market"]').addEventListener('click', () => close('market'));

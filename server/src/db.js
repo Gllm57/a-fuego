@@ -80,6 +80,10 @@ const MIGRATIONS = [
     PRIMARY KEY (player_id, ingredient_id)
   );
   ALTER TABLE players ADD COLUMN basket_claimed TEXT;
+  `,
+  // 3: contadores de juego y logros cobrados ({ stats, achievements })
+  `
+  ALTER TABLE players ADD COLUMN progress_json TEXT NOT NULL DEFAULT '{}';
   `
 ];
 

@@ -19,6 +19,14 @@ export const VIP_PRICE_MULT = 2;
 export const VIP_PATIENCE_MULT = 0.7;
 // Toques necesarios para apagar un fuego en una estación.
 export const FIRE_TAPS = 6;
+// Dificultad por restaurante (0 = taquería … 4 = cevichería): paciencia de los
+// clientes y ritmo de llegada. El diner ya se nota más exigente que la taquería.
+export const TIER_PATIENCE = Object.freeze([1, 0.88, 0.82, 0.76, 0.68]);
+export const TIER_PACE = Object.freeze([1, 0.91, 0.87, 0.82, 0.76]);
+// Grupos: dos amigos que llegan juntos y quieren comer a la vez.
+export const GROUP_WINDOW_MS = 10_000;
+export const GROUP_BONUS = 0.25;
+export const tierValue = (table, tier) => table[Math.max(0, Math.min(table.length - 1, tier | 0))];
 
 export function upgradeLevel(upgrades, id) {
   const lvl = Number(upgrades?.[id] ?? 0);
@@ -93,7 +101,7 @@ export function minPrepMs(stats, recipeId) {
 
 export function patienceMs(stats, recipe, { vip = false, tier = 0 } = {}) {
   const timed = recipe.components.filter((c) => PROCESSES[c.process].kind !== 'raw').length;
-  const base = (18_000 + 5_500 * recipe.components.length + 2_000 * timed) * (1 - 0.08 * tier);
+  const base = (18_000 + 5_500 * recipe.components.length + 2_000 * timed) * tierValue(TIER_PATIENCE, tier);
   return Math.round(base * stats.patienceMult * (vip ? VIP_PATIENCE_MULT : 1));
 }
 

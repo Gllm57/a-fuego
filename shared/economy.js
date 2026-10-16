@@ -12,6 +12,7 @@ import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE
 import { INGREDIENTS } from './data/ingredients.js';
 import { hashString } from './rng.js';
 import { upgradeLevel, storageCapacity } from './rules.js';
+import { emptyStats } from './achievements.js';
 
 export const STARTING_COINS = 200;
 
@@ -47,7 +48,9 @@ export function newPlayerState() {
     upgrades: {},
     inventory: { tortilla: 14, carne_res: 9, cebolla: 9, queso: 8 },
     dailyClaimed: null,
-    basketClaimed: null
+    basketClaimed: null,
+    stats: emptyStats(),
+    achievements: []
   };
 }
 
