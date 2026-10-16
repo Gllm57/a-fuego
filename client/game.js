@@ -248,7 +248,8 @@ export class Kitchen {
     const pct = (ms) => `${((ms / dur) * 100).toFixed(1)}%`;
     const units = Object.values(this.stock).reduce((a, n) => a + n, 0);
     const vips = this.orders.filter((o) => o.vip);
-    // Cuánto cuesta abrir hoy.
+    // Cuánto cuesta abrir hoy y cuántos grupos vienen.
+    const groupCount = new Set(this.orders.filter((o) => o.group != null).map((o) => o.group)).size;
     const cost = (this.config.upkeep ?? 0) + (this.config.salary ?? 0);
     const costText = this.helper ? `${fmt(this.config.upkeep ?? 0)} del local + ${fmt(this.config.salary ?? 0)} del sueldo de ${this.helper.name}` : 'gastos del local';
     ov.innerHTML = `
@@ -272,6 +273,7 @@ export class Kitchen {
         ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy en ${this.helper.stations.length ? this.#stName(this.helper.stations[0]).toLowerCase() : 'la barra'} (${rankName(this.helper, this.helper.rank).toLowerCase()})</span></div>` : ''}
         <ul class="brief__rules">
           <li>${icon('heart')}<span><b>${SERVICE_LIVES} vidas.</b> Cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina.</span></li>
+          ${groupCount ? `<li>${icon('people')}<span><b>${groupCount} ${groupCount > 1 ? 'grupos' : 'grupo'} de amigos.</b> Llegan juntos; si les sirves a todos con menos de ${GROUP_WINDOW_MS / 1000} s de diferencia, cada uno paga +${Math.round(GROUP_BONUS * 100)} %.</span></li>` : ''}
           <li>${coinSvg()}<span><b>Al cerrar pagas ${fmt(cost)}</b> (${costText}). Si vendes menos, pierdes la diferencia.</span></li>
         </ul>
         <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
@@ -369,7 +371,7 @@ export class Kitchen {
         if (o.vip) this.#ribbon('¡Crítico gastronómico!', 'Paga el doble pero tiene poca paciencia');
         if (o.group === o.id) {
           sfx.group();
-          if (!this.groupSeen) this.#ribbon('¡Llegó un grupo!', `Sírvelos casi a la vez: +${Math.round(GROUP_BONUS * 100)}% a los dos`, 'group');
+          if (!this.groupSeen) this.#ribbon('¡Llegó un grupo!', `Sírvelos casi a la vez: +${Math.round(GROUP_BONUS * 100)}% a cada uno`, 'group');
           this.groupSeen = true;
         }
       } else if (o.status === 'seated' && t > o.arriveAt + o.patienceMs) {
@@ -1016,19 +1018,24 @@ export class Kitchen {
     this.combo += 1;
     o.servedAt = servedAt;
     // Grupo: si su amigo comió hace poco, los dos cobran el bono.
-    const partner = o.group != null ? this.orders.find((x) => x.group === o.group && x.id !== o.id) : null;
-    const together = Boolean(partner?.servedAt != null && servedAt - partner.servedAt <= GROUP_WINDOW_MS);
+    // Grupo: si todos sus amigos ya comieron hace poco, todos cobran el bono.
+    const mates = o.group != null ? this.orders.filter((x) => x.group === o.group && x.id !== o.id) : [];
+    const times = [servedAt, ...mates.map((m) => m.servedAt)];
+    const together = mates.length > 0 && mates.every((m) => m.servedAt != null) && Math.max(...times) - Math.min(...times) <= GROUP_WINDOW_MS;
     // Estimación en vivo con la misma fórmula que usa el servidor.
     const { earned, mult } = plateEarnings(o, o.recipe, servedAt, o.perfects, this.combo, this.stats, together);
-    const partnerBonus = together ? Math.round(partner.recipe.price * GROUP_BONUS * mult) : 0;
+    const partnerBonus = together ? mates.reduce((a, m) => a + Math.round(m.recipe.price * GROUP_BONUS * mult), 0) : 0;
     const el = this.custEls.get(o.id);
     this.#serveFx(o, el, earned + partnerBonus);
     if (together) {
       sfx.together();
       if (el) setTimeout(() => floatText(el, '¡Comieron juntos!', 'good'), 450);
-    } else if (partner && partner.status === 'seated') {
-      const pel = this.custEls.get(partner.id);
-      if (pel) { pel.classList.add('is-waiting-friend'); floatText(pel, '¡Ahora yo!', ''); }
+    } else {
+      for (const m of mates) {
+        if (m.status !== 'seated') continue;
+        const pel = this.custEls.get(m.id);
+        if (pel) { pel.classList.add('is-waiting-friend'); floatText(pel, '¡Ahora yo!', ''); }
+      }
     }
     this.#comboUi(true);
     const visible = this.#visible();

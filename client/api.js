@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, sanitizeStaff, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta, UPGRADES, RESTAURANTS, RECIPES, STAFF, xpForLevel
@@ -164,6 +164,8 @@ class LocalApi {
             if (h.stars >= 3) data.state.stats.threeStars += 1;
           }
         }
+        // Un ayudante contratado antes de abrir su restaurante (versión anterior) deja de trabajar.
+        data.state = sanitizeStaff(data.state);
         for (const id of Object.keys(RETIRED_UPGRADES)) {
           const amount = retiredRefund(id, data.state.upgrades?.[id] ?? 0);
           if (data.state.upgrades) delete data.state.upgrades[id];

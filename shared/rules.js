@@ -29,6 +29,9 @@ export const SERVICE_LIVES = 3;
 export const CLOSE_GRACE_MS = 400;
 // Grupos: dos amigos que llegan juntos y quieren comer a la vez.
 export const GROUP_WINDOW_MS = 10_000;
+// Probabilidad de que llegue un grupo, según el restaurante: ninguno en los dos primeros
+// locales; desde el diner aparecen parejas y con 5 mesas también grupos de tres.
+export const TIER_GROUP_CHANCE = Object.freeze([0, 0, 0.14, 0.17, 0.2, 0.22]);
 export const GROUP_BONUS = 0.25;
 export const tierValue = (table, tier) => table[Math.max(0, Math.min(table.length - 1, tier | 0))];
 

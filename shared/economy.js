@@ -77,10 +77,23 @@ export function evaluateHire(state, id) {
   return { ok: true, price: member.hireCost };
 }
 
+// Sólo cuentan los ayudantes cuyo restaurante ya abriste (partidas viejas podían tener
+// contratado a alguien antes de tiempo).
+export function staffAllowed(state, id) {
+  const m = STAFF_BY_ID[id];
+  return Boolean(m && state.restaurants?.includes(m.reqRestaurant));
+}
+
 export function staffOwned(state) {
   const owned = new Set(state.staff?.owned ?? []);
   if (state.staff?.hired) owned.add(state.staff.hired);
-  return [...owned];
+  return [...owned].filter((id) => staffAllowed(state, id));
+}
+
+export function sanitizeStaff(state) {
+  const staff = state.staff ?? { hired: null, owned: [], exp: {} };
+  const hired = staffAllowed(state, staff.hired) ? staff.hired : null;
+  return { ...state, staff: { ...staff, hired, owned: staffOwned({ ...state, staff }) } };
 }
 
 export function applyHire(state, id, price = 0) {

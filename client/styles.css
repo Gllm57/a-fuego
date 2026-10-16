@@ -281,16 +281,21 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .helpers__head h2 { font-size: 18px; }
 .helpers__head span { font-size: 12px; font-weight: 800; color: var(--ink-2); }
 .helpers__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.helper { border: 0; background: var(--ground); border-radius: 22px; padding: 10px 6px 8px; display: flex; flex-direction: column; align-items: center; gap: 3px; font: inherit; color: inherit; cursor: pointer; box-shadow: inset 0 0 0 3px transparent; min-height: 44px; }
-.helper.is-hired { box-shadow: inset 0 0 0 3px var(--brand); background: var(--brand-soft); }
+.helper { border: 0; background: none; border-radius: 22px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font: inherit; color: inherit; cursor: pointer; min-height: 44px; -webkit-tap-highlight-color: transparent; }
+.helper:focus { outline: none; }
+.helper:focus-visible .staff-face { outline: 3px solid var(--brand); outline-offset: 3px; }
+/* Contratado: un anillo alrededor de la cara (sin marco cuadrado) y la etiqueta en verde. */
+.helper.is-hired .staff-face { box-shadow: 0 0 0 4px var(--paper), 0 0 0 7px var(--good); }
+.helper.is-hired small { background: #DDF2E8; color: #0F5A3C; border-radius: 999px; padding: 2px 8px; }
 .helper b { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
 .helper small { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
 .helper small svg { width: 12px; height: 12px; color: var(--good); }
-.helper .staff-face { position: relative; overflow: visible; }
+.helper .staff-face { position: relative; overflow: visible; width: 64px; height: 64px; border-radius: 50%; transition: box-shadow .2s; }
 .helper .staff-face > svg { border-radius: 50%; }
 .helper.is-locked .staff-face > svg:first-child { filter: grayscale(1) opacity(.55); }
-.helper__lock { position: absolute; right: -4px; bottom: -4px; width: 22px; height: 22px; border-radius: 50%; background: var(--night); color: #fff; display: grid; place-items: center; }
-.helper__lock svg { width: 13px; height: 13px; }
+/* Bloqueado: candado centrado sobre la cara en gris. */
+.helper__lock { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 34px; height: 34px; border-radius: 50%; background: rgba(42,23,13,.82); color: #fff; display: grid; place-items: center; box-shadow: 0 0 0 3px rgba(255,253,246,.9); }
+.helper__lock svg { width: 18px; height: 18px; }
 .staff-lock { display: flex; align-items: center; justify-content: center; gap: 6px; padding: 12px; border-radius: 999px; background: var(--line); font-weight: 800; font-size: 14px; color: var(--ink-2); }
 .staff-lock svg { width: 18px; height: 18px; }
 .tile--wide { grid-column: 1 / -1; }

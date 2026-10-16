@@ -3,7 +3,7 @@
 
 import { RECIPE_BY_ID } from './data/catalog.js';
 import { createRng } from './rng.js';
-import { patienceMs, TIER_PACE, tierValue } from './rules.js';
+import { patienceMs, TIER_PACE, TIER_GROUP_CHANCE, tierValue } from './rules.js';
 
 // Ventana de hora pico: los clientes llegan mucho más seguido.
 export function rushWindow(seed, durationMs) {
@@ -17,8 +17,9 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
   const rng = createRng(`${seed}:orders`);
   const rush = rushWindow(seed, durationMs);
   const pace = (mode === 'daily' ? 0.85 : 1) * tierValue(TIER_PACE, tier);
-  // Los grupos sólo aparecen en locales con 4 mesas o más.
-  const groups = (stats.slots ?? 3) >= 4;
+  // Los grupos aparecen cuando sube la dificultad (y hay mesas para sentarlos).
+  const slots = stats.slots ?? 3;
+  const groupChance = slots >= 4 ? tierValue(TIER_GROUP_CHANCE, tier) : 0;
   const orders = [];
   let t = 1500;
   let prev = null;
@@ -37,23 +38,27 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
       look: Math.floor(rng() * 8)
     });
     let extra = 0;
-    // A veces llega un amigo con él: se sienta al lado y pide otro plato.
-    if (groups && !vip && orders.length >= 2 && rng() < 0.16) {
+    // A veces llegan amigos con él: se sientan al lado y cada uno pide otro plato.
+    if (groupChance > 0 && !vip && orders.length >= 2 && rng() < groupChance) {
       const first = orders[orders.length - 1];
-      const friendId = menu.length > 1 ? menu.filter((id) => id !== recipeId)[Math.floor(rng() * (menu.length - 1))] : recipeId;
-      const friend = RECIPE_BY_ID[friendId];
+      const friends = slots >= 5 && tier >= 4 && rng() < 0.4 ? 2 : 1;
       first.group = first.id;
-      orders.push({
-        id: orders.length,
-        recipeId: friendId,
-        arriveAt: first.arriveAt + 400,
-        patienceMs: patienceMs(stats, friend, { tier }),
-        vip: false,
-        look: (first.look + 1 + Math.floor(rng() * 7)) % 8,
-        group: first.id
-      });
-      prev = friendId;
-      extra = 0.6;
+      for (let k = 1; k <= friends; k++) {
+        const pool = menu.length > 1 ? menu.filter((id) => id !== prev) : menu;
+        const friendId = pool[Math.floor(rng() * pool.length)];
+        const friend = RECIPE_BY_ID[friendId];
+        orders.push({
+          id: orders.length,
+          recipeId: friendId,
+          arriveAt: first.arriveAt + 400 * k,
+          patienceMs: patienceMs(stats, friend, { tier }),
+          vip: false,
+          look: (first.look + k * 3 + Math.floor(rng() * 2)) % 8,
+          group: first.id
+        });
+        prev = friendId;
+      }
+      extra = 0.6 * friends;
     }
     const progress = t / durationMs;
     const inRush = t >= rush.from && t < rush.to;

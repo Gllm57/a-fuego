@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, STAFF_BY_ID, sanitizeStaff, recipesOf, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -129,7 +129,7 @@ export class GameService {
     const inventory = Object.fromEntries(
       this.db.all('SELECT ingredient_id, qty FROM inventory WHERE player_id = ? AND qty > 0', playerId).map((r) => [r.ingredient_id, r.qty])
     );
-    return {
+    return sanitizeStaff({
       coins: p.coins,
       xp: p.xp,
       restaurants: unlocks.filter((u) => u.kind === 'restaurant').map((u) => u.item_id).sort((a, b) => order.get(a) - order.get(b)),
@@ -139,7 +139,7 @@ export class GameService {
       dailyClaimed: p.daily_claimed,
       basketClaimed: p.basket_claimed,
       ...this.#progress(p)
-    };
+    });
   }
 
   #progress(p) {

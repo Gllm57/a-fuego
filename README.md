@@ -19,8 +19,9 @@ usa las propinas para construir tu cadena de restaurantes.
 - **Cómo se pierde:** cada servicio tiene **3 vidas**; cada cliente que se va enojado quita una (un crítico, dos) y sin vidas **cierran la cocina** antes de tiempo (0 estrellas). Además, al cerrar siempre pagas los gastos del local y el sueldo del ayudante: si vendes menos, el servicio da **pérdidas** (la caja nunca baja de 0).
 - **Combos** hasta ×1.5 si nadie se va enojado: la flama del combo crece con cada plato y al
   máximo la cocina se enciende («¡En llamas!»). Al servir, el plato vuela al cliente y las monedas al contador.
-- **Grupos de amigos** (desde el Diner, con 4+ mesas): llegan dos juntos; si sus platos salen
-  con menos de 10 s de diferencia, los dos pagan +25 %.
+- **Grupos de amigos** (aparecen cuando sube la dificultad: desde el Diner llegan parejas y en la Izakaya
+  y la Cevichería también grupos de tres): si todos sus platos salen con menos de 10 s de diferencia,
+  cada uno paga +25 %.
 - **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
   desde la pausa o el perfil.
 - **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.

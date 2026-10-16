@@ -53,12 +53,12 @@ const r = (id, name, restaurant, comps, price, learnCost, reqLevel) => ({
 export const RECIPES = Object.freeze([
   // ── Venezolana ─────────────────────────────────────────────
   r('arepa_queso',  'Arepa de queso',    'arepera', [['harina_maiz','freir'],['queso','crudo']], 30, 0, 1),
-  r('empanada',     'Empanada de carne', 'arepera', [['harina_maiz','freir'],['carne_res','cortar']], 35, 0, 1),
+  r('empanada',     'Empanada de carne', 'arepera', [['harina_maiz','freir'],['carne_res','hervir']], 35, 0, 1),
   r('tequenos',     'Tequeños',          'arepera', [['queso','cortar'],['harina','freir']], 40, 200, 2),
   r('reina_pepiada','Reina pepiada',     'arepera', [['harina_maiz','freir'],['pollo','hervir'],['aguacate','batir']], 50, 350, 2),
   r('cachapa',      'Cachapa con cochino','arepera', [['maiz','batir'],['queso','crudo'],['cerdo','freir']], 55, 500, 3),
-  r('patacon',      'Patacón zuliano',   'arepera', [['platano','freir'],['carne_res','cortar'],['queso','crudo'],['lechuga','cortar']], 65, 800, 4),
-  r('pabellon',     'Pabellón criollo',  'arepera', [['arroz','hervir'],['caraota','hervir'],['carne_res','cortar'],['platano','freir']], 75, 1100, 5),
+  r('patacon',      'Patacón zuliano',   'arepera', [['platano','freir'],['carne_res','hornear'],['queso','crudo'],['lechuga','cortar']], 65, 800, 4),
+  r('pabellon',     'Pabellón criollo',  'arepera', [['arroz','hervir'],['caraota','hervir'],['carne_res','freir'],['platano','freir']], 75, 1100, 5),
   r('hallaca',      'Hallaca',           'arepera', [['harina_maiz','batir'],['cerdo','hervir'],['aceituna','crudo'],['hoja_platano','cortar']], 90, 1600, 6),
 
   // ── Mexicana ───────────────────────────────────────────────

@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -328,4 +328,34 @@ test('asistentes: uno por restaurante, contrato, sueldo por servicio y rangos', 
   const exp = addStaffExp(hired.staff, 'luis');
   assert.equal(exp.exp.luis, 1);
   assert.equal(applyHire(hired, null).staff.hired, null);
+});
+
+test('grupos: no hay en los primeros locales; con 5 mesas también llegan de a tres', () => {
+  const rich = { ...newPlayerState(), xp: 1e6, restaurants: RESTAURANTS.map((r) => r.id), recipes: RECIPES.map((r) => r.id), inventory: { carne_res: 50, papa: 50, tomate: 50, arroz: 50, cebolla: 50, tortilla: 50, queso: 50 } };
+  const sizes = (rid) => {
+    const out = new Map();
+    for (let i = 0; i < 30; i++) {
+      const os = ordersForConfig(buildRunConfig(rich, { restaurantId: rid, randomSeed: `t${i}`, day: '2026-10-16' }));
+      for (const o of os) if (o.group != null) out.set(`${i}:${o.group}`, (out.get(`${i}:${o.group}`) ?? 0) + 1);
+    }
+    return [...out.values()];
+  };
+  assert.equal(sizes('taqueria').length, 0);
+  assert.ok(sizes('diner').every((n) => n === 2));
+  assert.ok(sizes('cevicheria').some((n) => n === 3));
+});
+
+test('la carne de la arepera siempre se cocina', () => {
+  for (const r of RECIPES.filter((x) => x.restaurant === 'arepera')) {
+    for (const c of r.components) if (c.ingredient === 'carne_res') assert.notEqual(c.process, 'cortar', r.id);
+  }
+});
+
+test('un ayudante contratado antes de abrir su restaurante no trabaja', () => {
+  const s = { ...stocked(), staff: { hired: 'luis', owned: ['luis'], exp: {} } };
+  assert.equal(cfgFor(s).staff, null);
+  assert.equal(sanitizeStaff(s).staff.hired, null);
+  assert.deepEqual(sanitizeStaff(s).staff.owned, []);
+  assert.equal(evaluateHire(s, 'luis').reason, 'ya_comprado');
+  assert.equal(evaluateHire(sanitizeStaff(s), 'luis').reason, 'personal_bloqueado');
 });
