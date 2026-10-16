@@ -24,20 +24,37 @@ export function floatText(el, text, variant = '') {
   setTimeout(() => n.remove(), 1000);
 }
 
-export function flyIcon(from, to, svg) {
-  if (!from || !to) return;
+// Un ingrediente (o moneda) que vuela en arco suave hasta su destino. Devuelve cuánto
+// tarda en llegar, para que el destino lo reciba justo al aterrizar.
+export function flyIcon(from, to, svg, onLand) {
+  if (!from || !to) { onLand?.(); return 0; }
   const a = centerOf(from), b = centerOf(to);
+  const dx = b.x - a.x, dy = b.y - a.y;
+  const dist = Math.hypot(dx, dy);
+  const duration = Math.round(Math.min(540, 280 + dist * 0.42));
+  // Cumbre del arco: un poco por encima del punto más alto del recorrido.
+  const peak = Math.min(0, dy) - Math.min(64, 24 + dist * 0.12);
+  const at = 0.5 - 0.22 * Math.sign(dy) * Math.min(1, Math.abs(dy) / 140);
   const n = document.createElement('div');
   n.className = 'flyer';
-  n.innerHTML = svg;
+  n.innerHTML = `<span class="flyer__y"><span class="flyer__icon">${svg}</span></span>`;
   n.style.left = `${a.x - 16}px`;
   n.style.top = `${a.y - 16}px`;
   document.body.appendChild(n);
-  requestAnimationFrame(() => {
-    n.style.transform = `translate(${b.x - a.x}px, ${b.y - a.y}px) scale(.7)`;
-    n.style.opacity = '0.2';
-  });
-  setTimeout(() => n.remove(), 480);
+  // El avance horizontal y la subida/bajada van por separado: así la curva es continua.
+  n.animate([{ transform: 'translateX(0)' }, { transform: `translateX(${dx}px)` }], { duration, easing: 'cubic-bezier(.3,0,.5,1)', fill: 'forwards' });
+  n.firstChild.animate([
+    { transform: 'translateY(0)', easing: 'cubic-bezier(.2,.6,.4,1)' },
+    { transform: `translateY(${peak}px)`, offset: at, easing: 'cubic-bezier(.6,0,.8,.4)' },
+    { transform: `translateY(${dy}px)` }
+  ], { duration, fill: 'forwards' });
+  n.firstChild.firstChild.animate([
+    { transform: 'scale(.85) rotate(0deg)' },
+    { transform: 'scale(1.18) rotate(-10deg)', offset: at },
+    { transform: 'scale(.7) rotate(6deg)' }
+  ], { duration, easing: 'ease-in-out', fill: 'forwards' });
+  setTimeout(() => { n.remove(); onLand?.(); }, duration);
+  return duration;
 }
 
 // Plato que vuela en arco desde la comanda hasta el cliente.

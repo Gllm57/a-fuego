@@ -28,11 +28,13 @@ const ART = {
   plantas_r: `<svg viewBox="0 0 44 56"><ellipse cx="22" cy="54.5" rx="13" ry="2" fill="#3B2416" opacity=".15"/><g class="plant-leaves"><path d="M14 30h-3a3 3 0 0 1-3-3v-7a2.6 2.6 0 0 1 5.2 0v5H17" fill="#4FA35B" ${K}/><path d="M30 26h3a3 3 0 0 0 3-3v-9a2.6 2.6 0 0 0-5.2 0v7H27" fill="#4FA35B" ${K}/><rect x="16" y="9" width="12" height="27" rx="6" fill="#5DB560" ${K}/><path d="M22 13v20M19 15v16M25 15v16" stroke="#3E8E4A" stroke-width="1"/><g fill="#E2577B" ${K}><circle cx="19.5" cy="8" r="2.6"/><circle cx="24.5" cy="8" r="2.6"/><circle cx="22" cy="5" r="2.6"/></g><circle cx="22" cy="7.3" r="1.6" fill="#F2C200"/></g><path d="M11 37h22l-3 17H14z" fill="#1C4E9C" ${K}/><rect x="8.5" y="32.5" width="27" height="6" rx="2" fill="#F5EFE6" ${K}/><g fill="#F5EFE6"><circle cx="16" cy="44" r="1.6"/><circle cx="22" cy="47" r="1.6"/><circle cx="28" cy="44" r="1.6"/><circle cx="19" cy="51" r="1.2"/><circle cx="25" cy="51" r="1.2"/></g></svg>`
 };
 
-export function decoHtml(list) {
+// floor: false deja fuera lo que va en el piso (en la cocina va a los lados de la barra).
+export function decoHtml(list, { floor = true } = {}) {
   const out = [];
   for (const id of ['deco_reloj', 'deco_guacamaya', 'deco_pinata']) if (list.includes(id)) out.push(`<div class="deco deco--${id.slice(5)}" aria-hidden="true">${ART[id]}</div>`);
   if (list.includes('deco_mariposas')) out.push(`<div class="deco deco--mariposas" aria-hidden="true">${['#E2577B', '#F2C200', '#5AB4E5'].map((c, i) => `<i style="--c:${c};--d:${i * -2.3}s;--y:${18 + i * 16}px"><b></b><b></b></i>`).join('')}</div>`);
   if (list.includes('deco_banderines')) out.push(`<div class="deco deco--flags" aria-hidden="true">${['#F2C200', '#1C4E9C', '#C8102E'].concat(['#F2C200', '#1C4E9C', '#C8102E', '#F2C200', '#1C4E9C', '#C8102E']).map((c) => `<i style="--c:${c}"></i>`).join('')}</div>`);
+  if (!floor) return out.join('');
   for (const id of ['deco_gato', 'deco_pecera', 'deco_rocola']) if (list.includes(id)) out.push(`<div class="deco deco--${id.slice(5)}" aria-hidden="true">${ART[id]}</div>`);
   if (list.includes('deco_plantas')) out.push(`<div class="deco deco--plants" aria-hidden="true">${ART.deco_plantas}</div>${list.includes('deco_rocola') ? '' : `<div class="deco deco--plants deco--plants-r" aria-hidden="true">${ART.plantas_r}</div>`}`);
   return out.join('');
@@ -51,4 +53,17 @@ export function awningStyle(id) {
 
 export function equippedOf(state) {
   return decorOf(state ?? {}).equipped;
+}
+
+// En la cocina, lo del piso va en las orillas de la barra (a lo sumo dos por lado),
+// con su propio espacio: los clientes se sientan entre medio y nunca lo tapan.
+export function floorHtml(list) {
+  const left = [], right = [];
+  if (list.includes('deco_plantas')) left.push(['plantas', ART.deco_plantas]);
+  if (list.includes('deco_gato')) left.push(['gato', ART.deco_gato]);
+  if (list.includes('deco_rocola')) right.push(['rocola', ART.deco_rocola]);
+  if (list.includes('deco_pecera')) right.push(['pecera', ART.deco_pecera]);
+  if (list.includes('deco_plantas')) right.push(['plantas', ART.plantas_r]);
+  const side = (items, cls) => items.length ? `<div class="floor floor--${cls}" aria-hidden="true">${items.slice(0, 2).map(([k, svg]) => `<span class="floor__it floor__it--${k}">${svg}</span>`).join('')}</div>` : '';
+  return side(left, 'l') + side(right, 'r');
 }

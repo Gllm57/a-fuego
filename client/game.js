@@ -9,7 +9,7 @@ import {
 import { ingredientSvg, processSvg, customerSvg, STATION_ART, TOOL_ART, coinSvg, icon, staffSvg } from './art.js';
 import { sfx, music, vibrate } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
-import { lightsHtml, decoHtml, decorAttrs, awningStyle } from './decor-art.js';
+import { lightsHtml, decoHtml, floorHtml, decorAttrs, awningStyle } from './decor-art.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
@@ -57,6 +57,10 @@ export class Kitchen {
     this.helper = config.staff ? { ...STAFF_BY_ID[config.staff.id], rank: config.staff.rank, paused: false, task: '' } : null;
     this.itemSeq = 0;
     this.custEls = new Map();
+    this.leaving = new Map();
+    // Cuándo aterriza cada ingrediente en el plato o el fogón (para mostrarlo justo al llegar).
+    this.landAt = new Map();
+    this.onPlate = new Set();
     this.sig = { order: '', stations: {}, pantry: '' };
     this.pantryIds = [...new Set(config.menu.flatMap((id) => RECIPE_BY_ID[id].components.map((c) => c.ingredient)))];
     this.frame = this.frame.bind(this);
@@ -81,7 +85,7 @@ export class Kitchen {
             </div>
           </div>
           <div class="bar">
-            ${lightsHtml(this.decor.luces)}${decoHtml(this.decor.deco)}
+            ${lightsHtml(this.decor.luces)}${decoHtml(this.decor.deco, { floor: false })}${floorHtml(this.decor.deco)}
             <div class="bar__counter"></div>
             <div class="customers" data-slots="${this.stats.slots}" style="--slots:${this.stats.slots}"></div>
           </div>
@@ -153,6 +157,33 @@ export class Kitchen {
     });
     this.onVisibility = () => { if (document.hidden && this.running) this.pause(); };
     document.addEventListener('visibilitychange', this.onVisibility);
+    this.onResize = () => { cancelAnimationFrame(this.fitRaf); this.fitRaf = requestAnimationFrame(() => this.#fitLayout()); };
+    addEventListener('resize', this.onResize);
+    this.#fitLayout();
+    document.fonts?.ready.then(() => this.onResize());
+  }
+
+  // Fogones y frascos se achican lo justo para que toda la despensa quepa entera en
+  // pantalla (sin frascos cortados), en cualquier alto: iPhone con Safari, Android, tablet.
+  #fitLayout() {
+    if (!this.el?.root?.isConnected) return;
+    // Espacio a los lados de la barra para lo que el jugador puso en el piso.
+    for (const side of ['l', 'r']) {
+      const f = this.el.root.querySelector(`.floor--${side}`);
+      this.el.customers.style.setProperty(`--floor-${side}`, f ? `${Math.ceil(f.getBoundingClientRect().width) + 2}px` : '0px');
+    }
+    const counter = this.el.root.querySelector('.counter');
+    const shelf = this.el.root.querySelector('.shelf');
+    const grid = shelf.querySelector('.shelf__grid');
+    counter.style.removeProperty('--ring-max');
+    const ring = parseFloat(getComputedStyle(counter).getPropertyValue('--ring-max')) || 60;
+    const n = this.pantryIds.length;
+    const jar = n <= 5 ? 84 : n <= 10 ? 64 : n <= 15 ? 56 : 52;
+    for (let k = 1; k >= 0.58; k -= 0.03) {
+      shelf.style.setProperty('--jar', `${Math.round(jar * k)}px`);
+      counter.style.setProperty('--ring-max', `${Math.round(ring * Math.max(0.74, 0.45 + k * 0.55))}px`);
+      if (grid.scrollHeight <= grid.clientHeight + 1) break;
+    }
   }
 
   destroy() {
@@ -160,6 +191,8 @@ export class Kitchen {
     music.stop();
     cancelAnimationFrame(this.raf);
     document.removeEventListener('visibilitychange', this.onVisibility);
+    removeEventListener('resize', this.onResize);
+    cancelAnimationFrame(this.fitRaf);
     this.host.innerHTML = '';
   }
 
@@ -650,32 +683,36 @@ export class Kitchen {
   // ── Clientes ────────────────────────────────────────────
   #renderCustomers() {
     const box = this.el.customers;
+    if (!box?.isConnected) return;
     const visible = this.#visible();
     const ids = new Set(visible.map((o) => o.id));
     // Posiciones de antes, para que los que se quedan se deslicen a su nuevo lugar.
     const before = new Map([...this.custEls].map(([id, el]) => [id, el.getBoundingClientRect()]));
-    const pr = box.getBoundingClientRect();
     for (const [id, el] of this.custEls) {
       if (ids.has(id)) continue;
+      // El que se va sigue ocupando su silla hasta terminar de despedirse: nadie se le encima.
       const o = this.orders[id];
-      const r = before.get(id);
-      Object.assign(el.style, { position: 'absolute', left: `${r.left - pr.left}px`, top: `${r.top - pr.top}px`, width: `${r.width}px`, zIndex: 2 });
+      this.custEls.delete(id);
+      this.leaving.set(id, el);
       el.classList.remove('is-selected', 'is-waiting-friend');
+      el.setAttribute('aria-hidden', 'true');
       if (o.status === 'served') {
-        // Contento: el globo da las gracias, salta, y se va caminando hacia afuera.
         const bubble = el.querySelector('.bubble');
         if (bubble) bubble.innerHTML = `<span class="bubble__thanks">${THANKS[(o.id * 7) % THANKS.length]}</span>`;
         const face = el.querySelector('.avatar__face');
         if (face) face.innerHTML = customerSvg(o.look, 'happy', '', o.vip);
-        this.#walkOut(el, r, pr);
+        el.classList.add('is-served');
+        // Espera a que le llegue el plato y dé un par de bocados.
+        setTimeout(() => this.#goodbye(id, el, true), o.stayMs ?? 900);
+      } else {
+        this.#goodbye(id, el, false);
       }
-      el.classList.add(o.status === 'served' ? 'is-served' : 'is-leaving');
-      setTimeout(() => el.remove(), o.status === 'served' ? 2300 : 800);
-      this.custEls.delete(id);
     }
     box.querySelectorAll('.seat-empty, .queue-badge').forEach((n) => n.remove());
+    // Sólo se sientan los que caben: las sillas de los que se despiden siguen ocupadas.
+    const room = this.stats.slots - this.leaving.size;
     for (const o of visible) {
-      if (this.custEls.has(o.id)) continue;
+      if (this.custEls.has(o.id) || this.custEls.size >= room) continue;
       const el = document.createElement('button');
       el.className = `customer ${o.vip ? 'is-vip' : ''} ${o.group != null ? 'is-group' : ''}`;
       el.dataset.order = o.id;
@@ -695,13 +732,13 @@ export class Kitchen {
       this.custEls.set(o.id, el);
       sfx.arrive();
     }
-    for (let i = visible.length; i < this.stats.slots; i++) {
+    for (let i = this.custEls.size + this.leaving.size; i < this.stats.slots; i++) {
       const s = document.createElement('div');
       s.className = 'seat-empty';
       s.innerHTML = '<i></i><span>Libre</span>';
       box.appendChild(s);
     }
-    const q = this.#queueCount();
+    const q = this.#queueCount() + visible.filter((o) => !this.custEls.has(o.id)).length;
     if (q > 0) {
       const b = document.createElement('div');
       b.className = 'queue-badge';
@@ -715,8 +752,11 @@ export class Kitchen {
       const r1 = el.getBoundingClientRect();
       const dx = r0.left - r1.left, dy = r0.top - r1.top;
       if (Math.abs(dx) > 1 || Math.abs(dy) > 1) {
-        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 420, easing: 'cubic-bezier(.2,.9,.3,1)' });
+        el.animate([{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'none' }], { duration: 320, easing: 'cubic-bezier(.2,.8,.3,1)' });
       }
+    }
+    if (this.selected !== null && !this.custEls.has(this.selected)) {
+      this.selected = visible.find((o) => this.custEls.has(o.id))?.id ?? null;
     }
     for (const [id, el] of this.custEls) {
       el.classList.toggle('is-selected', id === this.selected);
@@ -724,34 +764,31 @@ export class Kitchen {
     }
   }
 
-  // Salida del cliente servido: mastica, da las gracias, salta de alegría y se va
-  // caminando con pasitos hasta salir por el borde más cercano del local.
-  #walkOut(el, r, pr) {
-    const left = r.left - pr.left;
-    const toRight = left + r.width / 2 > pr.width / 2;
-    const dist = toRight ? pr.width - left + 12 : -(left + r.width + 12);
-    const dir = toRight ? 1 : -1;
-    const frames = [
-      { offset: 0, transform: 'translate(0, 0) scale(1)' },
-      { offset: 0.16, transform: 'translate(0, 0) scale(1)' },
-      { offset: 0.26, transform: 'translate(0, -20px) scale(1.08)' },
-      { offset: 0.34, transform: 'translate(0, 0) scale(1.04, .94)' },
-      { offset: 0.4, transform: `translate(0, 0) scale(1) rotate(${dir * 4}deg)` }
-    ];
-    // Pasitos: avanza, sube y baja, y se balancea a cada lado.
-    const steps = 6;
-    for (let i = 1; i <= steps; i++) {
-      const t = 0.4 + (0.6 * i) / steps;
-      frames.push({ offset: t, transform: `translate(${(dist * i) / steps}px, ${i % 2 ? -7 : 0}px) rotate(${(i % 2 ? -1 : 1) * dir * 5}deg)` });
-    }
-    el.animate(frames, { duration: 2100, easing: 'linear', fill: 'forwards' });
-    el.animate([{ opacity: 1 }, { opacity: 1, offset: 0.82 }, { opacity: 0 }], { duration: 2100, fill: 'forwards' });
-    const bubble = el.querySelector('.bubble');
-    bubble?.animate([
-      { transform: 'scale(.6)', opacity: 0 }, { transform: 'scale(1.08)', opacity: 1, offset: 0.08 },
-      { transform: 'scale(1)', opacity: 1, offset: 0.14 }, { transform: 'translateY(0)', opacity: 1, offset: 0.36 },
-      { transform: 'translateY(-14px)', opacity: 0, offset: 0.5 }, { transform: 'translateY(-14px)', opacity: 0 }
-    ], { duration: 2100, fill: 'forwards' });
+  // Despedida en su propia silla: el contento salta y baja tras la barra; el enojado
+  // sacude la cabeza y se va. Al terminar, la silla queda libre y los demás se acomodan.
+  #goodbye(id, el, happy) {
+    if (!el.isConnected) { this.leaving.delete(id); return; }
+    const anim = happy
+      ? el.animate([
+        { transform: 'translateY(0) scale(1)', opacity: 1 },
+        { transform: 'translateY(-12px) scale(1.06)', opacity: 1, offset: 0.3, easing: 'cubic-bezier(.5,0,.75,0)' },
+        { transform: 'translateY(46px) scale(.72)', opacity: 0 }
+      ], { duration: 420, fill: 'forwards' })
+      : el.animate([
+        { transform: 'translateX(0)', opacity: 1, filter: 'grayscale(0)' },
+        { transform: 'translateX(-6px) rotate(-4deg)', offset: 0.12 },
+        { transform: 'translateX(6px) rotate(4deg)', offset: 0.24 },
+        { transform: 'translateX(0)', opacity: 1, offset: 0.36 },
+        { transform: 'translateY(46px) scale(.8)', opacity: 0, filter: 'grayscale(1)' }
+      ], { duration: 640, easing: 'ease-in', fill: 'forwards' });
+    const done = () => {
+      if (!this.leaving.has(id)) return;
+      this.leaving.delete(id);
+      el.remove();
+      this.#renderCustomers();
+    };
+    anim.onfinish = done;
+    setTimeout(done, 900);
   }
 
   #select(id) {
@@ -763,6 +800,15 @@ export class Kitchen {
       el.classList.toggle('is-selected', cid === id);
       el.setAttribute('aria-pressed', String(cid === id));
     }
+  }
+
+  #stackSvg(o, i, ingId) {
+    const key = `${o.id}:${i}`;
+    const svg = ingredientSvg(ingId, { title: '' });
+    if (this.onPlate.has(key)) return svg.replace('<svg class="', '<svg class="is-still ');
+    this.onPlate.add(key);
+    const wait = Math.max(0, Math.round((this.landAt.get(key) ?? 0) - performance.now()));
+    return svg.replace('<svg ', `<svg style="--land:${wait}ms" `);
   }
 
   // ── Comanda del pedido seleccionado ─────────────────────
@@ -789,7 +835,7 @@ export class Kitchen {
     }
     el.innerHTML = `
       <div class="order__plate"><div class="plate__dish"></div>
-        <div class="order__stack">${o.recipe.components.map((c, i) => o.filled[i] ? ingredientSvg(c.ingredient, { title: '' }) : '').join('')}</div>
+        <div class="order__stack">${o.recipe.components.map((c, i) => o.filled[i] ? this.#stackSvg(o, i, c.ingredient) : '').join('')}</div>
       </div>
       <div>
         <div class="order__title">${escapeHtml(o.recipe.name)}${o.vip ? ` <span class="tag tag--deal" style="padding:2px 8px;font-size:11px">${icon('crown', 'style="width:12px;height:12px"')} ×2</span>` : ''}</div>
@@ -929,7 +975,9 @@ export class Kitchen {
     }
     if (slot.dataset.item !== String(item.id)) {
       slot.dataset.item = item.id;
-      slot.innerHTML = ingredientSvg(item.ingredient, { className: 'station__item', title: '' });
+      const wait = Math.max(0, Math.round((this.landAt.get(`st:${item.id}`) ?? 0) - performance.now()));
+      this.landAt.delete(`st:${item.id}`);
+      slot.innerHTML = ingredientSvg(item.ingredient, { className: 'station__item', title: '' }).replace('<svg ', `<svg style="--land:${wait}ms" `);
     }
     slot.querySelectorAll('.fx-steam,.fx-sizzle,.fx-smoke,.fx-bubbles,.fx-heat,.station__taps').forEach((n) => n.remove());
     let label;
@@ -975,8 +1023,7 @@ export class Kitchen {
     if (proc.kind === 'raw') {
       this.#take(ingId);
       o.filled[idx] = true;
-      sfx.plate();
-      flyIcon(btn, this.el.order.querySelector('.order__plate') ?? this.el.order, ingredientSvg(ingId, { title: '' }));
+      this.#toPlate(o, idx, btn, ingId);
       this.#checkComplete(o);
       return;
     }
@@ -1004,7 +1051,8 @@ export class Kitchen {
     }
     o.busy[idx] = true;
     sfx.place();
-    flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
+    const fly = flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
+    this.landAt.set(`st:${base.id}`, performance.now() + fly);
   }
 
   // Pedido urgente: 2 unidades al doble de precio; llegan en 3 segundos.
@@ -1091,10 +1139,25 @@ export class Kitchen {
       o.perfects += 1;
       floatText(this.el.stations[st], '¡Perfecto!', 'good');
     }
-    sfx.plate();
-    const target = o.id === this.selected ? this.el.order.querySelector('.order__plate') : this.custEls.get(o.id);
-    flyIcon(this.el.stations[st], target ?? this.el.order, ingredientSvg(item.ingredient, { title: '' }));
+    this.#toPlate(o, item.compIndex, this.el.stations[st], item.ingredient);
     this.#checkComplete(o);
+  }
+
+  // El ingrediente vuela en arco al plato de la comanda (o al cliente, si no es el
+  // pedido a la vista); al aterrizar, el plato rebota y el ingrediente cae encima.
+  #toPlate(o, idx, from, ingId) {
+    sfx.plate();
+    const onTicket = o.id === this.selected;
+    const target = onTicket ? this.el.order.querySelector('.order__plate') : this.custEls.get(o.id);
+    const dur = flyIcon(from, target ?? this.el.order, ingredientSvg(ingId, { title: '' }), () => {
+      if (!onTicket) return;
+      const plate = this.el.order.querySelector('.order__plate');
+      if (!plate) return;
+      plate.classList.remove('is-land'); void plate.offsetWidth; plate.classList.add('is-land');
+    });
+    this.landAt.set(`${o.id}:${idx}`, performance.now() + dur);
+    o.landsAt = performance.now() + dur;
+    o.lastFromTicket = onTicket;
   }
 
   #checkComplete(o) {
@@ -1113,7 +1176,11 @@ export class Kitchen {
     const { earned, mult } = plateEarnings(o, o.recipe, servedAt, o.perfects, this.combo, this.stats, together);
     const partnerBonus = together ? mates.reduce((a, m) => a + Math.round(m.recipe.price * GROUP_BONUS * mult), 0) : 0;
     const el = this.custEls.get(o.id);
-    this.#serveFx(o, el, earned + partnerBonus);
+    const wait = Math.max(0, (o.landsAt ?? 0) - performance.now());
+    // Si el último ingrediente fue directo al cliente, no hace falta que vuele el plato.
+    const plateFlight = o.lastFromTicket ? 470 : 0;
+    o.stayMs = wait + plateFlight + 380;
+    setTimeout(() => this.#serveFx(o, el, earned + partnerBonus, o.lastFromTicket), wait);
     if (together) {
       sfx.together();
       if (el) setTimeout(() => floatText(el, '¡Comieron juntos!', 'good'), 450);
@@ -1131,8 +1198,9 @@ export class Kitchen {
   }
 
   // Animación al servir: el plato vuela al cliente y las monedas suben al contador.
-  #serveFx(o, el, amount) {
-    const from = this.el.order.querySelector('.order__plate') ?? this.el.order;
+  #serveFx(o, el, amount, fromTicket = true) {
+    if (!this.el.root?.isConnected) return;
+    const from = fromTicket ? this.el.order.querySelector('.order__plate') ?? this.el.order : null;
     const dish = o.recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('');
     sfx.serve();
     flyPlate(from, el ?? this.el.customers, dish, () => {
