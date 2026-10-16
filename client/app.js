@@ -62,7 +62,7 @@ function applyTheme(restaurantId) {
   r.setProperty('--ground', t.ground);
   // Toldo elegido en «Mi local» (o el del restaurante).
   const toldo = DECOR_BY_ID[app.profile ? decorOf(app.profile.state).equipped.toldo : 'toldo_local'];
-  const [a, b, deep] = toldo?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 78%, #fff)`, t.deep];
+  const [a, b, deep] = toldo?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 82%, #fff)`, t.deep];
   r.setProperty('--aw-a', a);
   r.setProperty('--aw-b', b);
   r.setProperty('--aw-deep', deep);
@@ -253,11 +253,10 @@ function renderHome() {
           <span>2★ en ${escapeHtml(dailyRest.name)}</span>
           ${daily.claimed ? `<span class="done-badge">✓ Completado</span>` : `<span class="recipe__price">${coinSvg()} +${fmt(daily.reward)}</span>`}
         </button>
-        <button class="tile" data-act="to-market">
-          <span class="tile__icon">${icon('market')}</span>
-          <b>Mercado</b>
-          <span>Despensa ${used}/${cap}</span>
-          <span class="recipe__price">${s.basketClaimed === daily.day ? 'Ofertas del día' : 'Canasta gratis hoy'}</span>
+        <button class="tile" data-act="decor">
+          <span class="tile__icon">${icon('sparkle')}</span>
+          <b>Mi local</b>
+          <span>Toldo, pared, luces y adornos</span>
         </button>
         <button class="tile" data-act="diary">
           <span class="tile__icon">${icon('journal')}</span>
@@ -268,11 +267,6 @@ function renderHome() {
           <span class="tile__icon">${icon('trophy')}</span>
           <b>Ranking</b>
           <span>Top de la semana</span>
-        </button>
-        <button class="tile tile--wide tile--decor" data-act="decor">
-          <span class="tile__icon">${icon('sparkle')}</span>
-          <span style="flex:1;min-width:0;display:flex;flex-direction:column;gap:2px"><b>Mi local</b><span>Toldo, pared, luces, barra y adornos</span></span>
-          ${icon('arrow')}
         </button>
       </div>
     </div>`;
@@ -710,7 +704,7 @@ function upgradeEffect(id, k, s) {
     case 'horno': return `Hornea en ${k.seconds.hornear.toFixed(1)} s`;
     case 'olla': return `Hierve en ${k.seconds.hervir.toFixed(1)} s`;
     case 'campana': return `Se quema tras ${k.burnSeconds.freir.toFixed(1)} s`;
-    case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · propina +${Math.round(k.tipBonus * 100)}%`;
+    case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · +${Math.round(k.tipBonus * 100)}% propina`;
     case 'refri': return `Despensa de ${storageCapacity(s.upgrades)} lugares`;
     case 'extra_tabla': case 'extra_bol': case 'extra_sarten': case 'extra_olla': case 'extra_horno': {
       const st = id.slice(6);
@@ -797,7 +791,7 @@ function bindAchievements(screen) {
 // ── Mi local (decoración) ───────────────────────────────────
 function awningVars(id) {
   const t = RESTAURANT_BY_ID[app.restaurantId].theme;
-  const [a, b, deep] = DECOR_BY_ID[id]?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 78%, #fff)`, t.deep];
+  const [a, b, deep] = DECOR_BY_ID[id]?.colors ?? [t.primary, `color-mix(in srgb, ${t.primary} 82%, #fff)`, t.deep];
   return `--aw-a:${a};--aw-b:${b};--aw-deep:${deep}`;
 }
 
