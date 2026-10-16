@@ -101,7 +101,7 @@ export const UPGRADE_ICONS = {
   batidora: `<path d="M5 9.5c0-2.5 2-4.5 4.5-4.5H18a2 2 0 0 1 0 4h-3.5l-2 3H8a3 3 0 0 1-3-2.5z"/><path d="M9.5 12v3.5M12.5 12v3.5"/><path d="M8 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5M11 15.5c0 2.5.7 5 1.5 5s1.5-2.5 1.5-5"/><path d="M15.5 7h1"/>`,
   // Tabla de picar con asa y cuchillo
   extra_tabla: `<rect x="3" y="7" width="15" height="13" rx="3"/><circle cx="14.5" cy="10.5" r="1.3"/><path d="M18 7.5l3-3"/><path d="M14 16l7-7"/><path d="M6 17h5"/>`, sarten: PROCESS_ICONS.freir,
-  horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music, mesas: ICONS.table,
+  horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music,
   extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
   extra_olla: PROCESS_ICONS.hervir, extra_horno: PROCESS_ICONS.hornear,
   refri: `<rect x="5" y="2" width="14" height="20" rx="4"/><path d="M5 10h14M9 5v2M9 13v3"/>`

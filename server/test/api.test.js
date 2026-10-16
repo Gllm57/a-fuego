@@ -33,7 +33,7 @@ test('sin token o con token falso: 401', async () => {
 test('compras: dinero insuficiente, éxito, libro contable e idempotencia', async () => {
   const { app, call } = await makeApp();
   const { token } = await guest(call);
-  const tooExpensive = await call('POST', '/api/v1/shop/purchase', { token, body: { kind: 'upgrade', id: 'mesas' } });
+  const tooExpensive = await call('POST', '/api/v1/shop/purchase', { token, body: { kind: 'upgrade', id: 'refri' } });
   assert.equal(tooExpensive.status, 409);
   assert.equal(tooExpensive.body.error.code, 'sin_dinero');
 

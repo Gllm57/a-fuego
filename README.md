@@ -41,7 +41,8 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Ingredientes del mercado | Sin ellos no hay servicio |
 | Abrir restaurantes (2.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros. **Requiere haber aprendido las 8 recetas del restaurante anterior** |
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
-| Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, más mesas, despensa más grande |
+| Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, despensa más grande |
+| Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 en la Izakaya y la Cevichería |
 | Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
 
 ### Pantallas

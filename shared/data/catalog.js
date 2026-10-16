@@ -26,16 +26,17 @@ export const STATION_IDS = Object.freeze(Object.keys(STATIONS));
 
 // La meta del dinero: abrir los 5 restaurantes de la cadena.
 // `upkeep`: gastos fijos por servicio (gas, luz, personal), se descuentan de lo ganado.
+// `seats`: clientes atendidos a la vez; crece con cada restaurante, hasta 5.
 export const RESTAURANTS = Object.freeze([
-  { id: 'taqueria',  name: 'Taquería La Lumbre', cuisine: 'Mexicana',      cost: 0,     reqLevel: 1,  upkeep: 60,
+  { id: 'taqueria',  name: 'Taquería La Lumbre', cuisine: 'Mexicana',      cost: 0,     reqLevel: 1,  upkeep: 60, seats: 3,
     theme: { primary: '#D9412B', deep: '#8F2414', soft: '#FDE3D8', ground: '#FFF3E3' } },
-  { id: 'diner',     name: 'Diner Ruta 66',      cuisine: 'Americana',     cost: 2500,  reqLevel: 3,  upkeep: 100,
+  { id: 'diner',     name: 'Diner Ruta 66',      cuisine: 'Americana',     cost: 2500,  reqLevel: 3,  upkeep: 100, seats: 4,
     theme: { primary: '#2F5FD0', deep: '#1B3A85', soft: '#DCE6FB', ground: '#F3F6FD' } },
-  { id: 'trattoria', name: 'Trattoria Fuoco',    cuisine: 'Italiana',      cost: 6000,  reqLevel: 6,  upkeep: 150,
+  { id: 'trattoria', name: 'Trattoria Fuoco',    cuisine: 'Italiana',      cost: 6000,  reqLevel: 6,  upkeep: 150, seats: 4,
     theme: { primary: '#1E7A5A', deep: '#0F4A35', soft: '#D6EEE4', ground: '#F2F8F4' } },
-  { id: 'izakaya',   name: 'Izakaya Hinode',     cuisine: 'Japonesa',      cost: 12000, reqLevel: 9,  upkeep: 210,
+  { id: 'izakaya',   name: 'Izakaya Hinode',     cuisine: 'Japonesa',      cost: 12000, reqLevel: 9,  upkeep: 210, seats: 5,
     theme: { primary: '#B3264A', deep: '#6E1229', soft: '#F8DCE3', ground: '#FBF4F1' } },
-  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 12, upkeep: 280,
+  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 12, upkeep: 280, seats: 5,
     theme: { primary: '#C77A00', deep: '#7A4A00', soft: '#FBEBCD', ground: '#FFF8EA' } }
 ]);
 
@@ -106,7 +107,6 @@ export const UPGRADES = Object.freeze([
   { id: 'olla',      name: 'Olla exprés',        desc: 'Hierve 12% más rápido por nivel',      station: 'olla',   costs: [400, 1100, 2600, 6000] },
   { id: 'campana',   name: 'Campana extractora', desc: 'Más tiempo antes de que algo se queme', station: null,     costs: [700, 2400] },
   { id: 'ambiente',  name: 'Ambiente y música',  desc: 'Clientes 10% más pacientes y +8% propina por nivel', station: null, costs: [600, 1600, 3500, 8000] },
-  { id: 'mesas',     name: 'Mesas extra',        desc: '+1 cliente atendido a la vez',         station: null,     costs: [1500, 5000] },
   { id: 'refri',     name: 'Refrigerador',       desc: '+25 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] },
   // Equipo extra: un segundo fogón de cada tipo, para no colapsar en hora pico.
   // `reqLevels[n]` es el nivel de chef necesario para comprar el nivel n+1.

@@ -300,7 +300,7 @@ function restaurantCard(r, i) {
       <span class="rest__body">
         <span class="rest__cuisine">Cocina ${r.cuisine}</span>
         <span class="rest__name">${r.name}</span>
-        <span class="rest__meta">${learned}/${recipes.length} recetas · gastos ${fmt(r.upkeep)}/servicio</span>
+        <span class="rest__meta">${learned}/${recipes.length} recetas · ${r.seats} mesas · gastos ${fmt(r.upkeep)}/servicio</span>
       </span>
     </button>`;
 }
@@ -328,7 +328,7 @@ function openRestaurant(r) {
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
     <div class="sheet__art rest__art" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">${storefrontSvg(r.theme, RESTAURANTS.indexOf(r))}</div>
-    <p class="note">Cocina ${r.cuisine}: ${recipes.length} recetas, ${recipes.filter((x) => x.learnCost === 0).length} incluidas. Platos más caros, clientes más exigentes y gastos de ${fmt(r.upkeep)} por servicio.</p>
+    <p class="note">Cocina ${r.cuisine}: ${recipes.length} recetas, ${recipes.filter((x) => x.learnCost === 0).length} incluidas. ${r.seats} clientes a la vez, platos más caros, clientes más exigentes y gastos de ${fmt(r.upkeep)} por servicio.</p>
     <div class="comp-list">${recipes.map((x) => `<span class="comp">${ingredientSvg(x.components[0].ingredient)}${escapeHtml(x.name)}</span>`).join('')}</div>
     <p class="note"><strong>${reason}</strong></p>
     ${d.reason === 'recetas_pendientes'
@@ -620,7 +620,6 @@ function upgradeEffect(id, k, s) {
     case 'olla': return `Hierve en ${k.seconds.hervir.toFixed(1)} s`;
     case 'campana': return `Se quema tras ${k.burnSeconds.freir.toFixed(1)} s`;
     case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · propina +${Math.round(k.tipBonus * 100)}%`;
-    case 'mesas': return `${k.slots} clientes a la vez`;
     case 'refri': return `Despensa de ${storageCapacity(s.upgrades)} lugares`;
     case 'extra_tabla': case 'extra_bol': case 'extra_sarten': case 'extra_olla': case 'extra_horno': {
       const st = id.slice(6);
@@ -777,7 +776,7 @@ function accountSection(p) {
 
 const REASONS = {
   bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', reto_diario: 'Reto del día', mercado: 'Mercado',
-  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina'
+  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra'
 };
 
 async function openLedger() {

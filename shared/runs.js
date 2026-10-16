@@ -48,6 +48,6 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
     seed: String(seed),
     menu,
     durationMs: RUN_DURATION_MS,
-    stats: kitchenStats(state.upgrades)
+    stats: kitchenStats(state.upgrades, restaurantId)
   };
 }

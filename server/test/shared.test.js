@@ -4,7 +4,7 @@ import {
   RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
   evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
-  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal
+  restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund
 } from '../../shared/index.js';
 import { honestServes } from './helpers.js';
 
@@ -69,12 +69,14 @@ test('rechaza servir a un cliente que todavía no estaba sentado', () => {
   if (stillSeated) rejects(c, [{ orderId: o.id, recipeId: o.recipeId, servedAt: t }], 'cliente_no_sentado');
 });
 
-test('las mejoras aceleran la cocina y añaden mesas', () => {
+test('las mejoras aceleran la cocina y las mesas crecen con el restaurante', () => {
   const base = kitchenStats({});
-  const up = kitchenStats({ sarten: 4, cuchillos: 4, mesas: 2, ambiente: 4 });
+  const up = kitchenStats({ sarten: 4, cuchillos: 4, mesas: 2, ambiente: 4 }, 'cevicheria');
   assert.ok(up.seconds.freir < base.seconds.freir);
   assert.ok(up.taps.cortar < base.taps.cortar);
-  assert.equal(up.slots, base.slots + 2);
+  assert.equal(base.slots, 3);
+  assert.equal(up.slots, 5);
+  assert.equal(kitchenStats({}, 'diner').slots, 4);
   assert.ok(up.patienceMult > base.patienceMult);
 });
 
@@ -99,7 +101,7 @@ test('el imperio llega al 100 % con todo comprado', () => {
   const s = newPlayerState();
   s.restaurants = RESTAURANTS.map((r) => r.id);
   s.recipes = RECIPES.map((r) => r.id);
-  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, mesas: 2, refri: 3, extra_tabla: 1, extra_bol: 1, extra_sarten: 1, extra_olla: 1, extra_horno: 1 };
+  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, refri: 3, extra_tabla: 1, extra_bol: 1, extra_sarten: 1, extra_olla: 1, extra_horno: 1 };
   const e = empireProgress(s);
   assert.equal(e.percent, 100);
   assert.equal(e.title, 'Chef Leyenda');
@@ -219,4 +221,10 @@ test('la siguiente meta guía a completar el recetario antes de abrir otro local
   assert.equal(RECIPES.find((r) => r.id === g.id).restaurant, 'taqueria');
   const all = { ...s, recipes: RECIPES.filter((r) => r.restaurant === 'taqueria').map((r) => r.id) };
   assert.deepEqual([nextGoal(all).kind, nextGoal(all).id], ['restaurant', 'diner']);
+});
+
+test('las mesas extra ya no se venden y se reembolsan', () => {
+  assert.equal(UPGRADE_BY_ID.mesas, undefined);
+  assert.equal(retiredRefund('mesas', 2), 6500);
+  assert.equal(retiredRefund('mesas', 0), 0);
 });

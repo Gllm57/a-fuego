@@ -69,7 +69,7 @@ export class Kitchen {
           <div class="bar">
             <div class="lamps" aria-hidden="true"><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span><span class="lamp"><i></i><b></b></span></div>
             <div class="bar__counter"></div>
-            <div class="customers" style="--slots:${this.stats.slots}"></div>
+            <div class="customers" data-slots="${this.stats.slots}" style="--slots:${this.stats.slots}"></div>
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
           <div class="counter" data-rows="${this.#stationRows().length}" style="--ring:${this.#ringSize()}">${this.#stationRows().map((row) => `<div class="counter__row">${row.map((type) => this.#stationGroup(type)).join('')}</div>`).join('')}</div>
@@ -640,7 +640,7 @@ export class Kitchen {
   #type(key) { return key.split('#')[0]; }
 
   // Reparte los tipos de fogón en filas equilibradas de hasta 5 fogones,
-  // sin separar nunca un par (p. ej. "Olla ×2") ni cambiar el orden.
+  // sin separar nunca un par (p. ej. las dos ollas) ni cambiar el orden.
   #stationRows() {
     if (this._rows) return this._rows;
     const groups = STATION_IDS.map((type) => ({ type, n: this.stationKeys.filter((k) => this.#type(k) === type).length }));
@@ -680,7 +680,7 @@ export class Kitchen {
           <span class="station__status">Libre</span>
         </button>`).join('')}
       </div>
-      <span class="station__name">${STATIONS[type].name}${keys.length > 1 ? ` ×${keys.length}` : ''}</span>
+      <span class="station__name">${STATIONS[type].name}</span>
     </div>`;
   }
 

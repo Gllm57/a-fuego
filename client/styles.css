@@ -469,6 +469,16 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .avatar { --p: 100; --fill: var(--good); position: relative; width: 66px; height: 66px; border-radius: 50%; display: grid; place-items: center; background: conic-gradient(var(--fill) calc(var(--p) * 1%), rgba(42,23,13,.12) 0); transition: transform .25s var(--ease-spring); }
 .avatar__face { width: 56px; height: 56px; border-radius: 50%; background: radial-gradient(circle at 50% 35%, #FFF8EE, var(--brand-soft)); display: grid; place-items: center; overflow: hidden; }
 .avatar__face svg { width: 100%; height: 100%; margin: 0; }
+/* 4 o 5 mesas: globos y caras más compactos para que quepan sin encimarse. */
+.customers[data-slots="4"], .customers[data-slots="5"] { gap: 4px; }
+.customers[data-slots="4"] .bubble, .customers[data-slots="5"] .bubble { min-width: 0; width: 100%; padding: 5px 4px 4px; border-radius: 16px; }
+.customers[data-slots="4"] .bubble__dish svg { width: 19px; height: 19px; }
+.customers[data-slots="5"] .bubble__dish svg { width: 15px; height: 15px; margin: 0 -1.5px; }
+.customers[data-slots="4"] .bubble__name, .customers[data-slots="5"] .bubble__name { font-size: 10px; max-width: 100%; white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+.customers[data-slots="4"] .avatar { width: 60px; height: 60px; }
+.customers[data-slots="4"] .avatar__face { width: 51px; height: 51px; }
+.customers[data-slots="5"] .avatar { width: 54px; height: 54px; }
+.customers[data-slots="5"] .avatar__face { width: 46px; height: 46px; }
 .customer.is-worried .avatar { --fill: var(--warn); }
 .customer.is-angry .avatar { --fill: var(--bad); }
 .customer.is-angry .avatar__face svg { animation: shake-soft .6s ease-in-out infinite; }

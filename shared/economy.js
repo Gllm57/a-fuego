@@ -5,7 +5,7 @@
 //   1. Ingredientes del mercado (sin ellos no se cocina; precios cambian cada día),
 //   2. Abrir restaurantes nuevos (5 cocinas del mundo),
 //   3. Aprender recetas (más caras = platos que pagan más),
-//   4. Mejorar la cocina (más rápida, más mesas, más despensa…).
+//   4. Mejorar la cocina (más rápida, más paciencia, más despensa…).
 // Al completar el 100 % del imperio se obtiene el título «Chef Leyenda».
 
 import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, recipesOf } from './data/catalog.js';
@@ -14,6 +14,12 @@ import { hashString } from './rng.js';
 import { upgradeLevel, storageCapacity } from './rules.js';
 
 export const STARTING_COINS = 200;
+
+// Mejoras que ya no existen: se devuelve lo pagado. Las mesas ahora vienen con cada restaurante.
+export const RETIRED_UPGRADES = Object.freeze({ mesas: [1500, 5000] });
+export function retiredRefund(id, level) {
+  return (RETIRED_UPGRADES[id] ?? []).slice(0, Math.max(0, level)).reduce((a, b) => a + b, 0);
+}
 
 export function xpForLevel(level) {
   return 150 * (level - 1) * level / 2;

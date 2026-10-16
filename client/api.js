@@ -2,7 +2,7 @@
 // el cliente como página estática) usa el mismo motor de /shared en el navegador.
 
 import {
-  newPlayerState, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
   BULK_QTY, BULK_DISCOUNT, inventoryDelta
@@ -117,6 +117,15 @@ class LocalApi {
         const base = newPlayerState();
         data.state = { ...base, ...data.state, inventory: data.state.inventory ?? base.inventory };
         data.history ??= [];
+        data.ledger ??= [];
+        for (const id of Object.keys(RETIRED_UPGRADES)) {
+          const amount = retiredRefund(id, data.state.upgrades?.[id] ?? 0);
+          if (data.state.upgrades) delete data.state.upgrades[id];
+          if (amount > 0) {
+            data.state.coins += amount;
+            data.ledger.unshift({ delta: amount, reason: 'reembolso_mejora', t: Date.now(), balanceAfter: data.state.coins });
+          }
+        }
         return data;
       }
     } catch { /* datos corruptos: empezar de nuevo */ }

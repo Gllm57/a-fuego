@@ -4,7 +4,7 @@
 import { randomUUID } from 'node:crypto';
 import {
   RESTAURANT_BY_ID, RESTAURANTS,
-  newPlayerState, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
+  newPlayerState, RETIRED_UPGRADES, retiredRefund, evaluatePurchase, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, dailyBasket, storageCapacity, inventoryCount, BULK_QTY, BULK_DISCOUNT, inventoryDelta
 } from '../../shared/index.js';
@@ -33,6 +33,19 @@ export class GameService {
     this.db = db;
     this.config = config;
     this.now = now;
+    this.#refundRetiredUpgrades();
+  }
+
+  #refundRetiredUpgrades() {
+    for (const id of Object.keys(RETIRED_UPGRADES)) {
+      for (const u of this.db.all("SELECT player_id, level FROM unlocks WHERE kind = 'upgrade' AND item_id = ?", id)) {
+        this.db.tx(() => {
+          const amount = retiredRefund(id, u.level);
+          if (amount > 0) this.#credit(u.player_id, amount, 'reembolso_mejora', id);
+          this.db.run("DELETE FROM unlocks WHERE player_id = ? AND kind = 'upgrade' AND item_id = ?", u.player_id, id);
+        });
+      }
+    }
   }
 
   // ── Cuentas ───────────────────────────────────────────────

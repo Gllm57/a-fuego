@@ -1,7 +1,7 @@
 // Reglas derivadas: cómo afectan las mejoras a la cocina, y los tiempos
 // mínimos que el servidor usa para detectar partidas imposibles.
 
-import { PROCESSES, RECIPE_BY_ID, UPGRADE_BY_ID, STATIONS } from './data/catalog.js';
+import { PROCESSES, RECIPE_BY_ID, RESTAURANT_BY_ID, UPGRADE_BY_ID, STATIONS } from './data/catalog.js';
 
 export const RUN_DURATION_MS = 90_000;
 export const BASE_SLOTS = 3;
@@ -30,7 +30,8 @@ export function storageCapacity(upgrades = {}) {
   return BASE_STORAGE + 25 * upgradeLevel(upgrades, 'refri');
 }
 
-export function kitchenStats(upgrades = {}) {
+// Los lugares en la barra dependen del restaurante (3 → 5), no de una mejora.
+export function kitchenStats(upgrades = {}, restaurantId = null) {
   const speed = (id) => 1 - 0.12 * upgradeLevel(upgrades, id);
   const campana = 1 + 0.4 * upgradeLevel(upgrades, 'campana');
   const ambiente = upgradeLevel(upgrades, 'ambiente');
@@ -50,7 +51,7 @@ export function kitchenStats(upgrades = {}) {
     },
     patienceMult: round2(1 + 0.1 * ambiente),
     tipBonus: round2(0.08 * ambiente),
-    slots: BASE_SLOTS + upgradeLevel(upgrades, 'mesas'),
+    slots: RESTAURANT_BY_ID[restaurantId]?.seats ?? BASE_SLOTS,
     // Cuántos fogones hay de cada tipo (1 + equipo extra comprado).
     stations: Object.fromEntries(Object.keys(STATIONS).map((st) => [st, 1 + upgradeLevel(upgrades, `extra_${st}`)]))
   };
