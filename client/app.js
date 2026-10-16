@@ -3,7 +3,7 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
 import { createApi, ApiError, SANDBOX } from './api.js';
 import { Kitchen } from './game.js';
@@ -344,13 +344,45 @@ function openRestaurant(r) {
         localSet('afuego.restaurant', r.id);
         applyTheme(r.id);
         confetti(document.body, [r.theme.primary, '#FFC23D', '#fff', r.theme.deep]);
-        toast(`¡Abriste ${r.name}! Compra sus ingredientes en el mercado`, 'good');
-        // Algunos locales traen un ayudante nuevo para contratar en Mejoras.
-        const helper = STAFF.find((m) => m.reqRestaurant === r.id);
-        if (helper) setTimeout(() => toast(`Nuevo ayudante: ${helper.name}, ${helper.role.toLowerCase()}. Contrátalo en Mejoras`, 'good'), 2600);
         go('home');
+        setTimeout(() => showUnlocks(r), 350);
       }
     });
+  });
+}
+
+// Letrero al abrir un local: qué desbloquea y qué cambia en la cocina.
+function unlocksFor(r) {
+  const i = RESTAURANTS.indexOf(r);
+  const prev = RESTAURANTS[i - 1];
+  const items = [];
+  const free = recipesOf(r.id).filter((x) => x.learnCost === 0);
+  items.push({ icon: 'book', title: `${recipesOf(r.id).length} recetas nuevas`, text: `Ya puedes cocinar ${free.map((x) => x.name).join(' y ')}. Las demás se aprenden en el Recetario.` });
+  const newIngs = [...new Set(recipesOf(r.id).flatMap((x) => x.components.map((c) => c.ingredient)))]
+    .filter((ing) => !RECIPES.some((x) => RESTAURANTS.indexOf(RESTAURANT_BY_ID[x.restaurant]) < i && x.components.some((c) => c.ingredient === ing)));
+  if (newIngs.length) items.push({ icon: 'market', title: 'Ingredientes nuevos en el mercado', text: newIngs.map((ing) => INGREDIENTS[ing].name).join(', ') + '.' });
+  if (prev && r.seats > prev.seats) items.push({ icon: 'table', title: `${r.seats} mesas`, text: 'Atiendes a más clientes a la vez.' });
+  const chance = TIER_GROUP_CHANCE[i] ?? 0;
+  const prevChance = TIER_GROUP_CHANCE[i - 1] ?? 0;
+  if (chance > 0 && prevChance === 0) items.push({ icon: 'people', title: 'Llegan grupos de amigos', text: `Entran juntos y ocupan varias mesas. Si les sirves a todos con menos de ${GROUP_WINDOW_MS / 1000} s de diferencia, cada uno paga +${Math.round(GROUP_BONUS * 100)} %. Si dejas esperando a uno, pierdes el bono.` });
+  else if (i === 4) items.push({ icon: 'people', title: 'Grupos de tres', text: 'Ahora también llegan grupos de tres amigos: sírvelos casi a la vez.' });
+  const helper = STAFF.find((m) => m.reqRestaurant === r.id);
+  if (helper) items.push({ icon: 'user', title: `Nuevo ayudante: ${helper.name}`, text: `${helper.role}. ${helper.desc} Contrátalo arriba en Mejoras.` });
+  if (i === 3 || i === 5) items.push({ icon: 'fire', title: 'Más incendios', text: 'En este local la cocina se prende fuego más seguido.' });
+  items.push({ icon: 'clock', title: 'Clientes más exigentes', text: `Esperan menos y llegan más seguido. Al cerrar pagas ${fmt(r.upkeep)} de gastos del local.` });
+  return items;
+}
+
+function showUnlocks(r) {
+  const items = unlocksFor(r);
+  sfx.logro();
+  openSheet(`
+    <div class="sheet__head"><h2>¡Abriste ${escapeHtml(r.name)}!</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
+    <p class="note" style="margin:0">Esto es lo nuevo:</p>
+    <ul class="unlocks">${items.map((x) => `<li><span class="unlocks__icon">${icon(x.icon)}</span><span><b>${escapeHtml(x.title)}</b><small>${escapeHtml(x.text)}</small></span></li>`).join('')}</ul>
+    <button class="btn btn--xl btn--gold" data-act="market">${icon('market')} Comprar ingredientes</button>
+  `, (sheet, close) => {
+    sheet.querySelector('[data-act="market"]').addEventListener('click', () => { close(); go('market'); });
   });
 }
 

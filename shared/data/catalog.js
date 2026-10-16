@@ -31,7 +31,7 @@ export const STATION_IDS = Object.freeze(Object.keys(STATIONS));
 export const RESTAURANTS = Object.freeze([
   { id: 'arepera',   name: 'Arepera El Ávila',   cuisine: 'Venezolana',    cost: 0,     reqLevel: 1,  upkeep: 50, seats: 3,
     stationNames: { sarten: 'Budare' },
-    theme: { primary: '#C46A00', deep: '#7A3A00', soft: '#FFE7B3', ground: '#FFF8E6' } },
+    theme: { primary: '#7B3FA6', deep: '#4A2270', soft: '#EADCF6', ground: '#F8F3FC' } },
   { id: 'taqueria',  name: 'Taquería La Lumbre', cuisine: 'Mexicana',      cost: 1500,  reqLevel: 3,  upkeep: 60, seats: 3,
     theme: { primary: '#D9412B', deep: '#8F2414', soft: '#FDE3D8', ground: '#FFF3E3' } },
   { id: 'diner',     name: 'Diner Ruta 66',      cuisine: 'Americana',     cost: 3500,  reqLevel: 5,  upkeep: 100, seats: 4,
