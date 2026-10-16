@@ -1191,6 +1191,14 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .station.is-flip .station__item { animation: wiggle .4s ease-in-out infinite; }
 .station.is-flipping .station__item { animation: flip-it .5s cubic-bezier(.3,.7,.4,1); }
 .station__item.is-flipped { filter: brightness(.82) saturate(1.15); }
+/* Parrilla: brasas que respiran mientras asa y marcas de la rejilla al voltear. */
+.station[data-station^="parrilla"]:has(.station__item) .grill-coals { animation: coals 1.2s ease-in-out infinite alternate; }
+@keyframes coals { from { opacity: .55; } to { opacity: 1; } }
+.station[data-station^="parrilla"] .station__slot:has(.station__item.is-flipped)::after {
+  content: ''; position: absolute; left: 50%; top: 50%; width: calc(var(--ring, 60px) * .36); height: calc(var(--ring, 60px) * .28);
+  transform: translate(-50%, -50%) rotate(-28deg); z-index: 3; pointer-events: none; border-radius: 4px;
+  background: repeating-linear-gradient(90deg, transparent 0 4px, rgba(45,22,10,.6) 4px 6px);
+}
 
 /* Herramientas animadas: cuchillo sobre la tabla, varillas sobre el bol */
 .station__tool { position: absolute; z-index: 4; width: 30px; height: 30px; right: -6px; top: -8px; pointer-events: none; transform-origin: 20% 90%; }

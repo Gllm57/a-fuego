@@ -47,7 +47,18 @@ export const INGREDIENTS = Object.freeze({
   platano:   { name: 'Plátano',       shape: 'long',   color: '#F2C94C', accent: '#5E8F28', cost: 3 },
   caraota:   { name: 'Caraotas',      shape: 'grain',  color: '#2B2220', accent: '#120D0C', cost: 2 },
   aceituna:  { name: 'Aceitunas',     shape: 'round',  color: '#7C8A2E', accent: '#55601C', cost: 4 },
-  hoja_platano:{ name: 'Hoja de plátano', shape: 'leaf', color: '#2F7D3A', accent: '#1F5426', cost: 2 }
+  hoja_platano:{ name: 'Hoja de plátano', shape: 'leaf', color: '#2F7D3A', accent: '#1F5426', cost: 2 },
+  chorizo:   { name: 'Chorizo',       shape: 'long',   color: '#B3402A', accent: '#7E2716', cost: 9 },
+  provoleta: { name: 'Provoleta',     shape: 'disc',   color: '#F6D27A', accent: '#D9A93E', cost: 10 },
+  perejil:   { name: 'Perejil',       shape: 'leaf',   color: '#3A9A48', accent: '#246B30', cost: 2 },
+  dulce_leche:{ name: 'Dulce de leche', shape: 'jar',  color: '#B8742E', accent: '#8A5218', cost: 7 },
+  morron:    { name: 'Morrón',        shape: 'drop',   color: '#D8352A', accent: '#9E2118', cost: 4 },
+  costilla:  { name: 'Costilla',      shape: 'slab',   color: '#A9442F', accent: '#74291A', cost: 16 },
+  ajo:       { name: 'Ajo',           shape: 'round',  color: '#F3EBDD', accent: '#CDBFA6', cost: 2 },
+  col:       { name: 'Col china',     shape: 'leaf',   color: '#CFE6A8', accent: '#93B865', cost: 3 },
+  gochujang: { name: 'Gochujang',     shape: 'jar',    color: '#C0281F', accent: '#8A1712', cost: 6 },
+  zanahoria: { name: 'Zanahoria',     shape: 'long',   color: '#F08A24', accent: '#3E8E2A', cost: 2 },
+  tteok:     { name: 'Tteok',         shape: 'long',   color: '#F4EFE2', accent: '#D9CFB8', cost: 5 }
 });
 
 export const INGREDIENT_IDS = Object.freeze(Object.keys(INGREDIENTS));

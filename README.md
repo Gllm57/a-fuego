@@ -24,7 +24,8 @@ usa las propinas para construir tu cadena de restaurantes.
   cada uno paga +25 %.
 - **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
   desde la pausa o el perfil.
-- **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.
+- **64 recetas** en 8 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa, peruana, el **Asador La Pampa** (argentina) y la **Barbacoa Seúl** (coreana).
+- **Parrilla:** estación propia de los tres últimos locales (Cevichería, Asador y Barbacoa). Lo que se asa pide voltearse a mitad de cocción (si se voltea a tiempo sale perfecto) y se quema si no se recoge. Se mejora con la *Parrilla de hierro* y la *Segunda parrilla*.
 - **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada restaurante avanzado. Pepe corta en una tabla (con el Diner, contrato 5.500), Rosa voltea y saca lo listo de una sartén (con la Trattoria, 11.000) y Don Luis hace más pacientes a los clientes (con la Izakaya, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
 
 - **Mi local** (Inicio → Mi local): decora el restaurante con toldo, pared, luces, barra y adornos.
@@ -52,13 +53,13 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Inversión | Efecto |
 |---|---|
 | Ingredientes del mercado | Sin ellos no hay servicio |
-| Abrir restaurantes (1.500 → 22.000) | Nueva cocina con 8 recetas; platos más caros. **Requiere haber aprendido las 8 recetas del restaurante anterior** |
+| Abrir restaurantes (1.500 → 55.000) | Nueva cocina con 8 recetas; platos más caros. **Requiere haber aprendido las 8 recetas del restaurante anterior** |
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
 | Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, despensa más grande |
-| Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 en la Izakaya y la Cevichería |
+| Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 desde la Izakaya |
 | Ayudantes (desde el 3.er restaurante) | Contrato 5.500 / 11.000 / 18.000 y sueldo 130 / 220 / 320 por servicio |
 | Logros (12) | Metas cortas con premio: primer servicio, combos, 3 estrellas, fuegos apagados, grupos, críticos… (50 → 2.000) |
-| Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
+| Equipo extra (nivel 3 → 14) | Segunda tabla, bol, sartén, olla, horno y parrilla: cocinar dos cosas iguales a la vez |
 
 ### Pantallas
 
@@ -72,7 +73,7 @@ semanal · Cocina · Cierre de caja.
 
 ```
 shared/   Reglas del juego (JS puro, sin dependencias). Lo usan servidor y cliente.
-  data/catalog.js    Restaurantes, 40 recetas, estaciones, mejoras (con validación de integridad)
+  data/catalog.js    Restaurantes, 64 recetas, estaciones, mejoras (con validación de integridad)
   rules.js           Efecto de las mejoras y tiempos mínimos físicamente posibles
   levelgen.js        Generación determinista de clientes a partir de una semilla
   scoring.js         Validación anti-trampas y cálculo de monedas/estrellas/XP

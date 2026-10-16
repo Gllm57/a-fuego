@@ -12,7 +12,9 @@ export const PROCESSES = Object.freeze({
   batir:   { station: 'bol',   verb: 'Batir',    kind: 'tap',   taps: 6 },
   freir:   { station: 'sarten',verb: 'Freír',    kind: 'timer', seconds: 4.5, burnSeconds: 2.8 },
   hornear: { station: 'horno', verb: 'Hornear',  kind: 'timer', seconds: 6,   burnSeconds: 3.2 },
-  hervir:  { station: 'olla',  verb: 'Hervir',   kind: 'timer', seconds: 5,   burnSeconds: null }
+  hervir:  { station: 'olla',  verb: 'Hervir',   kind: 'timer', seconds: 5,   burnSeconds: null },
+  // En la parrilla todo se voltea a mitad de cocción (si no, no sale perfecto).
+  asar:    { station: 'parrilla', verb: 'Asar',  kind: 'timer', seconds: 5.5, burnSeconds: 2.6 }
 });
 
 export const STATIONS = Object.freeze({
@@ -20,11 +22,14 @@ export const STATIONS = Object.freeze({
   bol:    { name: 'Bol',    process: 'batir',   hint: 'Toca rápido para batir' },
   sarten: { name: 'Sartén', process: 'freir',   hint: 'Recoge antes de que se queme' },
   horno:  { name: 'Horno',  process: 'hornear', hint: 'Recoge antes de que se queme' },
-  olla:   { name: 'Olla',   process: 'hervir',  hint: 'Recoge cuando esté listo' }
+  olla:   { name: 'Olla',   process: 'hervir',  hint: 'Recoge cuando esté listo' },
+  // Sólo en los locales con `grill` (los tres últimos de la cadena).
+  parrilla: { name: 'Parrilla', process: 'asar', hint: 'Voltea a tiempo y recoge antes de que se queme', grillOnly: true }
 });
 export const STATION_IDS = Object.freeze(Object.keys(STATIONS));
 
-// La meta del dinero: abrir los 5 restaurantes de la cadena.
+// La meta del dinero: abrir todos los restaurantes de la cadena.
+// `grill`: el local tiene parrilla (los tres últimos).
 // `upkeep`: gastos fijos por servicio (gas, luz, personal), se descuentan de lo ganado.
 // `seats`: clientes atendidos a la vez; crece con cada restaurante, hasta 5.
 // `stationNames`: nombre local de un fogón (en la arepera la sartén es el budare).
@@ -40,8 +45,12 @@ export const RESTAURANTS = Object.freeze([
     theme: { primary: '#1E7A5A', deep: '#0F4A35', soft: '#D6EEE4', ground: '#F2F8F4' } },
   { id: 'izakaya',   name: 'Izakaya Hinode',     cuisine: 'Japonesa',      cost: 13000, reqLevel: 11, upkeep: 210, seats: 5,
     theme: { primary: '#B3264A', deep: '#6E1229', soft: '#F8DCE3', ground: '#FBF4F1' } },
-  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 13, upkeep: 280, seats: 5,
-    theme: { primary: '#C77A00', deep: '#7A4A00', soft: '#FBEBCD', ground: '#FFF8EA' } }
+  { id: 'cevicheria',name: 'Cevichería El Muelle', cuisine: 'Peruana',     cost: 22000, reqLevel: 13, upkeep: 280, seats: 5, grill: true,
+    theme: { primary: '#C77A00', deep: '#7A4A00', soft: '#FBEBCD', ground: '#FFF8EA' } },
+  { id: 'asador',    name: 'Asador La Pampa',    cuisine: 'Argentina',     cost: 36000, reqLevel: 16, upkeep: 360, seats: 5, grill: true,
+    theme: { primary: '#3E8FD0', deep: '#1D5687', soft: '#DCEEFB', ground: '#F3F9FE' } },
+  { id: 'coreana',   name: 'Barbacoa Seúl',      cuisine: 'Coreana',       cost: 55000, reqLevel: 19, upkeep: 450, seats: 5, grill: true,
+    theme: { primary: '#0F7C8A', deep: '#07505A', soft: '#D3EEF1', ground: '#F1FAFB' } }
 ]);
 
 // r(id, nombre, restaurante, componentes, precio de venta, costo de aprender, nivel requerido)
@@ -106,10 +115,30 @@ export const RECIPES = Object.freeze([
   r('causa',        'Causa limeña',      'cevicheria', [['papa','hervir'],['aguacate','cortar'],['limon','crudo']], 70, 0, 12),
   r('ceviche',      'Ceviche clásico',   'cevicheria', [['pescado','cortar'],['limon','batir'],['cebolla','cortar'],['aji','crudo']], 100, 2500, 12),
   r('picarones',    'Picarones con miel','cevicheria', [['camote','hervir'],['harina','freir'],['miel','crudo']], 80, 3200, 13),
-  r('anticuchos',   'Anticuchos',        'cevicheria', [['carne_res','hornear'],['aji','batir'],['papa','hervir']], 110, 4000, 14),
+  r('anticuchos',   'Anticuchos',        'cevicheria', [['carne_res','asar'],['aji','batir'],['papa','hervir']], 110, 4000, 14),
   r('aji_gallina',  'Ají de gallina',    'cevicheria', [['pollo','hervir'],['aji','batir'],['arroz','hervir'],['huevo','hervir']], 120, 5000, 15),
   r('chaufa',       'Arroz chaufa',      'cevicheria', [['arroz','freir'],['huevo','batir'],['cerdo','freir'],['cebolla','cortar']], 125, 6000, 16),
-  r('lomo',         'Lomo saltado',      'cevicheria', [['carne_res','freir'],['papa','freir'],['tomate','cortar'],['arroz','hervir'],['cebolla','cortar']], 150, 7500, 17)
+  r('lomo',         'Lomo saltado',      'cevicheria', [['carne_res','freir'],['papa','freir'],['tomate','cortar'],['arroz','hervir'],['cebolla','cortar']], 150, 7500, 17),
+
+  // ── Argentina ──────────────────────────────────────────────
+  r('choripan',     'Choripán',          'asador', [['pan','crudo'],['chorizo','asar'],['perejil','cortar']], 95, 0, 16),
+  r('provoleta_asada','Provoleta',       'asador', [['provoleta','asar'],['perejil','cortar'],['tomate','crudo']], 90, 0, 16),
+  r('empanada_salt','Empanada salteña',  'asador', [['harina','hornear'],['carne_res','cortar'],['huevo','hervir'],['aceituna','crudo']], 120, 4000, 16),
+  r('panqueque',    'Panqueque con dulce de leche','asador', [['leche','batir'],['harina','freir'],['dulce_leche','crudo']], 110, 5000, 17),
+  r('asado_tira',   'Asado de tira',     'asador', [['costilla','asar'],['papa','hornear'],['perejil','cortar']], 140, 5500, 17),
+  r('bife',         'Bife de chorizo',   'asador', [['carne_res','asar'],['ajo','cortar'],['papa','freir']], 150, 6500, 18),
+  r('milanesa',     'Milanesa napolitana','asador', [['carne_res','freir'],['huevo','batir'],['tomate','batir'],['queso','hornear']], 155, 7500, 19),
+  r('parrillada',   'Parrillada mixta',  'asador', [['chorizo','asar'],['costilla','asar'],['morron','asar'],['perejil','cortar'],['pan','crudo']], 190, 9500, 20),
+
+  // ── Coreana ────────────────────────────────────────────────
+  r('kimchi',       'Kimchi',            'coreana', [['col','cortar'],['gochujang','batir'],['ajo','cortar']], 110, 0, 19),
+  r('tteokbokki',   'Tteokbokki',        'coreana', [['tteok','hervir'],['gochujang','batir'],['cebolla','cortar']], 120, 0, 19),
+  r('bulgogi',      'Bulgogi',           'coreana', [['carne_res','asar'],['cebolla','cortar'],['ajo','cortar'],['arroz','hervir']], 160, 7000, 19),
+  r('pajeon',       'Pajeon de mariscos','coreana', [['harina','batir'],['camaron','freir'],['cebolla','cortar']], 150, 8000, 20),
+  r('samgyeopsal',  'Samgyeopsal',       'coreana', [['cerdo','asar'],['ajo','asar'],['lechuga','crudo'],['gochujang','crudo']], 165, 8500, 20),
+  r('japchae',      'Japchae',           'coreana', [['fideos','hervir'],['zanahoria','cortar'],['carne_res','freir'],['cebolla','cortar']], 175, 10000, 21),
+  r('galbi',        'Galbi',             'coreana', [['costilla','asar'],['miel','batir'],['ajo','cortar'],['arroz','hervir']], 185, 11500, 22),
+  r('bibimbap',     'Bibimbap',          'coreana', [['arroz','hervir'],['huevo','freir'],['zanahoria','cortar'],['carne_res','asar'],['gochujang','crudo']], 200, 13000, 23)
 ]);
 
 // Mejoras compradas con dinero. `costs[n]` es el precio de pasar al nivel n+1.
@@ -119,6 +148,7 @@ export const UPGRADES = Object.freeze([
   { id: 'sarten',    name: 'Sartén de cobre',    desc: 'Fríe 12% más rápido por nivel',        station: 'sarten', costs: [400, 1100, 2600, 6000] },
   { id: 'horno',     name: 'Horno de piedra',    desc: 'Hornea 12% más rápido por nivel',      station: 'horno',  costs: [400, 1100, 2600, 6000] },
   { id: 'olla',      name: 'Olla exprés',        desc: 'Hierve 12% más rápido por nivel',      station: 'olla',   costs: [400, 1100, 2600, 6000] },
+  { id: 'parrilla',  name: 'Parrilla de hierro', desc: 'Asa 12% más rápido por nivel',         station: 'parrilla', costs: [900, 2400, 5200, 11000], reqLevels: [13, 13, 15, 17] },
   { id: 'campana',   name: 'Campana extractora', desc: 'Más tiempo antes de que algo se queme', station: null,     costs: [700, 2400] },
   { id: 'ambiente',  name: 'Ambiente y música',  desc: 'Clientes 10% más pacientes y +8% propina por nivel', station: null, costs: [600, 1600, 3500, 8000] },
   { id: 'refri',     name: 'Refrigerador',       desc: '+25 lugares en la despensa por nivel', station: null,     costs: [800, 2500, 6000] },
@@ -128,7 +158,8 @@ export const UPGRADES = Object.freeze([
   { id: 'extra_bol',    name: 'Segundo bol',    desc: 'Bate dos cosas a la vez',         station: 'bol',    extra: true, costs: [1500], reqLevels: [4] },
   { id: 'extra_sarten', name: 'Segunda sartén', desc: 'Fríe dos ingredientes a la vez',  station: 'sarten', extra: true, costs: [2000], reqLevels: [5] },
   { id: 'extra_olla',   name: 'Segunda olla',   desc: 'Hierve dos ingredientes a la vez', station: 'olla',  extra: true, costs: [2200], reqLevels: [6] },
-  { id: 'extra_horno',  name: 'Segundo horno',  desc: 'Hornea dos cosas a la vez',       station: 'horno',  extra: true, costs: [2600], reqLevels: [7] }
+  { id: 'extra_horno',  name: 'Segundo horno',  desc: 'Hornea dos cosas a la vez',       station: 'horno',  extra: true, costs: [2600], reqLevels: [7] },
+  { id: 'extra_parrilla', name: 'Segunda parrilla', desc: 'Asa dos cortes a la vez',     station: 'parrilla', extra: true, costs: [7000], reqLevels: [14] }
 ]);
 
 // Personal de cocina: un asistente a la vez. Contratarlo cuesta una vez (`hireCost`) y
@@ -171,6 +202,7 @@ export function recipesOf(restaurantId) {
     for (const c of rec.components) {
       if (!INGREDIENTS[c.ingredient]) throw new Error(`Ingrediente desconocido ${c.ingredient} en ${rec.id}`);
       if (!PROCESSES[c.process]) throw new Error(`Proceso desconocido ${c.process} en ${rec.id}`);
+      if (STATIONS[PROCESSES[c.process].station]?.grillOnly && !RESTAURANT_BY_ID[rec.restaurant].grill) throw new Error(`${rec.id} usa parrilla en un local sin parrilla`);
     }
   }
   for (const rest of RESTAURANTS) {

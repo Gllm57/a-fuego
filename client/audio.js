@@ -92,7 +92,11 @@ const THEMES = {
   diner:      { bpm: 132, root: 261.63, scale: [0, 3, 5, 6, 7, 10, 12], bass: [0, 0, 5, 7], lead: 'square', swing: 0.14 },
   trattoria:  { bpm: 100, root: 220.0,  scale: [0, 2, 4, 5, 7, 9, 11, 12], bass: [0, 5, 7, 5], lead: 'triangle', swing: 0 },
   izakaya:    { bpm: 88,  root: 293.66, scale: [0, 2, 3, 7, 8, 12], bass: [0, 0, 8, 7], lead: 'sine', swing: 0 },
-  cevicheria: { bpm: 108, root: 246.94, scale: [0, 2, 4, 7, 9, 12], bass: [0, 5, 0, 7], lead: 'triangle', swing: 0.1 }
+  cevicheria: { bpm: 108, root: 246.94, scale: [0, 2, 4, 7, 9, 12], bass: [0, 5, 0, 7], lead: 'triangle', swing: 0.1 },
+  // Asador: aire de tango (menor armónica, marcado).
+  asador:     { bpm: 120, root: 220.0,  scale: [0, 2, 3, 5, 7, 8, 11, 12], bass: [0, 7, 0, 7], lead: 'square', swing: 0 },
+  // Barbacoa coreana: pentatónica tranquila.
+  coreana:    { bpm: 96,  root: 261.63, scale: [0, 2, 5, 7, 9, 12], bass: [0, 7, 5, 7], lead: 'sine', swing: 0.05 }
 };
 const semi = (root, n) => root * Math.pow(2, n / 12);
 

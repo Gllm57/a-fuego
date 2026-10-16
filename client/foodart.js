@@ -1,4 +1,4 @@
-// Ilustración propia para cada uno de los 45 ingredientes (lienzo de 48×48).
+// Ilustración propia para cada ingrediente (lienzo de 48×48).
 // Estilo "pegatina": contorno cálido oscuro, sombra interior y un brillo.
 
 const K = 'stroke="#3B2416" stroke-width="1.6" stroke-linejoin="round" stroke-linecap="round"';
@@ -276,5 +276,85 @@ export const FOOD = {
     <path d="M6 38C10 20 22 8 42 6c-2 18-14 31-36 32z" fill="#2F7D3A" ${K}/>
     <path d="M8 36L40 8" stroke="#A5D46A" stroke-width="2" stroke-linecap="round"/>
     <path d="M14 30l-4-8M20 25l-3-9M26 20l-1-9M19 31l9 2M25 25l9 2M31 19l7 1" stroke="#1F5426" stroke-width="1.3" stroke-linecap="round"/>
-    ${shine(28, 13, 3, 1.4)}`
+    ${shine(28, 13, 3, 1.4)}`,
+
+  // Chorizo parrillero: dos piezas atadas, con brillo de grasa.
+  chorizo: `${shadow}
+    <path d="M6 30c0-6 5-9 11-8l8 1c4 1 5 7 0 9l-9 2c-6 1-10 0-10-4z" fill="#B3402A" ${K}/>
+    <path d="M22 20c1-6 6-9 12-8l5 1c5 1 6 8 1 10l-8 2c-6 1-10-1-10-5z" fill="#C24B32" ${K}/>
+    <path d="M24 23l1-3M5 30l-2-1" stroke="#3B2416" stroke-width="1.6" stroke-linecap="round"/>
+    <circle cx="12" cy="28" r="1.2" fill="#F3C3B3"/><circle cx="17" cy="31" r="1" fill="#F3C3B3"/><circle cx="30" cy="16" r="1.2" fill="#F3C3B3"/><circle cx="35" cy="19" r="1" fill="#F3C3B3"/>
+    ${shine(28, 14, 3, 1.3, -10)}`,
+
+  // Provoleta: rueda de queso con la costra dorada de la parrilla.
+  provoleta: `${shadow}
+    <ellipse cx="24" cy="30" rx="18" ry="8" fill="#D9A93E" ${K}/>
+    <ellipse cx="24" cy="25" rx="18" ry="8" fill="#F6D27A" ${K}/>
+    <path d="M13 22l6 7M20 19l7 8M28 18l6 8" stroke="#B9782A" stroke-width="2" stroke-linecap="round" opacity=".75"/>
+    <circle cx="33" cy="27" r="1.6" fill="#E9B451"/>
+    ${shine(15, 21, 3, 1.4, -10)}`,
+
+  perejil: `${shadow}
+    <path d="M24 42V24M24 30l-8-8M24 28l8-9" stroke="#2C7A36" stroke-width="2" stroke-linecap="round" fill="none"/>
+    ${[[24, 15], [14, 18], [34, 16], [17, 10], [30, 9], [24, 22]].map(([x, y]) => `<path d="M${x} ${y - 6}c3 1 5 3 4 6 3 1 3 4 1 6-2 2-4 1-5 0-1 1-3 2-5 0-2-2-2-5 1-6-1-3 1-5 4-6z" fill="#3A9A48" ${K}/>`).join('')}
+    ${shine(20, 12, 2, 1.2)}`,
+
+  // Frasco de dulce de leche con su etiqueta.
+  dulce_leche: `${shadow}
+    <path d="M10 18h28v19a5 5 0 0 1-5 5H15a5 5 0 0 1-5-5z" fill="#B8742E" ${K}/>
+    <rect x="12" y="10" width="24" height="9" rx="3" fill="#F5EFE6" ${K}/>
+    <path d="M12 14h24" stroke="#C9B9A2" stroke-width="1.2"/>
+    <rect x="14" y="24" width="20" height="11" rx="3" fill="#FFF3D6"/>
+    <path d="M18 29c2-2 4 2 6 0s4 2 6 0" stroke="#8A5218" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    ${shine(15, 33, 1.5, 3.4, 0)}`,
+
+  // Morrón (pimiento rojo) con su tallo.
+  morron: `${shadow}
+    <path d="M24 12c-6-3-14 1-15 9-1 9 3 18 9 20 3 1 4-1 6-1s3 2 6 1c6-2 10-11 9-20-1-8-9-12-15-9z" fill="#D8352A" ${K}/>
+    <path d="M24 13c-1 8-1 18 0 27" stroke="#9E2118" stroke-width="1.6" fill="none"/>
+    <path d="M24 13c0-3 1-6 4-8" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none"/>
+    <path d="M19 12c2 2 8 2 10 0" stroke="#2E7D32" stroke-width="3" stroke-linecap="round" fill="none"/>
+    ${shine(15, 22, 2.4, 4, 10)}`,
+
+  // Costilla: tira de asado con sus huesitos.
+  costilla: `${shadow}
+    <path d="M6 22c6-6 30-8 36-2 3 4 1 12-4 15-8 4-26 4-31-1-3-3-3-9-1-12z" fill="#A9442F" ${K}/>
+    <path d="M10 24c8-3 22-4 30-1" stroke="#D87A62" stroke-width="2" fill="none" stroke-linecap="round"/>
+    ${[13, 22, 31].map((x) => `<ellipse cx="${x}" cy="30" rx="3" ry="2.4" fill="#FFF6EA" ${K}/>`).join('')}
+    <path d="M12 34c8 2 18 2 26 0" stroke="#74291A" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    ${shine(16, 20, 3, 1.3, -6)}`,
+
+  // Cabeza de ajo con sus gajos.
+  ajo: `${shadow}
+    <path d="M24 9c-2 4-6 6-10 9-6 5-6 14-1 19 6 5 16 5 22 0 5-5 5-14-1-19-4-3-8-5-10-9z" fill="#F3EBDD" ${K}/>
+    <path d="M24 12c-4 8-5 18-1 27M24 12c4 8 5 18 1 27M18 18c-4 6-4 13-1 19M30 18c4 6 4 13 1 19" stroke="#CDBFA6" stroke-width="1.4" fill="none"/>
+    <path d="M24 9c0-2 1-4 3-5" stroke="#A89878" stroke-width="2" stroke-linecap="round"/>
+    ${shine(17, 22, 2, 3.4, 10)}`,
+
+  // Col china (napa): hojas blancas abajo y verdes arriba.
+  col: `${shadow}
+    <path d="M14 42c-4-10-4-24 4-32 3-3 9-3 12 0 8 8 8 22 4 32z" fill="#F4F6E6" ${K}/>
+    <path d="M14 22c-2-8 2-15 8-16 4 0 6 3 6 7 4-4 10-2 10 4 0 4-2 6-4 7-5 0-9-2-10-5-1 4-5 6-10 3z" fill="#9CC86A" ${K}/>
+    <path d="M24 42V20M19 40c-1-6-1-12 1-18M29 40c1-6 1-12-1-18" stroke="#D5DEC0" stroke-width="1.4" fill="none"/>
+    ${shine(20, 12, 2.4, 1.4)}`,
+
+  // Gochujang: pote rojo de pasta de ají coreana.
+  gochujang: `${shadow}
+    <path d="M8 20h32l-3 18a5 5 0 0 1-5 4H16a5 5 0 0 1-5-4z" fill="#C0281F" ${K}/>
+    <rect x="7" y="13" width="34" height="8" rx="4" fill="#2E7D32" ${K}/>
+    <circle cx="24" cy="30" r="6" fill="#FFF3D6"/>
+    <path d="M21 28h6M24 28v5M21 33h6" stroke="#C0281F" stroke-width="1.5" stroke-linecap="round"/>
+    ${shine(13, 25, 1.4, 3, 0)}`,
+
+  zanahoria: `${shadow}
+    <path d="M10 38c6-10 14-20 22-26 3-2 7 2 5 5-6 8-16 16-26 22-1 1-2 0-1-1z" fill="#F08A24" ${K}/>
+    <path d="M18 30l3 2M23 24l3 2M28 19l3 2" stroke="#C25F0E" stroke-width="1.4" stroke-linecap="round"/>
+    <path d="M34 13c0-4 2-7 5-8M35 14c3-2 6-2 9 0M33 12c-2-3-2-6 0-8" stroke="#3E8E2A" stroke-width="2.4" stroke-linecap="round" fill="none"/>
+    ${shine(22, 25, 2.6, 1.2, -40)}`,
+
+  // Tteok: pastelitos cilíndricos de arroz.
+  tteok: `${shadow}
+    ${[[12, 30, -20], [24, 25, 10], [32, 33, -5]].map(([x, y, r]) => `<g transform="rotate(${r} ${x} ${y})"><rect x="${x - 9}" y="${y - 4}" width="18" height="8" rx="4" fill="#F4EFE2" ${K}/><ellipse cx="${x + 9}" cy="${y}" rx="2" ry="4" fill="#E2D8C2" ${K}/></g>`).join('')}
+    ${shine(18, 23, 2.4, 1, 10)}`
+
 };

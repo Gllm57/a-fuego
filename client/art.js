@@ -47,7 +47,9 @@ export const PROCESS_ICONS = {
   batir: `<path d="M12 2.5v6"/><path d="M12 8.5c-3.5 0-5.5 4.5-5.5 8a5.5 5.5 0 0 0 11 0c0-3.5-2-8-5.5-8z"/><path d="M12 8.5c-1.6 0-2.6 4.5-2.6 8s1.2 5 2.6 5 2.6-1.5 2.6-5-1-8-2.6-8z"/><path d="M6.6 16.5h10.8"/>`,
   freir: `<circle cx="10" cy="13" r="7"/><path d="M17 13h6"/><path d="M8 4c0 1.5 1 2 1 3.5M12 3c0 1.5 1 2 1 3.5"/>`,
   hornear: `<rect x="3" y="4" width="18" height="16" rx="2"/><rect x="6" y="10" width="12" height="7" rx="1"/><path d="M7 7h1M11 7h1"/>`,
-  hervir: `<path d="M4 10h16v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M2 10h20"/><path d="M9 3c0 2 1 3 1 5M14 3c0 2 1 3 1 5"/>`
+  hervir: `<path d="M4 10h16v7a4 4 0 0 1-4 4H8a4 4 0 0 1-4-4z"/><path d="M2 10h20"/><path d="M9 3c0 2 1 3 1 5M14 3c0 2 1 3 1 5"/>`,
+  // Parrilla: rejilla con patas y llamita.
+  asar: `<rect x="3" y="8" width="18" height="8" rx="2"/><path d="M7 8v8M11 8v8M15 8v8"/><path d="M6 16l-2 5M18 16l2 5"/><path d="M12 2c1.5 1.5 1.5 3 0 4.5"/>`
 };
 
 export function processSvg(proc, cls = 'proc') {
@@ -107,6 +109,7 @@ export const UPGRADE_ICONS = {
   horno: PROCESS_ICONS.hornear, olla: PROCESS_ICONS.hervir, campana: ICONS.fan, ambiente: ICONS.music,
   extra_bol: PROCESS_ICONS.batir, extra_sarten: PROCESS_ICONS.freir,
   extra_olla: PROCESS_ICONS.hervir, extra_horno: PROCESS_ICONS.hornear,
+  parrilla: PROCESS_ICONS.asar, extra_parrilla: PROCESS_ICONS.asar,
   refri: `<rect x="5" y="2" width="14" height="20" rx="4"/><path d="M5 10h14M9 5v2M9 13v3"/>`
 };
 
@@ -149,6 +152,7 @@ export const STATION_ART = {
   bol: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#7FB2E0"/><circle cx="24" cy="24" r="16" fill="#C9E0F3"/><path d="M14 18a12 12 0 0 1 10-6" stroke="#fff" stroke-width="3" stroke-linecap="round" fill="none" opacity=".8"/></svg>`,
   sarten: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#2E2019"/><circle cx="24" cy="24" r="17" fill="#4A372A"/><circle cx="24" cy="24" r="12" fill="none" stroke="#5C4636" stroke-width="1.5"/><path d="M14 16a14 14 0 0 1 8-5" stroke="#7A604C" stroke-width="2.5" stroke-linecap="round" fill="none"/></svg>`,
   horno: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#5A4536"/><circle cx="24" cy="24" r="16" fill="#2A1A10"/><circle cx="24" cy="24" r="16" fill="#FF8A3D" opacity="var(--glow, .25)"/><path d="M12 24h24M14 18h20M14 30h20" stroke="#6E5442" stroke-width="1.5"/></svg>`,
+  parrilla: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><circle cx="24" cy="24" r="21" fill="#2A1C16"/><circle cx="24" cy="24" r="17" fill="#3B2A20"/><g class="grill-coals"><circle cx="17" cy="20" r="3.5" fill="#E8541C" opacity=".75"/><circle cx="29" cy="27" r="4" fill="#F28C2C" opacity=".7"/><circle cx="22" cy="31" r="2.6" fill="#E8541C" opacity=".7"/><circle cx="30" cy="16" r="2.4" fill="#F2A23C" opacity=".6"/></g><g stroke="#8A7A6E" stroke-width="2.2" stroke-linecap="round"><path d="M12 14h24M9 20h30M8 26h32M9 32h30M12 38h24"/></g><circle cx="24" cy="24" r="17" fill="none" stroke="#6B5444" stroke-width="2"/></svg>`,
   olla: `<svg class="base" viewBox="0 0 48 48" aria-hidden="true"><rect x="0" y="21" width="8" height="6" rx="3" fill="#6A7A88"/><rect x="40" y="21" width="8" height="6" rx="3" fill="#6A7A88"/><circle cx="24" cy="24" r="19" fill="#8A9AA8"/><circle cx="24" cy="24" r="15" fill="#5E8FC0"/><circle cx="20" cy="20" r="3" fill="#A9D2F5" opacity=".8"/><circle cx="29" cy="27" r="2" fill="#A9D2F5" opacity=".8"/></svg>`
 };
 
@@ -159,22 +163,27 @@ export function plateSvgItems(recipe, filled = null) {
 }
 
 // Fachada con arco para las tarjetas de restaurante. Cada cocina tiene un detalle propio.
-const SIGNS = [
-  (p) => `<circle cx="150" cy="40" r="16" fill="#FFC23D"/><path d="M150 18v-8M150 70v-8M128 40h-8M180 40h-8" stroke="#FFC23D" stroke-width="4" stroke-linecap="round"/>`,
-  (p) => `<rect x="118" y="26" width="64" height="26" rx="13" fill="#fff"/><text x="150" y="45" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="16" fill="${p}">66</text>`,
-  (p) => `<path d="M134 52h32l-4-26h-24z" fill="#fff"/><circle cx="150" cy="22" r="6" fill="${p}"/>`,
-  (p) => `<ellipse cx="128" cy="40" rx="11" ry="15" fill="#E8452C"/><ellipse cx="172" cy="40" rx="11" ry="15" fill="#E8452C"/><path d="M128 25v-6M172 25v-6M128 55v5M172 55v5" stroke="#2A170D" stroke-width="3"/>`,
-  (p) => `<path d="M126 48c8-16 40-16 48 0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="30" r="9" fill="#fff"/>`
-];
+// Letrero de cada fachada, por restaurante.
+const SIGNS = {
+  // Arepera: una arepa dorada.
+  arepera: (p) => `<ellipse cx="150" cy="40" rx="24" ry="14" fill="#F6DA8A"/><ellipse cx="150" cy="37" rx="24" ry="11" fill="#FBE7B0"/><circle cx="140" cy="36" r="2" fill="#C99A3A"/><circle cx="156" cy="34" r="2.2" fill="#C99A3A"/><circle cx="162" cy="41" r="1.8" fill="#C99A3A"/>`,
+  taqueria: (p) => `<circle cx="150" cy="40" r="16" fill="#FFC23D"/><path d="M150 18v-8M150 70v-8M128 40h-8M180 40h-8" stroke="#FFC23D" stroke-width="4" stroke-linecap="round"/>`,
+  diner: (p) => `<rect x="118" y="26" width="64" height="26" rx="13" fill="#fff"/><text x="150" y="45" text-anchor="middle" font-family="Fredoka, sans-serif" font-weight="700" font-size="16" fill="${p}">66</text>`,
+  trattoria: (p) => `<path d="M134 52h32l-4-26h-24z" fill="#fff"/><circle cx="150" cy="22" r="6" fill="${p}"/>`,
+  izakaya: (p) => `<ellipse cx="128" cy="40" rx="11" ry="15" fill="#E8452C"/><ellipse cx="172" cy="40" rx="11" ry="15" fill="#E8452C"/><path d="M128 25v-6M172 25v-6M128 55v5M172 55v5" stroke="#2A170D" stroke-width="3"/>`,
+  cevicheria: (p) => `<path d="M126 48c8-16 40-16 48 0" fill="none" stroke="#fff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="30" r="9" fill="#fff"/>`,
+  asador: (p) => `<rect x="120" y="34" width="60" height="16" rx="5" fill="#fff"/><path d="M130 34v16M142 34v16M154 34v16M166 34v16" stroke="${p}" stroke-width="3"/><path d="M150 30c-8-6-2-14 2-18 0 6 8 8 4 18z" fill="#FFC23D"/>`,
+  coreana: (p) => `<circle cx="150" cy="38" r="17" fill="#fff"/><path d="M137 38a13 13 0 0 1 26 0 6.5 6.5 0 0 1-13 0 6.5 6.5 0 0 0-13 0z" fill="#C8102E"/><path d="M137 38a6.5 6.5 0 0 0 13 0 6.5 6.5 0 0 1 13 0 13 13 0 0 1-26 0z" fill="#1C4E9C"/>`
+};
 
-export function storefrontSvg(theme, idx = 0) {
+export function storefrontSvg(theme, id = 'arepera') {
   const p = theme.primary, d = theme.deep;
   const scallops = Array.from({ length: 9 }, (_, i) => `<circle cx="${62 + i * 22}" cy="98" r="11" fill="${i % 2 ? '#fff' : p}"/>`).join('');
   return `<svg viewBox="0 0 300 240" aria-hidden="true">
     <ellipse cx="150" cy="236" rx="140" ry="14" fill="${d}" opacity=".18"/>
     <path d="M40 236V120a110 110 0 0 1 220 0v116z" fill="#FFF8EE"/>
     <path d="M40 120a110 110 0 0 1 220 0" fill="none" stroke="${d}" stroke-width="10"/>
-    ${(SIGNS[idx] ?? SIGNS[0])(p)}
+    ${(SIGNS[id] ?? SIGNS.arepera)(p)}
     <path d="M50 98h200v10H50z" fill="${p}"/>
     ${scallops}
     <circle cx="86" cy="156" r="24" fill="${p}" opacity=".16"/><circle cx="86" cy="156" r="24" fill="none" stroke="${d}" stroke-width="5"/>

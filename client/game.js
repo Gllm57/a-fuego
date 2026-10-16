@@ -30,7 +30,9 @@ export class Kitchen {
       return { ...o, recipe, status: 'waiting', filled: recipe.components.map(() => false), busy: recipe.components.map(() => false), perfects: 0 };
     });
     // Fogones: uno por tipo, más los extra comprados ("olla#2").
-    this.stationKeys = STATION_IDS.flatMap((st) => Array.from({ length: Math.max(1, this.stats.stations?.[st] ?? 1) }, (_, i) => (i ? `${st}#${i + 1}` : st)));
+    // Fogones de este local: la parrilla sólo existe en los que la tienen.
+    this.stationKeys = STATION_IDS.filter((st) => (this.stats.stations?.[st] ?? (STATIONS[st].grillOnly ? 0 : 1)) > 0)
+      .flatMap((st) => Array.from({ length: Math.max(1, this.stats.stations?.[st] ?? 1) }, (_, i) => (i ? `${st}#${i + 1}` : st)));
     this.stations = Object.fromEntries(this.stationKeys.map((s) => [s, null]));
     this.fires = {};
     this.events = generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
@@ -353,6 +355,7 @@ export class Kitchen {
         <ul class="brief__rules">
           <li>${icon('heart')}<span><b>${SERVICE_LIVES} vidas.</b> Cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina.</span></li>
           ${groupCount ? `<li>${icon('people')}<span><b>${groupCount} ${groupCount > 1 ? 'grupos' : 'grupo'} de amigos.</b> Llegan juntos; si les sirves a todos con menos de ${GROUP_WINDOW_MS / 1000} s de diferencia, cada uno paga +${Math.round(GROUP_BONUS * 100)} %.</span></li>` : ''}
+          ${this.stationKeys.includes('parrilla') ? `<li>${processSvg('asar')}<span><b>Parrilla.</b> Lo que asas se voltea cuando lo pide; recógelo antes de que se queme.</span></li>` : ''}
           <li>${coinSvg()}<span><b>Al cerrar pagas ${fmt(cost)}</b> (${costText}). Si vendes menos, pierdes la diferencia.</span></li>
         </ul>
         <button class="btn btn--gold btn--xl btn--shine" data-act="go">${icon('fire')} ¡A cocinar!</button>
@@ -907,9 +910,10 @@ export class Kitchen {
   // sin separar nunca un par (p. ej. las dos ollas) ni cambiar el orden.
   #stationRows() {
     if (this._rows) return this._rows;
-    const groups = STATION_IDS.map((type) => ({ type, n: this.stationKeys.filter((k) => this.#type(k) === type).length }));
+    const groups = STATION_IDS.map((type) => ({ type, n: this.stationKeys.filter((k) => this.#type(k) === type).length })).filter((g) => g.n > 0);
     const total = groups.reduce((a, g) => a + g.n, 0);
-    const rowsNeeded = Math.ceil(total / 5);
+    // Hasta 6 fogones por fila: con parrilla y equipo extra siguen bastando dos filas.
+    const rowsNeeded = Math.ceil(total / 6);
     const target = Math.ceil(total / rowsNeeded);
     const rows = [[]];
     let used = 0;
@@ -992,7 +996,7 @@ export class Kitchen {
       label = `${this.#stName(this.#type(st))}: toca ${item.need - item.taps} veces más`;
     } else {
       const type = this.#type(st);
-      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : type === 'sarten' ? 'sizzle' : type === 'olla' ? 'bubbles' : type === 'horno' ? 'heat' : 'steam';
+      const fx = state === 'burning' || state === 'burnt' ? 'smoke' : type === 'sarten' || type === 'parrilla' ? 'sizzle' : type === 'olla' ? 'bubbles' : type === 'horno' ? 'heat' : 'steam';
       slot.insertAdjacentHTML('beforeend', `<span class="fx-${fx}">${'<i></i>'.repeat(fx === 'sizzle' || fx === 'bubbles' ? 5 : 3)}</span>`);
       if (this.#type(st) === 'horno') el.style.setProperty('--glow', state === 'cooking' ? '.6' : '.3');
       const text = { cooking: PROCESSES[item.process].verb + '…', flip: '¡Voltea!', ready: '¡Listo!', burning: '¡Se quema!', burnt: 'Tirar' }[state];
@@ -1047,7 +1051,7 @@ export class Kitchen {
     } else {
       const readyAt = this.t + this.stats.seconds[comp.process] * 1000;
       const burnSec = this.stats.burnSeconds[comp.process];
-      const flip = comp.process === 'freir' && FLIP_INGREDIENTS.has(ingId)
+      const flip = (comp.process === 'freir' && FLIP_INGREDIENTS.has(ingId)) || comp.process === 'asar'
         ? { at: this.t + (readyAt - this.t) * 0.45, done: false, good: false } : null;
       this.stations[st] = { ...base, kind: 'timer', readyAt, burnAt: burnSec ? readyAt + burnSec * 1000 : Infinity, lastState: 'cooking', flip };
       if (proc.station === 'sarten') sfx.sizzle();

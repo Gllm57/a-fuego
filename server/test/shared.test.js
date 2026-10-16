@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  RECIPES, RESTAURANTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
-  evaluatePurchase, applyGrants, kitchenStats, levelFromXp, xpForLevel, empireProgress, generateOrders,
+  RECIPES, RESTAURANTS, INGREDIENTS, newPlayerState, buildRunConfig, ordersForConfig, scoreRun, RunValidationError,
+  evaluatePurchase, applyGrants, kitchenStats, RESTAURANT_BY_ID, levelFromXp, xpForLevel, empireProgress, generateOrders,
   evaluateMarketBuy, marketPrices, applyInventory, dailyBasket, lineTotal, generateEvents, RECIPE_BY_ID,
   restockPlan, inventoryDelta, storageCapacity, inventoryCount, minPrepMs, nextGoal, UPGRADE_BY_ID, retiredRefund, groupsTogether, plateEarnings, GROUP_WINDOW_MS, TIER_PATIENCE, TIER_PACE, addRunToStats, pendingAchievements, achievementProgress, evaluateHire, applyHire, staffRank, addStaffExp, sanitizeStaff, marketIngredients, decorOwned, decorOf, evaluateDecorBuy, applyDecorBuy, evaluateDecorEquip, applyDecorEquip, retiredDecorRefund
 } from '../../shared/index.js';
@@ -11,8 +11,9 @@ import { honestServes } from './helpers.js';
 const stocked = () => ({ ...newPlayerState(), inventory: { harina_maiz: 40, carne_res: 40, queso: 40 } });
 const cfgFor = (state = stocked(), seed = 'semilla') => buildRunConfig(state, { restaurantId: 'arepera', randomSeed: seed, day: '2026-10-15' });
 
-test('el catálogo tiene 48 recetas, 8 por restaurante, y empieza en la arepera', () => {
-  assert.equal(RECIPES.length, 48);
+test('el catálogo tiene 64 recetas, 8 por restaurante, y empieza en la arepera', () => {
+  assert.equal(RECIPES.length, 64);
+  assert.equal(RESTAURANTS.length, 8);
   assert.equal(RESTAURANTS[0].id, 'arepera');
   assert.equal(RESTAURANTS[0].cost, 0);
   for (const r of RESTAURANTS) assert.equal(RECIPES.filter((x) => x.restaurant === r.id).length, 8);
@@ -106,7 +107,7 @@ test('el imperio llega al 100 % con todo comprado', () => {
   const s = newPlayerState();
   s.restaurants = RESTAURANTS.map((r) => r.id);
   s.recipes = RECIPES.map((r) => r.id);
-  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, refri: 3, extra_tabla: 1, extra_bol: 1, extra_sarten: 1, extra_olla: 1, extra_horno: 1 };
+  s.upgrades = { cuchillos: 4, batidora: 4, sarten: 4, horno: 4, olla: 4, campana: 2, ambiente: 4, refri: 3, extra_tabla: 1, extra_bol: 1, extra_sarten: 1, extra_olla: 1, extra_horno: 1, parrilla: 4, extra_parrilla: 1 };
   const e = empireProgress(s);
   assert.equal(e.percent, 100);
   assert.equal(e.title, 'Chef Leyenda');
@@ -400,4 +401,30 @@ test('las decoraciones retiradas se quitan y se reembolsan', () => {
   assert.equal(clean.equipped.luces, 'luces_colgantes');
   assert.deepEqual(clean.equipped.deco, ['deco_gato']);
   assert.equal(retiredDecorRefund(clean), 0);
+});
+
+test('la parrilla sólo está en los tres últimos locales', () => {
+  const grill = RESTAURANTS.filter((r) => r.grill).map((r) => r.id);
+  assert.deepEqual(grill, ['cevicheria', 'asador', 'coreana']);
+  assert.equal(kitchenStats({}, 'diner').stations.parrilla, undefined);
+  assert.equal(kitchenStats({ extra_parrilla: 1 }, 'asador').stations.parrilla, 2);
+  assert.ok(kitchenStats({ parrilla: 2 }, 'coreana').seconds.asar < kitchenStats({}, 'coreana').seconds.asar);
+  for (const r of RECIPES) {
+    if (r.components.some((c) => c.process === 'asar')) assert.ok(RESTAURANT_BY_ID[r.restaurant].grill, r.id);
+  }
+});
+
+test('en el asador y la barbacoa coreana un jugador honesto vende y el servidor lo acepta', () => {
+  for (const rid of ['asador', 'coreana']) {
+    const s = newPlayerState();
+    s.restaurants = [...s.restaurants, rid];
+    s.recipes = RECIPES.filter((r) => r.restaurant === rid).map((r) => r.id);
+    s.xp = xpForLevel(24);
+    s.inventory = Object.fromEntries(Object.keys(INGREDIENTS).map((k) => [k, 30]));
+    const c = buildRunConfig(s, { restaurantId: rid, randomSeed: 'parrilla', day: '2026-10-15' });
+    assert.equal(c.stats.stations.parrilla, 1);
+    const res = scoreRun(c, { serves: honestServes(c, { pace: 1500 }) });
+    assert.ok(res.served > 3, `${rid}: ${res.served}`);
+    assert.ok(res.gross > 0);
+  }
 });

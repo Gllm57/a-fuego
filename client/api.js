@@ -28,7 +28,7 @@ function sandboxState() {
   return {
     ...base,
     coins: SANDBOX_COINS,
-    xp: xpForLevel(20),
+    xp: xpForLevel(24),
     restaurants: RESTAURANTS.map((r) => r.id),
     recipes: RECIPES.map((r) => r.id),
     upgrades,
@@ -167,6 +167,15 @@ class LocalApi {
             data.state.stats.vipServed += h.vipServed ?? 0;
             if (h.stars >= 3) data.state.stats.threeStars += 1;
           }
+        }
+        // Modo prueba: todo lo que se agregue al juego (locales, recetas, mejoras) queda abierto.
+        if (SANDBOX) {
+          const full = sandboxState();
+          data.state.restaurants = full.restaurants;
+          data.state.recipes = full.recipes;
+          data.state.upgrades = { ...full.upgrades, ...data.state.upgrades, ...full.upgrades };
+          data.state.xp = Math.max(data.state.xp ?? 0, full.xp);
+          data.state.decor = { ...data.state.decor, owned: full.decor.owned };
         }
         // Un ayudante contratado antes de abrir su restaurante (versión anterior) deja de trabajar.
         data.state = sanitizeStaff(data.state);

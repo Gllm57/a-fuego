@@ -19,10 +19,10 @@ export const VIP_PRICE_MULT = 2;
 export const VIP_PATIENCE_MULT = 0.7;
 // Toques necesarios para apagar un fuego en una estación.
 export const FIRE_TAPS = 6;
-// Dificultad por restaurante (0 = arepera … 5 = cevichería): paciencia de los
+// Dificultad por restaurante (0 = arepera … 7 = barbacoa coreana): paciencia de los
 // clientes y ritmo de llegada. Cada local se nota más exigente que el anterior.
-export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.76, 0.68]);
-export const TIER_PACE = Object.freeze([1.04, 0.97, 0.91, 0.87, 0.82, 0.76]);
+export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.76, 0.68, 0.65, 0.62]);
+export const TIER_PACE = Object.freeze([1.04, 0.97, 0.91, 0.87, 0.82, 0.76, 0.73, 0.70]);
 // Vidas por servicio: cada cliente que se va enojado quita una (un crítico, dos).
 // Sin vidas cierran la cocina antes de tiempo. Margen para el último fotograma.
 export const SERVICE_LIVES = 3;
@@ -31,7 +31,7 @@ export const CLOSE_GRACE_MS = 400;
 export const GROUP_WINDOW_MS = 10_000;
 // Probabilidad de que llegue un grupo, según el restaurante: ninguno en los dos primeros
 // locales; desde el diner aparecen parejas y con 5 mesas también grupos de tres.
-export const TIER_GROUP_CHANCE = Object.freeze([0, 0, 0.14, 0.17, 0.2, 0.22]);
+export const TIER_GROUP_CHANCE = Object.freeze([0, 0, 0.14, 0.17, 0.2, 0.22, 0.24, 0.26]);
 export const GROUP_BONUS = 0.25;
 export const tierValue = (table, tier) => table[Math.max(0, Math.min(table.length - 1, tier | 0))];
 
@@ -58,17 +58,22 @@ export function kitchenStats(upgrades = {}, restaurantId = null) {
     seconds: {
       freir: round2(PROCESSES.freir.seconds * speed('sarten')),
       hornear: round2(PROCESSES.hornear.seconds * speed('horno')),
-      hervir: round2(PROCESSES.hervir.seconds * speed('olla'))
+      hervir: round2(PROCESSES.hervir.seconds * speed('olla')),
+      asar: round2(PROCESSES.asar.seconds * speed('parrilla'))
     },
     burnSeconds: {
       freir: round2(PROCESSES.freir.burnSeconds * campana),
-      hornear: round2(PROCESSES.hornear.burnSeconds * campana)
+      hornear: round2(PROCESSES.hornear.burnSeconds * campana),
+      asar: round2(PROCESSES.asar.burnSeconds * campana)
     },
     patienceMult: round2(1 + 0.1 * ambiente),
     tipBonus: round2(0.08 * ambiente),
     slots: RESTAURANT_BY_ID[restaurantId]?.seats ?? BASE_SLOTS,
-    // Cuántos fogones hay de cada tipo (1 + equipo extra comprado).
-    stations: Object.fromEntries(Object.keys(STATIONS).map((st) => [st, 1 + upgradeLevel(upgrades, `extra_${st}`)]))
+    // Cuántos fogones hay de cada tipo (1 + equipo extra comprado). La parrilla, sólo
+    // en los locales que la tienen.
+    stations: Object.fromEntries(Object.keys(STATIONS)
+      .filter((st) => !STATIONS[st].grillOnly || !restaurantId || RESTAURANT_BY_ID[restaurantId]?.grill)
+      .map((st) => [st, 1 + upgradeLevel(upgrades, `extra_${st}`)]))
   };
 }
 

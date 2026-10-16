@@ -68,7 +68,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
   return orders;
 }
 
-// Fuegos en la cocina: bloquean la sartén o el horno hasta apagarlos.
+// Fuegos en la cocina: bloquean la sartén, el horno o (en los locales con parrilla) la parrilla.
 // Sólo hacen la partida más lenta, así que el servidor no necesita validarlos.
 export function generateEvents({ seed, durationMs, tier = 0 }) {
   const rng = createRng(`${seed}:events`);
@@ -78,9 +78,15 @@ export function generateEvents({ seed, durationMs, tier = 0 }) {
     const slice = (durationMs - 30_000) / count;
     events.push({
       type: 'fuego',
-      station: rng() < 0.6 ? 'sarten' : 'horno',
+      station: pickFireStation(rng(), tier),
       at: Math.round(20_000 + slice * i + rng() * slice * 0.7)
     });
   }
   return events;
+}
+
+// Desde la cevichería (tier 5) los tres últimos locales tienen parrilla, que también se prende.
+function pickFireStation(x, tier) {
+  if (tier >= 5 && x < 0.3) return 'parrilla';
+  return x < 0.6 ? 'sarten' : 'horno';
 }

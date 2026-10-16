@@ -105,7 +105,7 @@ const TABS = [
 const PAGES = {
   home: { title: null },
   market: { title: 'Mercado', sub: 'Precios de hoy · cambian cada día' },
-  recipes: { title: 'Recetario', sub: '48 recetas de 6 cocinas del mundo' },
+  recipes: { title: 'Recetario', sub: `${RECIPES.length} recetas de ${RESTAURANTS.length} cocinas del mundo` },
   upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
   diary: { title: 'Diario de caja', sub: 'Logros, ganancias y gastos de tus servicios', back: 'home' },
   ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' },
@@ -298,7 +298,7 @@ function restaurantCard(r, i) {
   return `
     <button class="rest ${owned ? '' : 'is-locked'}" role="listitem" data-rest="${r.id}" aria-pressed="${r.id === app.restaurantId}"
       style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft}">
-      <span class="rest__art">${storefrontSvg(r.theme, i)}
+      <span class="rest__art">${storefrontSvg(r.theme, r.id)}
         ${owned ? '' : `<span class="rest__lock">${icon('lock')}<span>${lockLabel(r)} · ${coinSvg()} ${fmt(r.cost)}</span></span>`}
       </span>
       <span class="rest__body">
@@ -348,7 +348,7 @@ function openRestaurant(r) {
   openSheet(`
     <div class="sheet__head"><h2>${r.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
     <div class="rest-hero ${can ? '' : 'is-locked'}" style="--r-brand:${r.theme.primary};--r-soft:${r.theme.soft};--r-deep:${r.theme.deep}">
-      <div class="rest-hero__art">${storefrontSvg(r.theme, i)}</div>
+      <div class="rest-hero__art">${storefrontSvg(r.theme, r.id)}</div>
       <span class="rest-hero__kicker">Cocina ${escapeHtml(r.cuisine.toLowerCase())}</span>
       ${can ? '' : `<span class="rest-hero__lock">${icon('lock')}</span>`}
     </div>
@@ -400,6 +400,7 @@ function unlocksFor(r) {
   else if (i === 4) items.push({ icon: 'people', title: 'Grupos de tres', text: 'Ahora también llegan grupos de tres amigos: sírvelos casi a la vez.' });
   const helper = STAFF.find((m) => m.reqRestaurant === r.id);
   if (helper) items.push({ icon: 'user', title: `Nuevo ayudante: ${helper.name}`, text: `${helper.role}. ${helper.desc} Contrátalo arriba en Mejoras.` });
+  if (r.grill && !RESTAURANTS[i - 1]?.grill) items.push({ icon: 'fire', title: 'Nueva estación: la parrilla', text: 'Asa carnes y verduras. A mitad de cocción pide que la voltees: hazlo a tiempo para que salga perfecto, y recógelo antes de que se queme. Mejórala en Mejoras.' });
   if (i === 3 || i === 5) items.push({ icon: 'fire', title: 'Más incendios', text: 'En este local la cocina se prende fuego más seguido.' });
   items.push({ icon: 'clock', title: 'Clientes más exigentes', text: `Esperan menos y llegan más seguido. Al cerrar pagas ${fmt(r.upkeep)} de gastos del local.` });
   return items;
@@ -697,6 +698,7 @@ function upgradeEffect(id, k, s) {
     case 'sarten': return `Fríe en ${k.seconds.freir.toFixed(1)} s`;
     case 'horno': return `Hornea en ${k.seconds.hornear.toFixed(1)} s`;
     case 'olla': return `Hierve en ${k.seconds.hervir.toFixed(1)} s`;
+    case 'parrilla': return `Asa en ${k.seconds.asar.toFixed(1)} s`;
     case 'campana': return `Se quema tras ${k.burnSeconds.freir.toFixed(1)} s`;
     case 'ambiente': return `Paciencia ×${k.patienceMult.toFixed(1)} · +${Math.round(k.tipBonus * 100)}% propina`;
     case 'refri': return `Despensa de ${storageCapacity(s.upgrades)} lugares`;
