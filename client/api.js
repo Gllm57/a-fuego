@@ -5,7 +5,7 @@ import {
   newPlayerState, RETIRED_UPGRADES, retiredRefund, emptyStats, STARTER_RESTAURANT, evaluateHire, applyHire, addStaffExp, addRunToStats, pendingAchievements, evaluatePurchase, applyGrants, empireProgress, nextGoal, levelFromXp, levelProgress,
   dailyChallenge, todayUTC, buildRunConfig, RunStartError, scoreRun, RunValidationError,
   marketIngredients, marketPrices, evaluateMarketBuy, applyInventory, dailyBasket, storageCapacity, inventoryCount,
-  BULK_QTY, BULK_DISCOUNT, inventoryDelta
+  BULK_QTY, BULK_DISCOUNT, inventoryDelta, UPGRADES, RESTAURANTS, RECIPES, STAFF, xpForLevel
 } from './shared/index.js';
 
 export class ApiError extends Error {
@@ -16,7 +16,35 @@ export class ApiError extends Error {
 }
 
 const TOKEN_KEY = 'afuego.token';
-const LOCAL_KEY = 'afuego.local.v1';
+// Modo prueba (artefacto): monedas infinitas y todo desbloqueado, guardado aparte.
+export const SANDBOX = typeof __AFUEGO_SANDBOX__ !== 'undefined' && __AFUEGO_SANDBOX__ === true;
+const LOCAL_KEY = SANDBOX ? 'afuego.sandbox.v1' : 'afuego.local.v1';
+const SANDBOX_COINS = 9_999_999;
+
+// Estado de prueba: el final del juego, con todo comprado y la cevichería abierta.
+function sandboxState() {
+  const base = newPlayerState();
+  const upgrades = Object.fromEntries(UPGRADES.map((u) => [u.id, u.costs.length]));
+  return {
+    ...base,
+    coins: SANDBOX_COINS,
+    xp: xpForLevel(20),
+    restaurants: RESTAURANTS.map((r) => r.id),
+    recipes: RECIPES.map((r) => r.id),
+    upgrades,
+    inventory: {},
+    staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 5, luis: 15 } }
+  };
+}
+
+// Rellena la despensa con lo que pide el menú de un restaurante (10 de cada uno).
+function sandboxRefill(state, restaurantId) {
+  const inventory = { ...state.inventory };
+  for (const r of RECIPES.filter((x) => x.restaurant === restaurantId)) {
+    for (const c of r.components) inventory[c.ingredient] = Math.max(inventory[c.ingredient] ?? 0, 10);
+  }
+  return { ...state, coins: SANDBOX_COINS, inventory };
+}
 
 const store = {
   get(k) { try { return localStorage.getItem(k); } catch { return null; } },
@@ -122,7 +150,7 @@ class LocalApi {
         data.ledger ??= [];
         // Partidas guardadas antes de los logros: se reconstruyen los contadores con el diario.
         data.state.stats = { ...emptyStats(), ...data.state.stats };
-        data.state.staff ??= { hired: null, exp: {} };
+        data.state.staff = { hired: null, owned: [], exp: {}, ...data.state.staff };
         // La arepera se agregó como primer local: quien ya jugaba la recibe gratis.
         if (!data.state.restaurants.includes(STARTER_RESTAURANT)) {
           data.state.restaurants = [STARTER_RESTAURANT, ...data.state.restaurants];
@@ -147,10 +175,15 @@ class LocalApi {
         return data;
       }
     } catch { /* datos corruptos: empezar de nuevo */ }
+    if (SANDBOX) return { state: sandboxRefill(sandboxState(), 'cevicheria'), name: 'Chef de prueba', bests: {}, history: [], ledger: [] };
     const state = newPlayerState();
     return { state, name: 'Chef Invitado', bests: {}, history: [], ledger: [{ delta: state.coins, reason: 'bono_bienvenida', t: Date.now() }] };
   }
-  #save() { store.set(LOCAL_KEY, JSON.stringify(this.data)); }
+  #save() {
+    // Monedas infinitas en el modo prueba: siempre vuelve a llenarse la caja.
+    if (SANDBOX) this.data.state.coins = SANDBOX_COINS;
+    store.set(LOCAL_KEY, JSON.stringify(this.data));
+  }
   #log(delta, reason) {
     this.data.ledger.unshift({ delta, reason, t: Date.now(), balanceAfter: this.data.state.coins });
     this.data.ledger = this.data.ledger.slice(0, 60);
@@ -181,12 +214,14 @@ class LocalApi {
   async hireStaff(id) {
     const d = evaluateHire(this.data.state, id);
     if (!d.ok) throw new ApiError(409, d.reason, PURCHASE_MSG[d.reason] ?? 'No se pudo contratar', d);
-    this.data.state = applyHire(this.data.state, id);
+    this.data.state = applyHire(this.data.state, id, d.price);
+    if (d.price > 0) this.#log(-d.price, 'contrato');
     this.#save();
     return { profile: this.#profile() };
   }
 
   async startRun(restaurantId, mode) {
+    if (SANDBOX) this.data.state = sandboxRefill(this.data.state, restaurantId);
     try {
       const config = buildRunConfig(this.data.state, { restaurantId, mode, randomSeed: crypto.randomUUID?.() ?? String(Math.random()), day: todayUTC() });
       const runId = `local-${Date.now()}`;
@@ -297,6 +332,6 @@ class LocalApi {
 const PURCHASE_MSG = {
   no_existe: 'Ese artículo no existe', ya_comprado: 'Ya lo tienes', nivel_insuficiente: 'Necesitas más nivel de chef',
   sin_dinero: 'No tienes suficientes monedas', restaurante_cerrado: 'Primero abre ese restaurante', nivel_maximo: 'Ya está al nivel máximo',
-  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', recetas_pendientes: 'Primero aprende todas las recetas del restaurante anterior', carrito_vacio: 'El carrito está vacío',
+  despensa_llena: 'No cabe en tu despensa: mejora el refrigerador', recetas_pendientes: 'Primero aprende todas las recetas del restaurante anterior', personal_bloqueado: 'Este ayudante se desbloquea con un restaurante más avanzado', carrito_vacio: 'El carrito está vacío',
   no_disponible: 'Ese ingrediente no se vende para tus recetas', cantidad_invalida: 'Cantidad inválida'
 };

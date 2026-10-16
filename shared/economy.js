@@ -53,7 +53,7 @@ export function newPlayerState() {
     basketClaimed: null,
     stats: emptyStats(),
     achievements: [],
-    staff: { hired: null, exp: {} }
+    staff: { hired: null, owned: [], exp: {} }
   };
 }
 
@@ -64,24 +64,36 @@ export function staffRank(services = 0) {
   return rank;
 }
 
-// Contratar (o despedir con id = null). No cuesta dinero: cobra sueldo en cada servicio.
+// Contratar (o despedir con id = null). La primera vez se paga el contrato (`hireCost`);
+// a quien ya trabajó contigo lo vuelves a llamar gratis. Además cobra sueldo en cada servicio.
 export function evaluateHire(state, id) {
-  if (id === null) return { ok: true };
+  if (id === null) return { ok: true, price: 0 };
   const member = STAFF_BY_ID[id];
   if (!member) return { ok: false, reason: 'no_existe' };
   if (state.staff?.hired === id) return { ok: false, reason: 'ya_comprado' };
+  if (staffOwned(state).includes(id)) return { ok: true, price: 0 };
+  if (!state.restaurants.includes(member.reqRestaurant)) return { ok: false, reason: 'personal_bloqueado', restaurant: member.reqRestaurant };
   if (levelFromXp(state.xp) < member.reqLevel) return { ok: false, reason: 'nivel_insuficiente', reqLevel: member.reqLevel };
-  return { ok: true };
+  if (state.coins < member.hireCost) return { ok: false, reason: 'sin_dinero', price: member.hireCost };
+  return { ok: true, price: member.hireCost };
 }
 
-export function applyHire(state, id) {
-  return { ...state, staff: { hired: id, exp: { ...(state.staff?.exp ?? {}) } } };
+export function staffOwned(state) {
+  const owned = new Set(state.staff?.owned ?? []);
+  if (state.staff?.hired) owned.add(state.staff.hired);
+  return [...owned];
+}
+
+export function applyHire(state, id, price = 0) {
+  const owned = staffOwned(state);
+  if (id && !owned.includes(id)) owned.push(id);
+  return { ...state, coins: state.coins - price, staff: { hired: id, owned, exp: { ...(state.staff?.exp ?? {}) } } };
 }
 
 // Un servicio más de experiencia para quien trabajó.
 export function addStaffExp(staff, id) {
   if (!id) return staff;
-  return { ...staff, exp: { ...staff.exp, [id]: (staff.exp?.[id] ?? 0) + 1 } };
+  return { ...staff, owned: staff.owned ?? [id], exp: { ...staff.exp, [id]: (staff.exp?.[id] ?? 0) + 1 } };
 }
 
 // Decide si una compra es válida. Nunca muta el estado.

@@ -18,6 +18,7 @@ const PURCHASE_ERRORS = {
   sin_dinero: [409, 'No tienes suficientes monedas'],
   restaurante_cerrado: [403, 'Primero abre ese restaurante'],
   recetas_pendientes: [403, 'Primero aprende todas las recetas del restaurante anterior'],
+  personal_bloqueado: [403, 'Este ayudante se desbloquea con un restaurante más avanzado'],
   nivel_maximo: [409, 'Ya está al nivel máximo'],
   tipo_invalido: [400, 'Tipo de compra inválido'],
   carrito_vacio: [400, 'El carrito está vacío'],
@@ -144,7 +145,10 @@ export class GameService {
   #progress(p) {
     let saved = {};
     try { saved = JSON.parse(p.progress_json ?? '{}'); } catch { /* vacío */ }
-    const staff = { hired: STAFF_BY_ID[saved.staff?.hired] ? saved.staff.hired : null, exp: { ...(saved.staff?.exp ?? {}) } };
+    const hired = STAFF_BY_ID[saved.staff?.hired] ? saved.staff.hired : null;
+    const owned = (saved.staff?.owned ?? []).filter((x) => STAFF_BY_ID[x]);
+    if (hired && !owned.includes(hired)) owned.push(hired);
+    const staff = { hired, owned, exp: { ...(saved.staff?.exp ?? {}) } };
     return { stats: { ...emptyStats(), ...saved.stats }, achievements: Array.isArray(saved.achievements) ? saved.achievements : [], staff };
   }
 
@@ -159,9 +163,11 @@ export class GameService {
       const d = evaluateHire(state, id);
       if (!d.ok) {
         const [status, msg] = PURCHASE_ERRORS[d.reason] ?? [400, 'No se pudo contratar'];
-        throw new AppError(status, d.reason, msg, { reqLevel: d.reqLevel });
+        throw new AppError(status, d.reason, msg, { reqLevel: d.reqLevel, restaurant: d.restaurant, price: d.price });
       }
-      const next = applyHire(state, id);
+      // El contrato se paga una sola vez y queda en el libro contable.
+      if (d.price > 0) this.#debit(playerId, d.price, 'contrato', id);
+      const next = applyHire(state, id, d.price);
       this.#saveProgress(playerId, next);
       return { profile: this.profile(playerId) };
     });

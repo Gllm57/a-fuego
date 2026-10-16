@@ -79,7 +79,7 @@ export class Kitchen {
           </div>
           <div class="order-wrap"><div class="ticket order"></div><div class="combo" aria-live="polite"></div></div>
           <div class="counter" data-rows="${this.#stationRows().length}" style="--ring:${this.#ringSize()}">${this.#stationRows().map((row) => `<div class="counter__row">${row.map((type) => this.#stationGroup(type)).join('')}</div>`).join('')}</div>
-          <div class="shelf" style="--jar:${this.pantryIds.length <= 5 ? 84 : this.pantryIds.length <= 10 ? 64 : 54}px">
+          <div class="shelf" ${this.pantryIds.length > 15 ? 'data-many' : ''} style="--jar:${this.pantryIds.length <= 5 ? 84 : this.pantryIds.length <= 10 ? 64 : this.pantryIds.length <= 15 ? 54 : 46}px">
             <div class="shelf__head"><span class="shelf__count"></span><span class="shelf__urgent"></span></div>
             <div class="shelf__grid">${this.pantryIds.map((id) => `
               <button class="jar" data-ing="${id}" aria-label="${INGREDIENTS[id].name}"><span class="jar__glass">${ingredientSvg(id, { title: '' })}</span><span class="jar__qty"></span><span class="jar__eta" hidden></span></button>`).join('')}

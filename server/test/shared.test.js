@@ -279,20 +279,29 @@ test('logros: contadores y cobro una sola vez', () => {
 
 test('asistentes: nivel para contratar, sueldo por servicio y rangos', () => {
   const s = stocked();
-  assert.equal(evaluateHire(s, 'pepe').reason, 'nivel_insuficiente');
+  // Se desbloquean con restaurantes avanzados, piden nivel y el contrato cuesta.
+  assert.equal(evaluateHire(s, 'pepe').reason, 'personal_bloqueado');
   assert.equal(evaluateHire(s, 'nadie').reason, 'no_existe');
-  const lvl = { ...s, xp: xpForLevel(7) };
-  assert.ok(evaluateHire(lvl, 'luis').ok);
-  const hired = applyHire(lvl, 'luis');
+  const chain = { ...s, restaurants: ['arepera', 'taqueria', 'diner', 'trattoria', 'izakaya'] };
+  assert.equal(evaluateHire(chain, 'luis').reason, 'nivel_insuficiente');
+  assert.equal(evaluateHire({ ...chain, xp: xpForLevel(12) }, 'luis').reason, 'sin_dinero');
+  const lvl = { ...chain, xp: xpForLevel(12), coins: 20000 };
+  const d = evaluateHire(lvl, 'luis');
+  assert.equal(d.price, 11000);
+  const hired = applyHire(lvl, 'luis', d.price);
+  assert.equal(hired.coins, 9000);
   assert.equal(evaluateHire(hired, 'luis').reason, 'ya_comprado');
+  // Volver a llamar a alguien que ya trabajó contigo es gratis.
+  const swapped = applyHire(hired, null);
+  assert.equal(evaluateHire(swapped, 'luis').price, 0);
   const base = cfgFor(lvl);
   const c = cfgFor(hired);
-  assert.equal(c.salary, 90);
+  assert.equal(c.salary, 150);
   assert.equal(c.staff.rank, 0);
   assert.ok(c.stats.patienceMult > base.stats.patienceMult);
   const res = scoreRun(c, { serves: honestServes(c) });
-  assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - 90));
-  assert.equal(res.salary, 90);
+  assert.equal(res.coins, Math.max(0, res.gross - res.upkeep - 150));
+  assert.equal(res.salary, 150);
   assert.equal(staffRank(0), 0);
   assert.equal(staffRank(5), 1);
   assert.equal(staffRank(40), 2);

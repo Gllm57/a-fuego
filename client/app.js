@@ -3,9 +3,9 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned
 } from './shared/index.js';
-import { createApi, ApiError } from './api.js';
+import { createApi, ApiError, SANDBOX } from './api.js';
 import { Kitchen } from './game.js';
 import { sfx, getPrefs, setPref } from './audio.js';
 import { ingredientSvg, processSvg, icon, coinSvg, starSvg, storefrontSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
@@ -17,7 +17,7 @@ const app = {
   market: null,
   cart: {},
   tab: 'home',
-  restaurantId: localGet('afuego.restaurant') ?? 'arepera',
+  restaurantId: localGet('afuego.restaurant') ?? (SANDBOX ? 'cevicheria' : 'arepera'),
   recipeTab: null,
   boardTab: null,
   busy: false
@@ -28,7 +28,7 @@ const root = document.getElementById('app');
 boot();
 
 // Instalable y jugable sin conexión (se ignora donde no hay service workers).
-if ('serviceWorker' in navigator && location.protocol === 'https:') {
+if (!SANDBOX && 'serviceWorker' in navigator && location.protocol === 'https:') {
   navigator.serviceWorker.register('sw.js').catch(() => {});
 }
 
@@ -106,8 +106,7 @@ const PAGES = {
   recipes: { title: 'Recetario', sub: '48 recetas de 6 cocinas del mundo' },
   upgrades: { title: 'Mejoras', sub: 'Aplican a todos tus locales' },
   diary: { title: 'Diario de caja', sub: 'Logros, ganancias y gastos de tus servicios', back: 'home' },
-  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' },
-  staff: { title: 'Personal de cocina', sub: 'Un asistente a la vez · cobra sueldo en cada servicio', back: 'home' }
+  ranking: { title: 'Ranking semanal', sub: 'Mejor servicio de la semana', back: 'home' }
 };
 
 function renderShell() {
@@ -144,7 +143,7 @@ function go(tab) {
   const screen = document.getElementById('screen');
   screen.style.animation = 'none'; void screen.offsetWidth; screen.style.animation = '';
   screen.scrollTop = 0;
-  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking, staff: renderStaff })[tab]();
+  ({ home: renderHome, market: renderMarket, recipes: renderRecipes, upgrades: renderUpgrades, diary: renderDiary, ranking: renderRanking })[tab]();
   renderNavDots();
 }
 
@@ -158,7 +157,8 @@ function renderNavDots() {
   const lowStock = dishesPossible(s, app.restaurantId) < 4 || s.basketClaimed !== app.profile.daily.day;
   const set = (id, on) => { const d = root.querySelector(`[data-tab="${id}"] .nav__dot`); if (d) d.hidden = !on; };
   set('recipes', canLearn);
-  set('upgrades', canUpgrade);
+  const canHire = STAFF.some((m) => { const x = staffState(s, m); return !x.owned && x.unlocked && s.coins >= m.hireCost; });
+  set('upgrades', canUpgrade || canHire);
   set('market', lowStock);
 }
 
@@ -175,10 +175,10 @@ function renderHeaderBar() {
         <span class="ring" style="--p:${pct}"><span class="ring__inner">${lvl.level}</span></span>
         <span style="min-width:0">
           <span class="chef-btn__name">${escapeHtml(app.profile.player.displayName)}</span>
-          <span class="chef-btn__title">${app.profile.empire.title}</span>
+          <span class="chef-btn__title">${SANDBOX ? 'Modo prueba · ' : ''}${app.profile.empire.title}</span>
         </span>
       </button>
-      <div class="coin-pill" aria-label="Monedas">${coinSvg()}<span class="coin-pill__num">${fmt(st().coins)}</span></div>
+      <div class="coin-pill" aria-label="${SANDBOX ? 'Monedas infinitas' : 'Monedas'}">${coinSvg()}<span class="coin-pill__num">${SANDBOX ? '∞' : fmt(st().coins)}</span></div>
     </div>
     ${page.title ? `<div class="page-head"><div><h1>${page.title}</h1><p>${page.sub}</p></div></div>` : ''}`;
   bar.querySelector('[data-act="profile"]').addEventListener('click', openProfile);
@@ -260,7 +260,6 @@ function renderHome() {
           <b>Ranking</b>
           <span>Top de la semana</span>
         </button>
-        ${staffTile(s)}
       </div>
     </div>`;
 
@@ -269,7 +268,6 @@ function renderHome() {
   screen.querySelectorAll('[data-act="to-market"]').forEach((b) => b.addEventListener('click', () => go('market')));
   screen.querySelector('[data-act="diary"]').addEventListener('click', () => go('diary'));
   screen.querySelector('[data-act="ranking"]').addEventListener('click', () => go('ranking'));
-  screen.querySelector('[data-act="staff"]').addEventListener('click', () => go('staff'));
   screen.querySelector('[data-act="goal"]').addEventListener('click', () => {
     if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; go('recipes'); }
     else if (goal.kind === 'restaurant') openRestaurant(RESTAURANT_BY_ID[goal.id]);
@@ -585,6 +583,7 @@ function renderUpgrades() {
   const screen = document.getElementById('screen');
   screen.innerHTML = `
     <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
+      ${staffSection(s)}
       ${UPGRADES.map((u, i) => {
         const lvl = upgradeLevel(s.upgrades, u.id);
         const max = lvl >= u.costs.length;
@@ -609,6 +608,7 @@ function renderUpgrades() {
         </article>`;
       }).join('')}
     </div>`;
+  screen.querySelectorAll('[data-staff]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); openStaffSheet(b.dataset.staff); }));
   screen.querySelectorAll('[data-up]').forEach((b) => b.addEventListener('click', async () => {
     if (await buy('upgrade', b.dataset.up)) { toast('¡Mejora instalada!', 'good'); app.market = null; renderUpgrades(); }
   }));
@@ -706,63 +706,77 @@ function bindAchievements(screen) {
   });
 }
 
-// ── Personal de cocina ──────────────────────────────────────
-function staffTile(s) {
-  const hired = STAFF_BY_ID[s.staff?.hired];
-  const first = Math.min(...STAFF.map((m) => m.reqLevel));
-  return `<button class="tile tile--wide tile--staff" data-act="staff">
-    <span class="staff-face">${hired ? staffSvg(hired) : icon('user')}</span>
-    <span class="tile--staff__text"><b>Personal de cocina</b>
-      <span>${hired ? `${hired.name} · ${hired.role} · sueldo ${fmt(hired.salary)}` : level() >= first ? 'Contrata un asistente para la cocina' : `Contrata asistentes desde el nivel ${first}`}</span></span>
-    ${icon('arrow')}
-  </button>`;
+// ── Ayudantes (arriba de Mejoras) ───────────────────────────
+function staffState(s, m) {
+  const owned = staffOwned(s).includes(m.id);
+  const exp = s.staff?.exp?.[m.id] ?? 0;
+  const rank = staffRank(exp);
+  const restOk = s.restaurants.includes(m.reqRestaurant);
+  const lvlOk = level() >= m.reqLevel;
+  return { owned, exp, rank, hired: s.staff?.hired === m.id, restOk, lvlOk, unlocked: owned || (restOk && lvlOk) };
 }
 
-function renderStaff() {
-  const s = st();
-  const hiredId = s.staff?.hired ?? null;
-  const screen = document.getElementById('screen');
-  screen.innerHTML = `
-    <div class="stagger" style="display:flex;flex-direction:column;gap:12px">
-      ${STAFF.map((m) => {
-        const exp = s.staff?.exp?.[m.id] ?? 0;
-        const rank = staffRank(exp);
-        const nextRank = STAFF_RANKS[rank + 1];
-        const pct = nextRank ? Math.round((exp - STAFF_RANKS[rank].from) / (nextRank.from - STAFF_RANKS[rank].from) * 100) : 100;
-        const on = hiredId === m.id;
-        const locked = level() < m.reqLevel;
-        return `<article class="card staff-card ${on ? 'is-hired' : ''}">
-          <div class="staff-card__head">
-            <span class="staff-face staff-face--lg">${staffSvg(m)}</span>
-            <div style="flex:1;min-width:0"><b class="staff-card__name">${m.name}</b><span class="staff-card__role">${m.role}</span></div>
-            <span class="tag">${m.stations.length ? m.stations.map((st) => STATIONS[st].name).join(' y ') : 'Barra'}</span>
-          </div>
-          <p class="staff-card__desc">${m.desc}</p>
-          <div class="staff-card__exp"><span>${rankName(m, rank)}${nextRank ? ` · ${exp - STAFF_RANKS[rank].from}/${nextRank.from - STAFF_RANKS[rank].from} servicios para ${rankName(m, rank + 1)}` : ' · rango máximo'}</span>
-            <div class="progress"><div class="progress__fill" style="width:${pct}%"></div></div></div>
-          <div class="staff-card__foot">
-            <span>Sueldo <b>${fmt(m.salary)}</b>/servicio</span>
-            ${on ? `<button class="btn btn--sm btn--ghost" data-fire>Despedir</button><span class="staff-card__badge">${icon('check')} Contratado</span>`
-              : locked ? `<span class="staff-card__lock">${icon('lock')} Nivel ${m.reqLevel}</span>`
-              : `<button class="btn btn--sm" data-hire="${m.id}">${hiredId ? 'Cambiar a ' + m.name : 'Contratar'}</button>`}
-          </div>
-        </article>`;
-      }).join('')}
-      <p class="note" style="text-align:center">El sueldo se paga al cerrar cada servicio, junto con los gastos del local. Con cada servicio tu asistente gana experiencia y trabaja mejor.</p>
-    </div>`;
-  const hire = async (id) => {
-    if (app.busy) return;
-    app.busy = true;
-    try {
-      const res = await app.api.hireStaff(id);
-      setProfile(res.profile);
-      sfx.buy();
-      toast(id ? `¡${STAFF_BY_ID[id].name} se une a tu cocina!` : 'Asistente despedido', id ? 'good' : '');
-      renderStaff();
-    } catch (err) { errorToast(err); } finally { app.busy = false; }
+function staffSection(s) {
+  return `<section class="card helpers">
+    <div class="helpers__head"><h2>Ayudantes</h2><span>Uno a la vez · contrato + sueldo</span></div>
+    <div class="helpers__row">${STAFF.map((m) => {
+      const x = staffState(s, m);
+      const label = x.hired ? 'Trabajando' : x.owned ? 'Contratable' : x.unlocked ? fmt(m.hireCost) : RESTAURANT_BY_ID[m.reqRestaurant].name.split(' ')[0];
+      return `<button class="helper ${x.hired ? 'is-hired' : ''} ${x.unlocked ? '' : 'is-locked'}" data-staff="${m.id}" aria-label="${m.name}, ${m.role}">
+        <span class="staff-face">${staffSvg(m)}${x.unlocked ? '' : `<span class="helper__lock">${icon('lock')}</span>`}</span>
+        <b>${m.name}</b><small>${x.hired ? icon('check') : ''}${escapeHtml(label)}</small>
+      </button>`;
+    }).join('')}</div>
+  </section>`;
+}
+
+function openStaffSheet(id) {
+  const m = STAFF_BY_ID[id];
+  const draw = () => {
+    const s = st();
+    const x = staffState(s, m);
+    const nextRank = STAFF_RANKS[x.rank + 1];
+    const pct = nextRank ? Math.round((x.exp - STAFF_RANKS[x.rank].from) / (nextRank.from - STAFF_RANKS[x.rank].from) * 100) : 100;
+    let action;
+    if (x.hired) action = `<button class="btn btn--ghost btn--wide" data-hire="">Despedir</button>`;
+    else if (x.owned) action = `<button class="btn btn--wide" data-hire="${m.id}">Llamar a ${m.name} · gratis</button>`;
+    else if (!x.restOk) action = `<div class="staff-lock">${icon('lock')} Se desbloquea al abrir <b>${escapeHtml(RESTAURANT_BY_ID[m.reqRestaurant].name)}</b></div>`;
+    else if (!x.lvlOk) action = `<div class="staff-lock">${icon('lock')} Necesitas nivel <b>${m.reqLevel}</b></div>`;
+    else action = `<button class="btn btn--wide" data-hire="${m.id}" ${s.coins < m.hireCost ? 'disabled' : ''}>Contratar · ${coinSvg()} ${fmt(m.hireCost)}</button>`;
+    return `
+      <div class="sheet__head"><h2>${m.name}</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
+      <div class="staff-card ${x.hired ? 'is-hired' : ''}">
+        <div class="staff-card__head">
+          <span class="staff-face staff-face--lg">${staffSvg(m)}</span>
+          <div style="flex:1;min-width:0"><b class="staff-card__name">${m.role}</b><span class="staff-card__role">${m.stations.length ? m.stations.map((t) => STATIONS[t].name).join(' y ') : 'Barra'}</span></div>
+        </div>
+        <p class="staff-card__desc">${m.desc}</p>
+        <div class="ticket">
+          <div class="ticket__row"><span>Contrato (una vez)</span><b>${x.owned ? 'Pagado' : fmt(m.hireCost)}</b></div>
+          <div class="ticket__row"><span>Sueldo por servicio</span><b class="neg">−${fmt(m.salary)}</b></div>
+          <div class="ticket__row"><span>Requisitos</span><b>${escapeHtml(RESTAURANT_BY_ID[m.reqRestaurant].name)} · Nv ${m.reqLevel}</b></div>
+        </div>
+        ${x.owned ? `<div class="staff-card__exp"><span>${rankName(m, x.rank)}${nextRank ? ` · ${x.exp - STAFF_RANKS[x.rank].from}/${nextRank.from - STAFF_RANKS[x.rank].from} servicios para ${rankName(m, x.rank + 1)}` : ' · rango máximo'}</span>
+          <div class="progress"><div class="progress__fill" style="width:${pct}%"></div></div></div>` : ''}
+        ${action}
+      </div>`;
   };
-  screen.querySelectorAll('[data-hire]').forEach((b) => b.addEventListener('click', () => hire(b.dataset.hire)));
-  screen.querySelector('[data-fire]')?.addEventListener('click', () => hire(null));
+  openSheet(draw(), (sheet, close) => {
+    const bind = () => sheet.querySelector('[data-hire]')?.addEventListener('click', async (e) => {
+      const target = e.currentTarget.dataset.hire || null;
+      if (app.busy) return;
+      app.busy = true;
+      try {
+        const res = await app.api.hireStaff(target);
+        setProfile(res.profile);
+        sfx.buy();
+        toast(target ? `¡${m.name} se une a tu cocina!` : `${m.name} ya no trabaja contigo`, target ? 'good' : '');
+        close();
+        if (app.tab === 'upgrades') renderUpgrades();
+      } catch (err) { errorToast(err); } finally { app.busy = false; }
+    });
+    bind();
+  });
 }
 
 // ── Ranking ─────────────────────────────────────────────────
@@ -877,7 +891,7 @@ function accountSection(p) {
 
 const REASONS = {
   bono_bienvenida: 'Bono de bienvenida', servicio: 'Servicio (ganancia neta)', reto_diario: 'Reto del día', mercado: 'Mercado',
-  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro'
+  compra_restaurant: 'Abrir restaurante', compra_recipe: 'Aprender receta', compra_upgrade: 'Mejora de cocina', reembolso_mejora: 'Reembolso: mesas extra', logro: 'Logro', contrato: 'Contrato de ayudante'
 };
 
 async function openLedger() {

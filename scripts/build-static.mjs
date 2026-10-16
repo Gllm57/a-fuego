@@ -19,6 +19,8 @@ const isApp = entry === 'app.js';
 const title = arg('--title', null);
 // `--artifact <archivo>` escribe además un fragmento HTML listo para publicar como artefacto.
 const artifactOut = arg('--artifact', null);
+// `--sandbox`: modo prueba, con monedas infinitas y todo desbloqueado (guardado aparte).
+const sandbox = process.argv.includes('--sandbox');
 
 if (dist !== root) await rm(dist, { recursive: true, force: true });
 await mkdir(dist, { recursive: true });
@@ -31,7 +33,7 @@ const js = await build({
   minify: true,
   write: false,
   legalComments: 'none',
-  define: { __AFUEGO_STATIC__: 'true' },
+  define: { __AFUEGO_STATIC__: 'true', __AFUEGO_SANDBOX__: sandbox ? 'true' : 'false' },
   // En el servidor /shared se sirve junto al cliente; aquí se resuelve a la carpeta real.
   plugins: [{
     name: 'shared',
@@ -62,7 +64,7 @@ if (artifactOut) {
   await writeFile(path.resolve(root, artifactOut), fragment);
 }
 
-if (isApp) {
+if (isApp && !sandbox) {
   for (const f of ['manifest.webmanifest', 'sw.js', 'icon.svg', 'icon-180.png', 'icon-192.png', 'icon-512.png']) {
     await copyFile(path.join(client, f), path.join(dist, f));
   }

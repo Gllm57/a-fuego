@@ -23,7 +23,7 @@ usa las propinas para construir tu cadena de restaurantes.
 - **Música por restaurante** (sintetizada, se acelera en la hora pico) y vibración; se apagan
   desde la pausa o el perfil.
 - **48 recetas** en 6 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa y peruana.
-- **Personal de cocina:** contrata un asistente (Pepe corta en la tabla, Rosa voltea y saca lo listo del budare y el horno, Don Luis hace más pacientes a los clientes). Cobra sueldo por servicio y mejora con la experiencia (novato → hábil → experto).
+- **Ayudantes** (arriba de Mejoras): se desbloquean desde el tercer restaurante. Pepe corta en la tabla (Diner, nv 6, contrato 3.000), Rosa voltea y saca lo listo del budare y el horno (Trattoria, nv 9, 6.500) y Don Luis hace más pacientes a los clientes (Izakaya, nv 12, 11.000). Uno a la vez; el contrato se paga una vez y además cobran sueldo por servicio (60 / 110 / 150). Mejoran con la experiencia (novato → hábil → experto).
 
 ### Economía (difícil a propósito)
 
@@ -49,7 +49,7 @@ La meta es construir la cadena **¡A Fuego!** y llegar a **Chef Leyenda** (100 %
 | Aprender recetas (250 → 7.500) | El plato entra al menú; mejor margen |
 | Mejoras de cocina | Más rápido, menos toques, más tiempo antes de quemarse, clientes más pacientes, despensa más grande |
 | Mesas | Vienen con cada restaurante: 3 en la Taquería, 4 en el Diner y la Trattoria, 5 en la Izakaya y la Cevichería |
-| Asistente de cocina (nivel 3, 5 y 7) | Sueldo 40 / 70 / 90 por servicio |
+| Ayudantes (desde el 3.er restaurante) | Contrato 3.000 / 6.500 / 11.000 y sueldo 60 / 110 / 150 por servicio |
 | Logros (12) | Metas cortas con premio: primer servicio, combos, 3 estrellas, fuegos apagados, grupos, críticos… (50 → 2.000) |
 | Equipo extra (nivel 3 → 7) | Segunda tabla, bol, sartén, olla y horno: cocinar dos cosas iguales a la vez |
 
@@ -143,6 +143,8 @@ Variables de entorno:
 manifiesto, iconos y service worker. Se instala en la pantalla de inicio y funciona sin
 conexión. Ejecuta el mismo motor de `/shared` en el navegador y guarda el progreso en el
 dispositivo (sin ranking global ni protección anti-trampas del servidor).
+
+**Modo prueba** (monedas infinitas, todo desbloqueado, en la Cevichería): `npm run build:sandbox`.
 
 **Prueba del nivel máximo** (Cevichería sin mejoras, ritmo de reto diario):
 **https://gllm57.github.io/a-fuego/nivel-maximo/** — se genera con `npm run build:demo`.
