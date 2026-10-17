@@ -3,7 +3,7 @@
 import {
   RESTAURANTS, RESTAURANT_BY_ID, CHEF_TITLES, facadeStage, facadeNext, FACADE_STAGES, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
-  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, DECOR, DECOR_BY_ID, DECOR_SLOTS, decorOf, decorOwned, decorAvailable, ACHIEVEMENT_BY_ID, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
+  evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, DECOR, DECOR_BY_ID, DECOR_SLOTS, decorOf, decorOwned, decorAvailable, upgradeAvailable, ACHIEVEMENT_BY_ID, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
 import { createApi, ApiError, SANDBOX } from './api.js';
 import { Kitchen } from './game.js';
@@ -126,7 +126,12 @@ function renderShell() {
   root.querySelector('.nav').addEventListener('click', (e) => {
     if (e.target.closest('[data-act="play"]')) return play(app.restaurantId, 'normal');
     const b = e.target.closest('[data-tab]');
-    if (b && b.dataset.tab !== app.tab) { sfx.tap(); go(b.dataset.tab); }
+    if (b && b.dataset.tab !== app.tab) {
+      sfx.tap();
+      // El recetario abre en la cocina del local que tienes elegido.
+      if (b.dataset.tab === 'recipes') app.recipeTab = null;
+      go(b.dataset.tab);
+    }
   });
   go(app.tab);
 }
@@ -156,7 +161,7 @@ function renderNavDots() {
   const canLearn = RECIPES.some((r) => !s.recipes.includes(r.id) && s.restaurants.includes(r.restaurant) && level() >= r.reqLevel && s.coins >= r.learnCost);
   const canUpgrade = UPGRADES.some((u) => {
     const l = upgradeLevel(s.upgrades, u.id);
-    return l < u.costs.length && s.coins >= u.costs[l] && level() >= (u.reqLevels?.[l] ?? 1);
+    return l < u.costs.length && upgradeAvailable(s, u) && s.coins >= u.costs[l] && level() >= (u.reqLevels?.[l] ?? 1);
   });
   const lowStock = dishesPossible(s, app.restaurantId) < 4 || s.basketClaimed !== app.profile.daily.day;
   const set = (id, on) => { const d = root.querySelector(`[data-tab="${id}"] .nav__dot`); if (d) d.hidden = !on; };
@@ -640,12 +645,24 @@ function drawCart() {
 }
 
 // ── Recetas ─────────────────────────────────────────────────
+// Lleva la ficha elegida al centro de su fila. Al volver a dibujar la fila
+// se parte de donde estaba, así el desliz es suave y no salta al principio.
+function centerChip(rail, prevLeft) {
+  const chip = rail?.querySelector('[aria-pressed="true"]');
+  if (!chip) return;
+  if (prevLeft != null) rail.scrollLeft = prevLeft;
+  const c = chip.getBoundingClientRect(), r = rail.getBoundingClientRect();
+  const left = rail.scrollLeft + c.left - r.left - (r.width - c.width) / 2;
+  rail.scrollTo({ left, behavior: prevLeft == null ? 'auto' : 'smooth' });
+}
+
 function renderRecipes() {
   const s = st();
   app.recipeTab ??= app.restaurantId;
   const rid = app.recipeTab;
   const rest = RESTAURANT_BY_ID[rid];
   const screen = document.getElementById('screen');
+  const prevLeft = screen.querySelector('.chips')?.scrollLeft;
   screen.innerHTML = `
     <div class="chips" role="group" aria-label="Restaurante">
       ${RESTAURANTS.map((r) => `<button class="chip" data-chip="${r.id}" aria-pressed="${r.id === rid}">${s.restaurants.includes(r.id) ? '' : icon('lock')}${r.cuisine}</button>`).join('')}
@@ -654,6 +671,7 @@ function renderRecipes() {
     ${nextUnlockNote(rid)}
     <div class="stagger" style="display:flex;flex-direction:column;gap:12px">${recipesOf(rid).map((r) => recipeCard(r)).join('')}</div>
     <p class="note" style="text-align:center">El margen es lo que cobras menos lo que cuestan sus ingredientes en el mercado.</p>`;
+  centerChip(screen.querySelector('.chips'), prevLeft);
   screen.querySelectorAll('[data-chip]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.recipeTab = b.dataset.chip; renderRecipes(); }));
   screen.querySelectorAll('[data-learn]').forEach((b) => b.addEventListener('click', async () => {
     if (await buy('recipe', b.dataset.learn)) { toast('¡Receta aprendida! Compra sus ingredientes en el mercado', 'good'); renderRecipes(); }
@@ -718,6 +736,7 @@ function renderUpgrades() {
             <div class="upgrade__foot">
               <span class="upgrade__effect">${upgradeEffect(u.id, now, s)}</span>
               ${max ? `<span class="tag tag--ok">${icon('check')} ${u.extra ? 'Instalado' : 'Máximo'}</span>`
+                : !upgradeAvailable(s, u) ? `<span class="tag tag--lock">${icon('lock')} Con ${grillRestaurant().name}</span>`
                 : level() < req ? `<span class="tag tag--lock">${icon('lock')} Nivel ${req} · ${fmt(price)}</span>`
                 : `<button class="btn btn--sm" data-up="${u.id}" ${s.coins < price ? 'disabled' : ''}>${coinSvg()} ${fmt(price)}</button>`}
             </div>
@@ -730,6 +749,9 @@ function renderUpgrades() {
     if (await buy('upgrade', b.dataset.up)) { toast('¡Mejora instalada!', 'good'); app.market = null; renderUpgrades(); }
   }));
 }
+
+// El primer local de la cadena que trae parrilla.
+const grillRestaurant = () => RESTAURANTS.find((r) => r.grill);
 
 function upgradeEffect(id, k, s) {
   switch (id) {
@@ -860,6 +882,7 @@ function renderDecor() {
     return null;
   };
   const screen = document.getElementById('screen');
+  const prevChips = screen.querySelector('.chips')?.scrollLeft;
   screen.innerHTML = `
     <div style="display:flex;flex-direction:column;gap:12px">
       <section class="scene" data-counter="${look.barra}" data-awning="${look.toldo}" aria-label="Vista previa del local" style="${awningVars(look.toldo)}">
@@ -889,6 +912,7 @@ function renderDecor() {
         </button>`;
       }).join('')}</div>
     </div>`;
+  centerChip(screen.querySelector('.chips'), prevChips);
   screen.querySelectorAll('[data-slot]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.decorTab = b.dataset.slot; renderDecor(); }));
   screen.querySelectorAll('[data-decor]').forEach((b) => b.addEventListener('click', async () => {
     const x = DECOR_BY_ID[b.dataset.decor];
@@ -1007,11 +1031,13 @@ async function renderRanking() {
   const s = st();
   app.boardTab = s.restaurants.includes(app.boardTab) ? app.boardTab : app.restaurantId;
   const screen = document.getElementById('screen');
+  const prevLeft = screen.querySelector('.chips')?.scrollLeft;
   screen.innerHTML = `
     <div class="chips" role="group" aria-label="Restaurante">
       ${RESTAURANTS.filter((r) => s.restaurants.includes(r.id)).map((r) => `<button class="chip" data-chip="${r.id}" aria-pressed="${r.id === app.boardTab}">${r.cuisine}</button>`).join('')}
     </div>
     <section class="card" id="board"><div class="empty">Cargando…</div></section>`;
+  centerChip(screen.querySelector('.chips'), prevLeft);
   screen.querySelectorAll('[data-chip]').forEach((b) => b.addEventListener('click', () => { sfx.tap(); app.boardTab = b.dataset.chip; renderRanking(); }));
   const box = screen.querySelector('#board');
   try {

@@ -22,6 +22,7 @@ const PURCHASE_ERRORS = {
   no_comprado: [409, 'Primero cómpralo'],
   personal_bloqueado: [403, 'Este ayudante se desbloquea con un restaurante más avanzado'],
   nivel_maximo: [409, 'Ya está al nivel máximo'],
+  sin_parrilla: [403, 'Primero abre un local con parrilla'],
   tipo_invalido: [400, 'Tipo de compra inválido'],
   carrito_vacio: [400, 'El carrito está vacío'],
   no_disponible: [400, 'Ese ingrediente no se vende para tus recetas'],

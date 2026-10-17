@@ -8,7 +8,7 @@
 //   4. Mejorar la cocina (más rápida, más paciencia, más despensa…).
 // Al completar el 100 % del imperio se obtiene el título «Chef Leyenda».
 
-import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, STAFF_BY_ID, STAFF_RANKS, recipesOf } from './data/catalog.js';
+import { RESTAURANTS, RESTAURANT_BY_ID, RECIPES, RECIPE_BY_ID, UPGRADES, UPGRADE_BY_ID, STAFF_BY_ID, STAFF_RANKS, STATIONS, recipesOf } from './data/catalog.js';
 import { INGREDIENTS } from './data/ingredients.js';
 import { hashString } from './rng.js';
 import { upgradeLevel, storageCapacity } from './rules.js';
@@ -217,6 +217,7 @@ export function evaluatePurchase(state, kind, id) {
     if (!up) return no('no_existe');
     const current = upgradeLevel(state.upgrades, id);
     if (current >= up.costs.length) return no('nivel_maximo');
+    if (!upgradeAvailable(state, up)) return no('sin_parrilla');
     const reqLevel = up.reqLevels?.[current] ?? 1;
     if (level < reqLevel) return no('nivel_insuficiente', { reqLevel });
     const price = up.costs[current];
@@ -225,6 +226,12 @@ export function evaluatePurchase(state, kind, id) {
   }
 
   return no('tipo_invalido');
+}
+
+// Las mejoras de la parrilla sólo se venden cuando tienes un local con parrilla.
+export function upgradeAvailable(state, up) {
+  if (!STATIONS[up.station]?.grillOnly) return true;
+  return state.restaurants.some((id) => RESTAURANT_BY_ID[id]?.grill);
 }
 
 // Aplica una compra ya validada (usado por el modo sin conexión del cliente).

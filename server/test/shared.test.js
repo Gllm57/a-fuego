@@ -445,3 +445,11 @@ test('la fachada de cada local sube de etapa jugando', () => {
   const all = RECIPES.filter((r) => r.restaurant === 'arepera').map((r) => r.id);
   assert.equal(facadeStage({ ...s, recipes: all, restStats: rs }, 'arepera'), 3);
 });
+
+test('las mejoras de la parrilla se venden sólo con un local con parrilla', () => {
+  const s = { ...newPlayerState(), xp: xpForLevel(20), coins: 50_000 };
+  assert.equal(evaluatePurchase(s, 'upgrade', 'parrilla').reason, 'sin_parrilla');
+  assert.equal(evaluatePurchase(s, 'upgrade', 'extra_parrilla').reason, 'sin_parrilla');
+  assert.equal(evaluatePurchase({ ...s, restaurants: [...s.restaurants, 'cevicheria'] }, 'upgrade', 'parrilla').ok, true);
+  assert.equal(evaluatePurchase(s, 'upgrade', 'sarten').ok, true);
+});
