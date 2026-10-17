@@ -14,7 +14,8 @@ const door = (d) => `<path d="M124 236v-62a26 26 0 0 1 52 0v62z" fill="${d}"/><c
 const FACADES = {
   arepera: {
     arch: () => `<path d="M40 120a110 110 0 0 1 220 0" fill="none" stroke="#C2683A" stroke-width="16" stroke-dasharray="14 4"/><path d="M40 129a110 110 0 0 1 220 0" fill="none" stroke="#8E4A26" stroke-width="3"/>`,
-    sign: () => `<ellipse cx="150" cy="44" rx="24" ry="13" fill="#F6DA8A"/><ellipse cx="150" cy="41" rx="24" ry="10" fill="#FBE7B0"/><circle cx="140" cy="40" r="2" fill="#C99A3A"/><circle cx="157" cy="38" r="2" fill="#C99A3A"/>`,
+    // El cerro Ávila (el nombre del local) con su solcito.
+    sign: () => `<circle cx="168" cy="30" r="8" fill="#FFC23D"/><path d="M118 62l14-18 8 8 12-20 10 12 6-6 14 24z" fill="#4E8E3A"/><path d="M146 40l6-8 6 7-4 3-4-3-4 3z" fill="#fff" opacity=".85"/><path d="M118 62l14-18 8 8 6-8" fill="none" stroke="#3E7A34" stroke-width="2" stroke-linejoin="round"/><path d="M116 62h68" stroke="#3E7A34" stroke-width="3" stroke-linecap="round"/>`,
     front: (p, d) => [86, 214].map((x) => `<circle cx="${x}" cy="160" r="24" fill="#EADCF6"/><path d="M${x - 12} 138v44M${x - 4} 136v48M${x + 4} 136v48M${x + 12} 138v44" stroke="#8E4A26" stroke-width="3.5"/><circle cx="${x}" cy="160" r="24" fill="none" stroke="${d}" stroke-width="5"/>`).join('')
       + `<path d="M124 236v-62a26 26 0 0 1 52 0v62z" fill="#8E4A26"/><path d="M137 236v-74M150 236v-78M163 236v-74" stroke="#6E3618" stroke-width="2"/><circle cx="168" cy="206" r="3.5" fill="#FFC23D"/>`,
     sides: () => `<circle cx="30" cy="196" r="14" fill="#E2577B"/><circle cx="44" cy="184" r="10" fill="#F28CA8"/><circle cx="22" cy="180" r="9" fill="#C8336A"/><circle cx="40" cy="206" r="8" fill="#5E9E4A"/><path d="M16 236l4-20h16l4 20z" fill="#C2703A"/>${plant(272, '#4E8E3A')}`
