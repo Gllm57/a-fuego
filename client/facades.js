@@ -74,11 +74,8 @@ const FACADES = {
 // Guirnalda de foquitos (etapa 2 en adelante).
 const garland = (y = 84) => `<path d="M58 ${y}q92 34 184 0" fill="none" stroke="#2A170D" stroke-width="1.5"/>${[[74, 6], [98, 13], [124, 17], [150, 18], [176, 17], [202, 13], [226, 6]].map(([x, dy], i) => `<circle class="facade-bulb" cx="${x}" cy="${y + dy}" r="4" fill="${['#FFE08A', '#F28C8C', '#9FD3F0'][i % 3]}" style="--i:${i}"/>`).join('')}`;
 
-// Local leyenda: estrella dorada, festón con oro, jardineras y alfombra roja.
-const legend = (d, sx = 240) => `<path d="M40 112a110 110 0 0 1 220 0" fill="none" stroke="#FFC23D" stroke-width="3"/>`
-  + [86, 214].map((x) => `<rect x="${x - 24}" y="188" width="48" height="9" rx="3" fill="#8E4A26"/><circle cx="${x - 16}" cy="186" r="5" fill="#E2577B"/><circle cx="${x - 2}" cy="185" r="5" fill="#F2C200"/><circle cx="${x + 12}" cy="186" r="5" fill="#E2577B"/>`).join('')
-  + `<path d="M118 236l6-4h52l6 4z" fill="#C8102E"/>`
-  + `<g class="facade-star"><circle cx="${sx}" cy="58" r="17" fill="#FFC23D" stroke="${d}" stroke-width="3"/><path d="M${sx} 47l3.4 7 7.6 1.1-5.5 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.4 7.6-1.1z" fill="#fff"/></g>`;
+// Local leyenda: la estrella dorada (lo demás de la fachada queda igual).
+const legend = (d, sx = 240) => `<g class="facade-star"><circle cx="${sx}" cy="58" r="17" fill="#FFC23D" stroke="${d}" stroke-width="3"/><path d="M${sx} 47l3.4 7 7.6 1.1-5.5 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.4 7.6-1.1z" fill="#fff"/></g>`;
 
 export function storefrontSvg(theme, id = 'arepera', { stage = 1 } = {}) {
   if (stage === 0) return obraSvg(theme);
@@ -94,7 +91,7 @@ export function storefrontSvg(theme, id = 'arepera', { stage = 1 } = {}) {
     ${f.sign(p, d)}
     ${stage >= 2 && id !== 'taqueria' ? garland(f.roof ? 66 : 68) : ''}
     <path d="M50 98h200v10H50z" fill="${p}"/>
-    ${scallops(p, stage >= 3 ? '#FFC23D' : '#fff')}
+    ${scallops(p)}
     ${f.front(p, d)}
     ${stage >= 2 ? f.sides(p, d) : ''}
     ${stage >= 3 ? legend(d, id === 'asador' ? 60 : 240) : ''}

@@ -105,3 +105,48 @@ export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vi
     ${mood === 'angry' ? `<g class="cf-steam"><path d="M50 12c2-2 5-1 5 1 2-1 4 1 3 3 2 1 1 4-1 4M8 14c-2-1-1-4 1-4 0-2 3-3 4-1" fill="none" stroke="#D2362A" stroke-width="2" stroke-linecap="round"/></g>` : ''}
   </svg>`;
 }
+
+// Ayudantes de cocina: mismo estilo que los clientes, con gorro de chef, chaqueta blanca
+// cruzada y pañuelo del color de cada uno. Van dentro de un círculo de color.
+const CHEFS = {
+  pepe: { skin: '#E9B98F', hair: '#3A2216', hairStyle: 'short', scarf: '#1C4E9C' },
+  rosa: { skin: '#C98E66', hair: '#1E1410', hairStyle: 'long', scarf: '#C8102E', earrings: true },
+  luis: { skin: '#8D5A3B', hair: '#D9D2C8', hairStyle: 'grey', scarf: '#2A170D', mustache: true, glasses: true }
+};
+
+export function chefSvg(member, extra = '') {
+  const C = CHEFS[member.id] ?? { skin: member.look.skin, hair: '#3A2216', hairStyle: 'short', scarf: member.look.shirt };
+  const skinDark = shade(C.skin, -28);
+  const clip = `chef-${member.id}`;
+  const hairBack = C.hairStyle === 'long'
+    ? `<path d="M15 30c-1-10 6-16 17-16s18 6 17 16c1 9-1 15-4 17H19c-3-2-5-8-4-17z" fill="${C.hair}" ${K}/>` : '';
+  const hairFront = C.hairStyle === 'short'
+    ? `<path d="M18 26c0-4 1-7 3-9M46 26c0-4-1-7-3-9" stroke="${C.hair}" stroke-width="4" stroke-linecap="round"/>`
+    : C.hairStyle === 'long'
+      ? `<path d="M18 27c0-5 2-9 5-11M46 27c0-5-2-9-5-11" stroke="${C.hair}" stroke-width="5" stroke-linecap="round"/>`
+      : `<path d="M18 27c-1-4 0-7 2-9M46 27c1-4 0-7-2-9" stroke="${C.hair}" stroke-width="4" stroke-linecap="round"/>`;
+  return `<svg viewBox="0 0 64 64" aria-hidden="true" ${extra}>
+    <defs><clipPath id="${clip}"><circle cx="32" cy="32" r="32"/></clipPath></defs>
+    <circle cx="32" cy="32" r="32" fill="${member.look.bg}"/>
+    <g clip-path="url(#${clip})"><g transform="translate(5.5 10) scale(.83)">
+      ${hairBack}
+      <path d="M8 66c0-12 10-19 24-19s24 7 24 19z" fill="#FFFFFF" ${K}/>
+      <path d="M32 50v16" stroke="#E3D6C6" stroke-width="1.6"/>
+      ${[54, 59, 64].map((y) => `<circle cx="27" cy="${y}" r="1.2" fill="#B9AA98"/><circle cx="37" cy="${y}" r="1.2" fill="#B9AA98"/>`).join('')}
+      <path d="M27 40h10v8c-3 2-7 2-10 0z" fill="${skinDark}"/>
+      <path d="M23 46l9 7 9-7 1 4-10 7-10-7z" fill="${C.scarf}" ${K}/>
+      <circle cx="17.5" cy="31" r="3.6" fill="${C.skin}" ${K}/><circle cx="46.5" cy="31" r="3.6" fill="${C.skin}" ${K}/>
+      ${C.earrings ? `<circle cx="17" cy="36" r="1.8" fill="#FFC23D" ${K}/><circle cx="47" cy="36" r="1.8" fill="#FFC23D" ${K}/>` : ''}
+      <ellipse cx="32" cy="29" rx="14.5" ry="15.5" fill="${C.skin}" ${K}/>
+      <ellipse cx="22.5" cy="36" rx="2.6" ry="1.6" fill="#F28C8C" opacity=".55"/><ellipse cx="41.5" cy="36" rx="2.6" ry="1.6" fill="#F28C8C" opacity=".55"/>
+      ${eyes('happy', C.glasses)}
+      <path d="M31 33c-1 2-1 3 1 3.5" stroke="${skinDark}" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+      ${mouth('happy')}
+      ${C.mustache ? `<path d="M25 36.5c2-2 5-2 7 0 2-2 5-2 7 0-2 1.5-5 1.5-7 .5-2 1-5 1-7-.5z" fill="${C.hair}" ${K}/>` : ''}
+      ${hairFront}
+      <path d="M17 13c-6-1-7-10-1-12 1-7 10-8 13-3 3-5 11-5 13 0 4-4 12-1 11 5 5 2 4 10-2 11z" fill="#FFFFFF" ${K}/>
+      <path d="M24 4c0 3 1 6 2 8M32 2v10M40 4c0 3-1 6-2 8" stroke="#E3D6C6" stroke-width="1.4" fill="none" stroke-linecap="round"/>
+      <rect x="16.5" y="12" width="31" height="7" rx="2.5" fill="#FFFFFF" ${K}/>
+    </g></g>
+  </svg>`;
+}
