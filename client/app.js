@@ -898,7 +898,7 @@ function staffState(s, m) {
 
 function staffSection(s) {
   return `<section class="card helpers">
-    <div class="helpers__head"><h2>Ayudantes</h2><span>Uno nuevo con Diner, Trattoria e Izakaya</span></div>
+    <div class="helpers__head"><h2>Ayudantes</h2><span>Uno nuevo en cada local avanzado</span></div>
     <div class="helpers__row">${STAFF.map((m) => {
       const x = staffState(s, m);
       const label = x.hired ? 'Trabajando' : x.owned ? 'Contratable' : x.unlocked ? fmt(m.hireCost) : `Con ${RESTAURANT_BY_ID[m.reqRestaurant].name.split(' ')[0]}`;
@@ -930,6 +930,17 @@ function openStaffSheet(id) {
           <div style="flex:1;min-width:0"><b class="staff-card__name">${m.role}</b><span class="staff-card__role">${m.stations.length ? m.stations.map((t) => STATIONS[t].name).join(' y ') : 'Barra'}</span></div>
         </div>
         <p class="staff-card__desc">${m.desc}</p>
+        <ol class="ranks" aria-label="Lo que hace en cada rango">
+          ${m.levels.map((lv, i) => {
+            const now = x.owned && i === x.rank;
+            const done = x.owned && i < x.rank;
+            const from = STAFF_RANKS[i].from;
+            return `<li class="rank ${now ? 'is-now' : done ? 'is-done' : ''}">
+              <span class="rank__dot">${icon(done ? 'check' : now ? 'sparkle' : 'lock')}</span>
+              <span><b>${rankName(m, i)}</b> <small>${from ? `desde ${from} servicios` : 'al contratar'}${now ? ' · ahora' : ''}</small><span class="rank__perk">${lv.perk}</span></span>
+            </li>`;
+          }).join('')}
+        </ol>
         <div class="ticket">
           <div class="ticket__row"><span>Contrato (una vez)</span><b>${x.owned ? 'Pagado' : fmt(m.hireCost)}</b></div>
           <div class="ticket__row"><span>Sueldo por servicio</span><b class="neg">−${fmt(m.salary)}</b></div>
@@ -1119,7 +1130,7 @@ async function submitRun(host, kitchen, run, outcome, attempt = 0) {
     const stageBefore = facadeStage(st(), rid);
     kitchen.destroy();
     app.market = null;
-    showResults(host, run, res);
+    showResults(host, run, res, outcome);
     setProfile(res.profile);
     // Si la fachada del local subió de etapa, se avisa al terminar.
     const stageAfter = facadeStage(st(), rid);
@@ -1134,6 +1145,29 @@ async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   }
 }
 
+// Lo que aportó el ayudante en el servicio, su sueldo y cuánto le falta para el siguiente rango.
+function helperSummary(result, run, profile, hs = {}) {
+  const m = STAFF_BY_ID[result.staff];
+  if (!m) return '';
+  const before = run.config.staff?.rank ?? 0;
+  const exp = profile.state.staff?.exp?.[m.id] ?? 0;
+  const rank = staffRank(exp);
+  const did = !m.stations.length ? `Atendió la barra: <b>+${fmt(result.staffBonus ?? 0)}</b> monedas extra por los ${result.served} platos, con clientes más pacientes.`
+    : m.id === 'pepe' ? `Hizo <b>${hs.cuts ?? 0}</b> cortes por ti.`
+      : `Volteó <b>${hs.flips ?? 0}</b> y sacó <b>${hs.saves ?? 0}</b> a tiempo por ti.`;
+  const next = STAFF_RANKS[rank + 1];
+  // En la arepera la sartén se llama budare.
+  const local = (t) => (RESTAURANT_BY_ID[run.config.restaurantId].stationNames?.sarten ? t.replace(/las dos sartenes/g, 'los dos budares').replace(/una sartén/g, 'un budare').replace(/la sartén/g, 'el budare') : t);
+  const growth = rank > before
+    ? `<b>¡Ahora es ${rankName(m, rank)}!</b> ${m.levels[rank].perk}`
+    : next ? `${rankName(m, rank + 1)} en ${next.from - exp} ${next.from - exp === 1 ? 'servicio' : 'servicios'}: ${m.levels[rank + 1].perk.charAt(0).toLowerCase()}${m.levels[rank + 1].perk.slice(1)}`
+      : `${rankName(m, rank)}: ${m.levels[rank].perk.charAt(0).toLowerCase()}${m.levels[rank].perk.slice(1)}`;
+  return `<div class="helper-sum ${rank > before ? 'is-up' : ''}">
+    <span class="staff-face">${staffSvg(m)}</span>
+    <div><small>${escapeHtml(m.name)} · ${rankName(m, before)} · sueldo ${fmt(result.salary)}</small><p>${did}</p><p class="helper-sum__next">${local(growth)}</p></div>
+  </div>`;
+}
+
 const REVIEWS = [
   ['Me fui con hambre… ¿abren mañana?', 'Esperé tanto que me creció la barba.'],
   ['Estaba rico, cuando por fin llegó.', 'Buen sazón, pero el servicio puede mejorar.'],
@@ -1142,7 +1176,7 @@ const REVIEWS = [
 ];
 const HEADLINES = ['Hay que practicar', 'Servicio completado', '¡Buen servicio!', '¡Servicio perfecto!'];
 
-function showResults(host, run, res) {
+function showResults(host, run, res, outcome = {}) {
   const { result, rewards, levelUp, profile } = res;
   const rest = RESTAURANT_BY_ID[run.config.restaurantId];
   const quote = REVIEWS[result.stars][Math.floor(Math.random() * 2)];
@@ -1181,6 +1215,7 @@ function showResults(host, run, res) {
           <div class="ticket__row is-total"><span>${net < 0 ? 'Pérdida' : 'Ganancia'}</span><b class="${net < 0 ? 'neg' : ''}">${fmt(net)}</b></div>
           <div class="ticket__row"><span class="note">Ingredientes usados${wasted ? `, ${wasted} desperdiciados` : ''} (ya pagados en el mercado)</span><b class="note">~${fmt(result.ingredientCost)}</b></div>
         </div>
+        ${helperSummary(result, run, profile, outcome.helperStats)}
         ${levelUp ? `<div class="levelup">${starSvg('')} ¡Subiste a nivel ${levelUp}! Hay recetas y locales nuevos.</div>` : ''}
         <div class="review"><span class="review__face">${customerSvg(Math.floor(Math.random() * 6), result.stars >= 2 ? 'happy' : result.stars === 1 ? 'worried' : 'angry', '')}</span>
           <div><small>Reseña de un cliente</small><p>“${quote}”</p></div></div>

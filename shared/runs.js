@@ -47,6 +47,7 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
     const lv = member.levels[rank];
     if (lv.patience) stats.patienceMult = Math.round(stats.patienceMult * lv.patience * 100) / 100;
     if (lv.tip) stats.tipBonus = Math.round((stats.tipBonus + lv.tip) * 100) / 100;
+    if (lv.plate) stats.plateBonus = lv.plate;
   }
   return {
     version: 3,

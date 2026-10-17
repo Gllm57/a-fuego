@@ -27,7 +27,12 @@ usa las propinas para construir tu cadena de restaurantes.
 - **64 recetas** en 8 restaurantes: empieza en la **Arepera El Ávila** (venezolana) y sigue con la mexicana, americana, italiana, japonesa, peruana, el **Asador La Pampa** (argentina) y la **Barbacoa Seúl** (coreana).
 - **Fachadas:** cada local tiene su propio edificio en Inicio, dibujado con el estilo de los alimentos: casa colonial, adobe con papel picado, diner retro con neón, casita italiana de dos pisos, izakaya, caseta del muelle, estancia con parrilla y hanok coreano. Los que aún no abres se ven **en obra**; al abrirlos los andamios caen y se revela su diseño. Cada tarjeta muestra la etapa del local: *Recién abierto*, *Con clientela* (25 servicios ahí) y *Local leyenda* (menú completo y 10 servicios de 3 estrellas), que además pone la estrella dorada en la fachada.
 - **Parrilla:** estación propia de los tres últimos locales (Cevichería, Asador y Barbacoa). Lo que se asa pide voltearse a mitad de cocción (si se voltea a tiempo sale perfecto) y se quema si no se recoge. Se mejora con la *Parrilla de hierro* y la *Segunda parrilla*.
-- **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada restaurante avanzado. Pepe corta en una tabla (con el Diner, contrato 5.500), Rosa voltea y saca lo listo de una sartén (con la Trattoria, 11.000) y Don Luis hace más pacientes a los clientes (con la Izakaya, 18.000). Uno a la vez y cada uno ocupa un solo fogón; el contrato se paga una vez y además cobran sueldo por servicio (130 / 220 / 320). Mejoran con la experiencia (novato → hábil → experto).
+- **Ayudantes** (arriba de Mejoras): uno nuevo al abrir cada local avanzado, de a uno a la vez. Contrato una vez y sueldo por servicio. Suben de rango con los servicios trabajados (novato → hábil a los 5 → experto a los 15) y la ficha muestra qué hace en cada rango:
+  - **Pepe** (Diner, 5.500 · 130): corta en una tabla; de experto, las dos tablas y el bol.
+  - **Rosa** (Trattoria, 11.000 · 220): voltea y saca lo de la sartén; de experta, las dos sartenes.
+  - **Don Luis** (Izakaya, 18.000 · 180): +6/+9/+12 monedas por plato, clientes más pacientes y más propina.
+  - **Ramón** (Cevichería, 26.000 · 260): como Rosa, en la parrilla; de experto, las dos parrillas.
+  - Al terminar cada servicio, un resumen muestra lo que aportó y cuánto le falta para el siguiente rango.
 
 - **Mi local** (Inicio → Mi local): decora el restaurante con toldo, pared, luces, barra y adornos.
   43 piezas (gato de la suerte, pecera, rocola, piñata, guacamaya, plantas, toldo arcoíris…).

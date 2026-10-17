@@ -33,7 +33,7 @@ function sandboxState() {
     recipes: RECIPES.map((r) => r.id),
     upgrades,
     inventory: {},
-    staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 5, luis: 15 } },
+    staff: { hired: 'rosa', owned: STAFF.map((m) => m.id), exp: { pepe: 0, rosa: 15, luis: 15, ramon: 5 } },
     restStats: Object.fromEntries(RESTAURANTS.map((r, i) => [r.id, i < 3 ? { runs: 40, threeStars: 12 } : i < 6 ? { runs: 30, threeStars: 2 } : { runs: 3, threeStars: 0 }])),
     decor: { owned: DECOR.map((x) => x.id), equipped: { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: [] } }
   };

@@ -299,7 +299,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .helpers__head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
 .helpers__head h2 { font-size: 18px; }
 .helpers__head span { font-size: 12px; font-weight: 800; color: var(--ink-2); }
-.helpers__row { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.helpers__row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; }
 .helper { border: 0; background: none; border-radius: 22px; padding: 6px 4px; display: flex; flex-direction: column; align-items: center; gap: 4px; font: inherit; color: inherit; cursor: pointer; min-height: 44px; -webkit-tap-highlight-color: transparent; }
 .helper:focus { outline: none; }
 .helper:focus-visible .staff-face { outline: 3px solid var(--brand); outline-offset: 3px; }
@@ -309,7 +309,7 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .helper b { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
 .helper small { display: inline-flex; align-items: center; gap: 2px; font-size: 11px; font-weight: 800; color: var(--ink-2); white-space: nowrap; }
 .helper small svg { width: 12px; height: 12px; color: var(--good); }
-.helper .staff-face { position: relative; overflow: visible; width: 64px; height: 64px; border-radius: 50%; transition: box-shadow .2s; }
+.helper .staff-face { position: relative; overflow: visible; width: 58px; height: 58px; border-radius: 50%; transition: box-shadow .2s; }
 .helper .staff-face > svg { border-radius: 50%; }
 .helper.is-locked .staff-face > svg:first-child { filter: grayscale(1) opacity(.55); }
 /* Bloqueado: candado centrado sobre la cara en gris. */
@@ -1265,6 +1265,27 @@ h1, h2, h3 { font-family: var(--font-display); margin: 0; font-weight: 600; lett
 .avatar__face, .staff-face, .review__face, .helper-chip__face { -webkit-mask-image: radial-gradient(circle closest-side, #000 97%, transparent 100%); mask-image: radial-gradient(circle closest-side, #000 97%, transparent 100%); }
 /* iOS dibuja los botones con su estilo nativo si no se le quita. */
 button { -webkit-appearance: none; appearance: none; }
+
+/* Ficha del ayudante: qué hace en cada rango. */
+.ranks { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rank { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border-radius: 16px; background: var(--paper); box-shadow: inset 0 0 0 2px var(--line); font-size: 13px; }
+.rank b { font-family: var(--font-display); font-weight: 600; font-size: 15px; }
+.rank small { font-size: 11px; font-weight: 800; color: var(--ink-2); }
+.rank__perk { display: block; font-weight: 700; color: var(--ink-2); margin-top: 2px; }
+.rank__dot { flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center; background: var(--line); color: var(--ink-2); }
+.rank__dot svg { width: 15px; height: 15px; }
+.rank.is-done .rank__dot { background: var(--good); color: #fff; }
+.rank.is-now { box-shadow: inset 0 0 0 3px var(--good); background: color-mix(in srgb, var(--good) 8%, var(--paper)); }
+.rank.is-now .rank__dot { background: #FFC23D; color: var(--ink); }
+.rank.is-now .rank__perk { color: var(--ink); }
+/* Resumen del ayudante al terminar el servicio. */
+.helper-sum { width: 100%; display: flex; gap: 12px; align-items: center; padding: 12px 14px; border-radius: 20px; background: rgba(255,255,255,.08); box-shadow: inset 0 0 0 2px rgba(255,255,255,.12); text-align: left; }
+.helper-sum .staff-face { width: 52px; height: 52px; }
+.helper-sum small { display: block; font-size: 11px; font-weight: 900; letter-spacing: .3px; color: #E8D6C8; text-transform: uppercase; }
+.helper-sum p { margin: 2px 0 0; font-size: 13px; font-weight: 700; color: #FFF8EE; }
+.helper-sum b { color: #FFC23D; }
+.helper-sum__next { color: #C9F0DC !important; }
+.helper-sum.is-up { box-shadow: inset 0 0 0 3px #FFC23D; animation: medal-in .6s var(--ease-spring) both .8s; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; animation-iteration-count: 1 !important; transition-duration: .01ms !important; }

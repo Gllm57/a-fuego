@@ -164,21 +164,46 @@ export const UPGRADES = Object.freeze([
 
 // Personal de cocina: un asistente a la vez. Contratarlo cuesta una vez (`hireCost`) y
 // cobra sueldo en cada servicio. Cada uno se desbloquea al abrir su restaurante (`reqRestaurant`):
-// Pepe con el Diner, Rosa con la Trattoria y Don Luis con la Izakaya.
-// `ranks` según servicios trabajados; cada rango lo hace más rápido o mejor.
-//  - pepe: corta solo en UNA tabla (`tapMs` entre cortes).
-//  - rosa: voltea y recoge en UNA sartén (`reactMs` tras el aviso).
-//  - luis: los clientes esperan más (`patience`) y dejan más propina (`tip`).
+// Pepe con el Diner, Rosa con la Trattoria, Don Luis con la Izakaya y Ramón con la Cevichería.
+// `levels` según su rango (servicios trabajados); `perk` es lo que hace en ese rango y
+// `stations` los fogones que atiende (por defecto, el primero de su tipo).
+//  - pepe: corta solo (`tapMs` entre cortes); de experto atiende las dos tablas y el bol.
+//  - rosa: voltea y saca lo de la sartén (`reactMs`); de experta, las dos sartenes.
+//  - luis: clientes más pacientes, más propina y monedas extra por plato (`plate`).
+//  - ramon: como Rosa, pero en la parrilla; de experto, las dos parrillas.
 export const STAFF = Object.freeze([
   { id: 'pepe', name: 'Pepe', role: 'El picador', stations: ['tabla'], salary: 130, hireCost: 5500, reqRestaurant: 'diner',
-    desc: 'Se queda en una tabla y corta solo lo que pongas en ella. Tú lo pones; él hace los cortes.',
-    look: { shirt: '#1C4E9C', skin: '#E9B98F', bg: '#FFE7B3' }, levels: [{ tapMs: 460 }, { tapMs: 360 }, { tapMs: 270 }] },
+    desc: 'Se queda en la tabla y corta solo lo que pongas en ella. Tú lo pones; él hace los cortes.',
+    look: { shirt: '#1C4E9C', skin: '#E9B98F', bg: '#FFE7B3' },
+    levels: [
+      { tapMs: 460, perk: 'Corta en una tabla (un corte cada 0,46 s).' },
+      { tapMs: 360, perk: 'Corta más rápido (un corte cada 0,36 s).' },
+      { tapMs: 270, stations: ['tabla', 'tabla#2', 'bol', 'bol#2'], perk: 'Atiende las dos tablas y también bate en el bol, a toda velocidad.' }
+    ] },
   { id: 'rosa', name: 'Rosa', role: 'La del budare', fem: true, stations: ['sarten'], salary: 220, hireCost: 11000, reqRestaurant: 'trattoria',
-    desc: 'Se queda en una sartén: voltea la carne a tiempo y la saca antes de que se queme.',
-    look: { shirt: '#C8102E', skin: '#C98E66', bg: '#FDE3D8' }, levels: [{ reactMs: 1150 }, { reactMs: 700 }, { reactMs: 350 }] },
-  { id: 'luis', name: 'Don Luis', role: 'El mesero', stations: [], salary: 320, hireCost: 18000, reqRestaurant: 'izakaya',
-    desc: 'Atiende la barra: los clientes esperan más y dejan mejor propina.',
-    look: { shirt: '#2A170D', skin: '#8D5A3B', bg: '#DCE6FB' }, levels: [{ patience: 1.12, tip: 0.03 }, { patience: 1.15, tip: 0.05 }, { patience: 1.2, tip: 0.08 }] }
+    desc: 'Se queda en la sartén: voltea la carne a tiempo y la saca antes de que se queme. Los incendios los apagas tú.',
+    look: { shirt: '#C8102E', skin: '#C98E66', bg: '#FDE3D8' },
+    levels: [
+      { reactMs: 1150, perk: 'Voltea y saca lo de una sartén (reacciona en 1,2 s).' },
+      { reactMs: 700, perk: 'Reacciona más rápido (0,7 s): casi todo sale perfecto.' },
+      { reactMs: 350, stations: ['sarten', 'sarten#2'], perk: 'Maneja las dos sartenes y reacciona al instante (0,35 s).' }
+    ] },
+  { id: 'luis', name: 'Don Luis', role: 'El mesero', stations: [], salary: 180, hireCost: 18000, reqRestaurant: 'izakaya',
+    desc: 'Atiende la barra: los clientes esperan más, dejan mejor propina y cada plato servido deja monedas extra.',
+    look: { shirt: '#2A170D', skin: '#8D5A3B', bg: '#DCE6FB' },
+    levels: [
+      { patience: 1.12, tip: 0.03, plate: 6, perk: '+6 monedas por plato · clientes 12 % más pacientes · +3 % de propina.' },
+      { patience: 1.15, tip: 0.05, plate: 9, perk: '+9 monedas por plato · clientes 15 % más pacientes · +5 % de propina.' },
+      { patience: 1.2, tip: 0.08, plate: 12, perk: '+12 monedas por plato · clientes 20 % más pacientes · +8 % de propina.' }
+    ] },
+  { id: 'ramon', name: 'Ramón', role: 'El parrillero', stations: ['parrilla'], salary: 260, hireCost: 26000, reqRestaurant: 'cevicheria',
+    desc: 'Se queda en la parrilla: voltea lo que asas en su punto y lo saca antes de que se queme. Los incendios los apagas tú.',
+    look: { shirt: '#3E8FD0', skin: '#D49A6A', bg: '#DCEEFB' },
+    levels: [
+      { reactMs: 1150, perk: 'Voltea y saca lo de una parrilla (reacciona en 1,2 s).' },
+      { reactMs: 700, perk: 'Reacciona más rápido (0,7 s): casi todo sale perfecto.' },
+      { reactMs: 350, stations: ['parrilla', 'parrilla#2'], perk: 'Maneja las dos parrillas y reacciona al instante (0,35 s).' }
+    ] }
 ]);
 export const STAFF_RANKS = Object.freeze([{ name: 'Novato', fem: 'Novata', from: 0 }, { name: 'Hábil', fem: 'Hábil', from: 5 }, { name: 'Experto', fem: 'Experta', from: 15 }]);
 export const rankName = (member, rank) => (member?.fem ? STAFF_RANKS[rank].fem : STAFF_RANKS[rank].name);

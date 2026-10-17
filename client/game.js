@@ -56,7 +56,11 @@ export class Kitchen {
     this.lives = SERVICE_LIVES;
     this.closed = false;
     // Asistente contratado (si hay): trabaja solo en sus fogones.
-    this.helper = config.staff ? { ...STAFF_BY_ID[config.staff.id], rank: config.staff.rank, paused: false, task: '' } : null;
+    // El ayudante atiende los fogones de su rango (de experto, a veces más de uno).
+    const member = config.staff ? STAFF_BY_ID[config.staff.id] : null;
+    this.helper = member ? { ...member, rank: config.staff.rank, stations: member.levels[config.staff.rank]?.stations ?? member.stations, paused: false, task: '' } : null;
+    // Lo que hizo durante el servicio, para el resumen final.
+    this.helperStats = { cuts: 0, flips: 0, saves: 0 };
     this.itemSeq = 0;
     this.custEls = new Map();
     this.leaving = new Map();
@@ -353,7 +357,7 @@ export class Kitchen {
           <span class="timeline__label" style="left:0">0:00</span><span class="timeline__label" style="right:0">${clockText(dur)}</span>
         </div>
         <div class="brief__legend"><span><i class="lg-rush"></i>Hora pico</span><span><i class="lg-fire"></i>Fuego</span><span><i class="lg-vip"></i>Crítico</span></div>
-        ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy en ${this.helper.stations.length ? this.#stName(this.helper.stations[0]).toLowerCase() : 'la barra'} (${rankName(this.helper, this.helper.rank).toLowerCase()})</span></div>` : ''}
+        ${this.helper ? `<div class="brief__helper"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span><b>${escapeHtml(this.helper.name)}</b> te ayuda hoy en ${this.#helperPlaces()} (${rankName(this.helper, this.helper.rank).toLowerCase()})</span></div>` : ''}
         <ul class="brief__rules">
           <li>${icon('heart')}<span><b>${SERVICE_LIVES} vidas.</b> Cada cliente que se va enojado quita una (un crítico, dos). Sin vidas, cierran la cocina.</span></li>
           ${groupCount ? `<li>${icon('people')}<span><b>${groupCount} ${groupCount > 1 ? 'grupos' : 'grupo'} de amigos.</b> Llegan juntos; si les sirves a todos con menos de ${GROUP_WINDOW_MS / 1000} s de diferencia, cada uno paga +${Math.round(GROUP_BONUS * 100)} %.</span></li>` : ''}
@@ -548,7 +552,22 @@ export class Kitchen {
     }
   }
 
-  // El ayudante ocupa un solo fogón: el primero de su tipo (no los extra).
+  // Dónde trabaja hoy, en palabras: «la tabla», «las dos sartenes», «las dos tablas y el bol»…
+  #helperPlaces() {
+    const keys = this.helper.stations.filter((k) => this.stationKeys.includes(k));
+    if (!keys.length) return 'la barra';
+    const types = [...new Set(keys.map((k) => this.#type(k)))];
+    return types.map((t) => {
+      const n = keys.filter((k) => this.#type(k) === t).length;
+      const name = this.#stName(t).toLowerCase();
+      const fem = name === 'sartén' || name.endsWith('a');
+      const plural = name === 'sartén' ? 'sartenes' : /[aeiou]$/.test(name) ? `${name}s` : `${name}es`;
+      if (n > 1) return `${fem ? 'las dos' : 'los dos'} ${plural}`;
+      return `${fem ? 'la' : 'el'} ${name}`;
+    }).join(' y ');
+  }
+
+  // El ayudante ocupa los fogones de su rango (en novato y hábil, el primero de su tipo).
   #helperAt(st) {
     return Boolean(this.helper?.stations.includes(st));
   }
@@ -570,11 +589,11 @@ export class Kitchen {
         if (!item) continue;
         if (item.kind === 'tap' && lv.tapMs) {
           task ||= `corta ${INGREDIENTS[item.ingredient].name.toLowerCase()}`;
-          if (this.t - Math.max(item.lastTapAt ?? 0, item.startedAt) >= lv.tapMs) this.#onStation(st, this.el.stations[st]);
+          if (this.t - Math.max(item.lastTapAt ?? 0, item.startedAt) >= lv.tapMs) { this.helperStats.cuts += 1; this.#onStation(st, this.el.stations[st]); }
         } else if (item.kind === 'timer' && lv.reactMs) {
           const state = this.#timerState(item);
-          if (state === 'flip' && this.t - item.flip.at >= lv.reactMs * 0.6) { task = `voltea ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.#onStation(st, this.el.stations[st]); }
-          else if ((state === 'ready' || state === 'burning') && this.t - item.readyAt >= lv.reactMs) { task = `saca ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.#onStation(st, this.el.stations[st]); }
+          if (state === 'flip' && this.t - item.flip.at >= lv.reactMs * 0.6) { task = `voltea ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.helperStats.flips += 1; this.#onStation(st, this.el.stations[st]); }
+          else if ((state === 'ready' || state === 'burning') && this.t - item.readyAt >= lv.reactMs) { task = `saca ${INGREDIENTS[item.ingredient].name.toLowerCase()}`; this.helperStats.saves += 1; this.#onStation(st, this.el.stations[st]); }
           else if (state === 'burnt') this.#onStation(st, this.el.stations[st]);
           else task ||= `vigila ${this.#stName(this.#type(st)).toLowerCase()}`;
         }
@@ -1302,7 +1321,7 @@ export class Kitchen {
     if (this.closed) sfx.burn(); else sfx.count(true);
     music.stop();
     this.el.root.classList.remove('is-hot');
-    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, firesOut: this.firesOut, estimate: this.coins }), 1100);
+    setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, firesOut: this.firesOut, estimate: this.coins, helperStats: this.helperStats }), 1100);
   }
 }
 

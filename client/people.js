@@ -111,7 +111,8 @@ export function customerSvg(look = 0, mood = 'happy', cls = 'customer__face', vi
 const CHEFS = {
   pepe: { skin: '#E9B98F', hair: '#3A2216', hairStyle: 'short', scarf: '#1C4E9C' },
   rosa: { skin: '#C98E66', hair: '#1E1410', hairStyle: 'long', scarf: '#C8102E', earrings: true },
-  luis: { skin: '#8D5A3B', hair: '#D9D2C8', hairStyle: 'grey', scarf: '#2A170D', mustache: true, glasses: true }
+  luis: { skin: '#8D5A3B', hair: '#D9D2C8', hairStyle: 'grey', scarf: '#2A170D', mustache: true, glasses: true },
+  ramon: { skin: '#D49A6A', hair: '#5A2E14', hairStyle: 'short', scarf: '#3E8FD0', mustache: true }
 };
 
 export function chefSvg(member, extra = '') {

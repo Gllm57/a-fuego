@@ -317,12 +317,17 @@ test('asistentes: uno por restaurante, contrato, sueldo por servicio y rangos', 
   assert.equal(evaluateHire(swapped, 'luis').price, 0);
   const base = cfgFor(lvl);
   const c = cfgFor(hired);
-  assert.equal(c.salary, 320);
+  assert.equal(c.salary, 180);
   assert.equal(c.staff.rank, 0);
   assert.ok(c.stats.patienceMult > base.stats.patienceMult);
+  assert.equal(c.stats.plateBonus, 6);
   const res = scoreRun(c, { serves: honestServes(c) });
-  assert.equal(res.coins, res.gross - res.upkeep - 320);
-  assert.equal(res.salary, 320);
+  assert.equal(res.coins, res.gross - res.upkeep - 180);
+  assert.equal(res.salary, 180);
+  // Don Luis deja 6 monedas por plato servido (en novato).
+  assert.equal(res.staffBonus, res.served * 6);
+  // Ramón llega con la cevichería.
+  assert.equal(evaluateHire(chain, 'ramon').reason, 'personal_bloqueado');
   assert.equal(staffRank(0), 0);
   assert.equal(staffRank(5), 1);
   assert.equal(staffRank(40), 2);

@@ -41,7 +41,9 @@ export function plateEarnings(order, recipe, servedAt, perfects, combo, stats, t
   const perfectBonus = price * 0.05 * perfects;
   const groupBonus = together ? price * GROUP_BONUS : 0;
   const mult = 1 + 0.1 * Math.min(combo - 1, MAX_COMBO_STEPS);
-  return { price, tip, perfectBonus, groupBonus, mult, earned: Math.round((price + tip + perfectBonus + groupBonus) * mult) };
+  // Monedas fijas por plato de un mesero (Don Luis): no se multiplican por el combo.
+  const staffBonus = stats.plateBonus ?? 0;
+  return { price, tip, perfectBonus, groupBonus, mult, staffBonus, earned: Math.round((price + tip + perfectBonus + groupBonus) * mult) + staffBonus };
 }
 
 // Un grupo "comió junto" si sus dos platos salieron con menos de GROUP_WINDOW_MS de diferencia.
@@ -178,6 +180,7 @@ export function scoreRun(config, submission) {
   let d = 0;
   let gross = 0;
   let tips = 0;
+  let staffBonus = 0;
   let perfectsTotal = 0;
   let vipServed = 0;
   const breakdown = [];
@@ -190,6 +193,7 @@ export function scoreRun(config, submission) {
     const e = plateEarnings(order, recipe, s.servedAt, s.perfects, combo, stats, groups.together.has(s.orderId));
     gross += e.earned;
     tips += Math.round(e.tip * e.mult);
+    staffBonus += e.staffBonus;
     perfectsTotal += s.perfects;
     if (order.vip) vipServed += 1;
     breakdown.push({ orderId: s.orderId, recipeId: recipe.id, vip: order.vip, together: groups.together.has(s.orderId), base: e.price, tip: Math.round(e.tip), mult: e.mult, earned: e.earned });
@@ -201,7 +205,8 @@ export function scoreRun(config, submission) {
   const coins = gross - upkeep - salary - emergencyCost;
   const closed = closedAt !== null;
   const target = orders.reduce((sum, o) => sum + RECIPE_BY_ID[o.recipeId].price * (o.vip ? VIP_PRICE_MULT : 1), 0);
-  const ratio = target > 0 ? gross / target : 0;
+  // Las estrellas miden cómo cocinaste: lo que deja el mesero no cuenta.
+  const ratio = target > 0 ? (gross - staffBonus) / target : 0;
   const stars = closed ? 0 : STAR_THRESHOLDS.filter((th) => ratio >= th).length;
   const xp = serves.length * 10 + perfectsTotal * 2 + vipServed * 15 + stars * 25;
   const ingredientCost = Object.entries(used).reduce((s, [ing, n]) => s + INGREDIENTS[ing].cost * n, 0)
@@ -226,6 +231,7 @@ export function scoreRun(config, submission) {
     upkeep,
     salary,
     staff: config.staff?.id ?? null,
+    staffBonus,
     emergency,
     emergencyCost,
     coins,
