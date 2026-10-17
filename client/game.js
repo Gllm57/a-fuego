@@ -182,11 +182,13 @@ export class Kitchen {
     const ring = parseFloat(getComputedStyle(counter).getPropertyValue('--ring-max')) || 60;
     const n = this.pantryIds.length;
     const jar = n <= 5 ? 84 : n <= 10 ? 64 : n <= 15 ? 56 : 52;
-    for (let k = 1; k >= 0.58; k -= 0.03) {
-      shelf.style.setProperty('--jar', `${Math.round(jar * k)}px`);
-      counter.style.setProperty('--ring-max', `${Math.round(ring * Math.max(0.74, 0.45 + k * 0.55))}px`);
-      if (grid.scrollHeight <= grid.clientHeight + 1) break;
-    }
+    // Primero ceden los fogones (hasta 40 px); los frascos, con los alimentos, sólo si no alcanza.
+    const fits = () => grid.scrollHeight <= grid.clientHeight + 1;
+    shelf.style.setProperty('--jar', `${jar}px`);
+    let r = ring;
+    counter.style.setProperty('--ring-max', `${r}px`);
+    while (!fits() && r > 40) { r -= 2; counter.style.setProperty('--ring-max', `${r}px`); }
+    for (let k = 0.97; !fits() && k >= 0.6; k -= 0.03) shelf.style.setProperty('--jar', `${Math.round(jar * k)}px`);
   }
 
   destroy() {
