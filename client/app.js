@@ -1,7 +1,7 @@
 // Aplicación: pantallas, navegación y flujo de partidas.
 
 import {
-  RESTAURANTS, RESTAURANT_BY_ID, facadeStage, facadeNext, FACADE_STAGES, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
+  RESTAURANTS, RESTAURANT_BY_ID, CHEF_TITLES, facadeStage, facadeNext, FACADE_STAGES, RECIPES, RECIPE_BY_ID, UPGRADES, INGREDIENTS, PROCESSES,
   recipesOf, kitchenStats, upgradeLevel, storageCapacity, inventoryCount, lineTotal, recipeIngredients, menuFor, restockPlan,
   evaluatePurchase, previousRestaurant, recipeProgress, ACHIEVEMENTS, achievementProgress, STAFF, STAFF_BY_ID, STAFF_RANKS, STATIONS, staffRank, rankName, staffOwned, DECOR, DECOR_BY_ID, DECOR_SLOTS, decorOf, decorOwned, decorAvailable, ACHIEVEMENT_BY_ID, TIER_GROUP_CHANCE, GROUP_WINDOW_MS, GROUP_BONUS
 } from './shared/index.js';
@@ -211,7 +211,7 @@ function renderHome() {
         <span class="ring empire__ring" style="--p:${empire.percent}"><span class="ring__inner"><b>${empire.percent}%</b><small>IMPERIO</small></span></span>
         <div>
           <div class="empire__kicker">TU CADENA ¡A FUEGO!</div>
-          <h1 class="empire__title">${empire.title}</h1>
+          <button class="empire__title" data-act="titles" aria-label="Ver los títulos de chef">${empire.title} ${icon('arrow')}</button>
           <div class="empire__stats">
             <span class="pill">${icon('store', 'style="width:14px;height:14px"')} ${empire.restaurants}/${empire.restaurantsTotal}</span>
             <span class="pill">${icon('book', 'style="width:14px;height:14px"')} ${empire.recipes}/${empire.recipesTotal}</span>
@@ -272,6 +272,7 @@ function renderHome() {
   screen.querySelector('[data-act="diary"]').addEventListener('click', () => go('diary'));
   screen.querySelector('[data-act="ranking"]').addEventListener('click', () => go('ranking'));
   screen.querySelector('[data-act="decor"]').addEventListener('click', () => go('decor'));
+  screen.querySelector('[data-act="titles"]').addEventListener('click', () => { sfx.tap(); openTitles(); });
   screen.querySelector('[data-act="goal"]').addEventListener('click', () => {
     if (goal.kind === 'recipe') { app.recipeTab = RECIPE_BY_ID[goal.id].restaurant; go('recipes'); }
     else if (goal.kind === 'restaurant') openRestaurant(RESTAURANT_BY_ID[goal.id]);
@@ -310,7 +311,7 @@ function restaurantCard(r, i) {
         <span class="rest__cuisine">Cocina ${r.cuisine}</span>
         <span class="rest__name">${r.name}</span>
         <span class="rest__meta">${learned}/${recipes.length} recetas · ${r.seats} mesas · gastos ${fmt(r.upkeep)}/servicio</span>
-        ${owned ? `<span class="rest__stage" data-stage="${stage}">${icon(stage >= 3 ? 'crown' : 'home')} ${FACADE_STAGES[stage]}${next ? ` · <small>${next}</small>` : ''}</span>` : ''}
+        ${owned ? `<span class="rest__stage" data-stage="${stage}">${icon(stage >= 3 ? 'crown' : 'home')}<b>${FACADE_STAGES[stage]}</b>${next ? `<small> · ${next}</small>` : ''}</span>` : ''}
       </span>
     </button>`;
 }
@@ -388,6 +389,31 @@ function openRestaurant(r) {
       }
     });
   });
+}
+
+// Los títulos de chef que se pueden alcanzar y en cuál vas.
+function openTitles() {
+  const e = app.profile.empire;
+  const now = [...CHEF_TITLES].reverse().find((t) => e.percent >= t.from);
+  const next = CHEF_TITLES.find((t) => t.from > e.percent);
+  openSheet(`
+    <div class="sheet__head"><h2>Títulos de chef</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
+    <p class="note" style="margin:0">Tu título sube con el <b>% del imperio</b>: locales abiertos (40 %), recetas aprendidas (40 %) y mejoras compradas (20 %). Vas en <b>${e.percent} %</b>${next ? `: te faltan ${next.from - e.percent} puntos para ${next.name}.` : '. ¡Llegaste a lo más alto!'}</p>
+    <ol class="ranks" aria-label="Títulos">
+      ${CHEF_TITLES.map((t) => {
+        const isNow = t === now;
+        const done = t.from < now.from;
+        return `<li class="rank ${isNow ? 'is-now' : done ? 'is-done' : ''}">
+          <span class="rank__dot">${icon(done ? 'check' : isNow ? 'sparkle' : 'lock')}</span>
+          <span><b>${t.name}</b> <small>${t.from} % del imperio${isNow ? ' · ahora' : ''}</small><span class="rank__perk">${t.desc}</span></span>
+        </li>`;
+      }).join('')}
+    </ol>
+    <div class="empire__stats" style="justify-content:center">
+      <span class="pill">${icon('store', 'style="width:14px;height:14px"')} ${e.restaurants}/${e.restaurantsTotal} locales</span>
+      <span class="pill">${icon('book', 'style="width:14px;height:14px"')} ${e.recipes}/${e.recipesTotal} recetas</span>
+    </div>
+  `);
 }
 
 // Letrero al abrir un local: qué desbloquea y qué cambia en la cocina.

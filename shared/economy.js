@@ -377,12 +377,17 @@ export function empireProgress(state) {
   };
 }
 
+// Títulos de chef según el % del imperio (locales 40 %, recetas 40 %, mejoras 20 %).
+export const CHEF_TITLES = Object.freeze([
+  { from: 0, name: 'Cocinero Novato', desc: 'Tu primer local y tus primeras recetas.' },
+  { from: 25, name: 'Sous Chef', desc: 'Una cadena en marcha: varios locales y un buen recetario.' },
+  { from: 50, name: 'Chef de Cocina', desc: 'Medio imperio: la mitad de los locales, recetas y mejoras.' },
+  { from: 75, name: 'Chef Ejecutivo', desc: 'Casi todo abierto: te faltan los últimos locales y mejoras.' },
+  { from: 100, name: 'Chef Leyenda', desc: 'Todos los locales, todas las recetas y todas las mejoras al máximo.' }
+]);
+
 export function titleFor(pct) {
-  if (pct >= 100) return 'Chef Leyenda';
-  if (pct >= 75) return 'Chef Ejecutivo';
-  if (pct >= 50) return 'Chef de Cocina';
-  if (pct >= 25) return 'Sous Chef';
-  return 'Cocinero Novato';
+  return [...CHEF_TITLES].reverse().find((t) => pct >= t.from).name;
 }
 
 // Sugiere el siguiente objetivo concreto en el que invertir.
@@ -469,7 +474,7 @@ export function facadeNext(state, restaurantId) {
     const recipes = recipesOf(restaurantId);
     const learned = recipes.filter((r) => state.recipes?.includes(r.id)).length;
     if (learned < recipes.length) return `Menú ${learned}/${recipes.length}`;
-    return `${Math.min(rs.threeStars ?? 0, FACADE_LEYENDA_STARS)}/${FACADE_LEYENDA_STARS} servicios de 3 estrellas`;
+    return `${Math.min(rs.threeStars ?? 0, FACADE_LEYENDA_STARS)}/${FACADE_LEYENDA_STARS} con 3 estrellas`;
   }
   return null;
 }
