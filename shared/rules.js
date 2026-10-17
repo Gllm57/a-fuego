@@ -21,7 +21,7 @@ export const VIP_PATIENCE_MULT = 0.7;
 export const FIRE_TAPS = 6;
 // Dificultad por restaurante (0 = arepera … 7 = barbacoa coreana): paciencia de los
 // clientes y ritmo de llegada. Cada local se nota más exigente que el anterior.
-export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.76, 0.68, 0.65, 0.62]);
+export const TIER_PATIENCE = Object.freeze([1.05, 0.96, 0.88, 0.82, 0.70, 0.63, 0.60, 0.57]);
 export const TIER_PACE = Object.freeze([1.04, 0.97, 0.91, 0.87, 0.82, 0.76, 0.73, 0.70]);
 // Vidas por servicio: cada cliente que se va enojado quita una (un crítico, dos).
 // Sin vidas cierran la cocina antes de tiempo. Margen para el último fotograma.

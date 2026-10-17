@@ -11,7 +11,7 @@ import { generateEvents } from './levelgen.js';
 
 export const MAX_COMBO_STEPS = 5;
 export const TIP_RATE = 0.3;
-export const STAR_THRESHOLDS = Object.freeze([0.4, 0.8, 1.15]);
+export const STAR_THRESHOLDS = Object.freeze([0.4, 0.8, 1.35]);
 
 export class RunValidationError extends Error {
   constructor(reason, detail) {

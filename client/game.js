@@ -36,7 +36,7 @@ export class Kitchen {
     this.stations = Object.fromEntries(this.stationKeys.map((s) => [s, null]));
     this.fires = {};
     this.events = generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
-    this.rush = rushWindow(config.seed, config.durationMs);
+    this.rush = rushWindow(config.seed, config.durationMs, config.tier ?? 0);
     this.rushState = 'before';
     this.stock = { ...(config.stock ?? {}) };
     this.waste = {};

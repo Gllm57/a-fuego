@@ -53,7 +53,7 @@ function intro() {
   const easyOrders = ordersForConfig(easy);
   const avgPatience = (os) => os.reduce((a, o) => a + o.patienceMs, 0) / os.length / 1000;
   const fires = generateEvents({ seed: cfg.seed, durationMs: cfg.durationMs, tier: cfg.tier }).length;
-  const rush = rushWindow(cfg.seed, cfg.durationMs);
+  const rush = rushWindow(cfg.seed, cfg.durationMs, cfg.tier);
   const stats = kitchenStats({}, REST.id);
   const recipes = recipesOf(REST.id);
   root.innerHTML = `

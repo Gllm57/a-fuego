@@ -6,16 +6,18 @@ import { createRng } from './rng.js';
 import { patienceMs, TIER_PACE, TIER_GROUP_CHANCE, tierValue } from './rules.js';
 
 // Ventana de hora pico: los clientes llegan mucho más seguido.
-export function rushWindow(seed, durationMs) {
+// Desde el Izakaya (nivel de local 4) dura más y es más intensa.
+export function rushWindow(seed, durationMs, tier = 0) {
   const rng = createRng(`${seed}:rush`);
   const from = Math.round(durationMs * (0.35 + rng() * 0.25));
-  return { from, to: from + 22_000 };
+  const hard = tier >= 4;
+  return { from, to: from + (hard ? 30_000 : 22_000), pace: hard ? 0.48 : 0.55 };
 }
 
 export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal', tier = 0 }) {
   if (!Array.isArray(menu) || menu.length === 0) throw new Error('El menú está vacío');
   const rng = createRng(`${seed}:orders`);
-  const rush = rushWindow(seed, durationMs);
+  const rush = rushWindow(seed, durationMs, tier);
   const pace = (mode === 'daily' ? 0.85 : 1) * tierValue(TIER_PACE, tier);
   // Los grupos aparecen cuando sube la dificultad (y hay mesas para sentarlos).
   const slots = stats.slots ?? 3;
@@ -62,7 +64,7 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
     }
     const progress = t / durationMs;
     const inRush = t >= rush.from && t < rush.to;
-    const gap = (8500 - 3500 * progress) * pace * (inRush ? 0.55 : 1) * (0.75 + rng() * 0.5);
+    const gap = (8500 - 3500 * progress) * pace * (inRush ? rush.pace : 1) * (0.75 + rng() * 0.5);
     t += gap * (1 + extra) + 800 * (recipe.components.length - 2);
   }
   return orders;
