@@ -376,7 +376,7 @@ export class Kitchen {
 
   #countdown() {
     const ov = document.createElement('div');
-    ov.className = 'overlay';
+    ov.className = 'overlay overlay--count';
     this.el.root.appendChild(ov);
     let n = 3;
     const step = () => {

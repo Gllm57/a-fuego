@@ -289,7 +289,14 @@ function renderHome() {
       openRestaurant(r);
     }
   }));
-  requestAnimationFrame(() => screen.querySelector(`[data-rest="${app.restaurantId}"]`)?.scrollIntoView({ inline: 'center', block: 'nearest' }));
+  // Centra el local elegido sólo en el carrusel: scrollIntoView también movería la pantalla en celulares bajos.
+  requestAnimationFrame(() => {
+    const card = screen.querySelector(`[data-rest="${app.restaurantId}"]`);
+    const rail = card?.parentElement;
+    if (!rail) return;
+    const c = card.getBoundingClientRect(), r = rail.getBoundingClientRect();
+    rail.scrollLeft += c.left - r.left - (r.width - c.width) / 2;
+  });
 }
 
 function restaurantCard(r, i) {
@@ -1164,7 +1171,7 @@ async function submitRun(host, kitchen, run, outcome, attempt = 0) {
   } catch (err) {
     if (err.status === 0 && attempt < 3) return setTimeout(() => submitRun(host, kitchen, run, outcome, attempt + 1), 1500);
     kitchen.destroy();
-    host.innerHTML = `<div class="game"><div class="results">
+    host.innerHTML = `<div class="game game--results"><div class="results">
       <h1>Ups…</h1><p class="note" style="color:#EADBD0;text-align:center">${escapeHtml(err.message)}${err.details?.reason ? ` (${escapeHtml(err.details.reason)})` : ''}</p>
       <div class="results__actions"><button class="btn btn--xl btn--gold" data-act="home">Volver</button></div></div></div>`;
     host.querySelector('[data-act="home"]').addEventListener('click', () => { host.remove(); applyTheme(app.restaurantId); go(app.tab); });
@@ -1214,7 +1221,7 @@ function showResults(host, run, res, outcome = {}) {
   // (st() todavía tiene la caja de antes del servicio: el perfil nuevo se aplica después.)
   const paidLoss = net < 0 ? Math.max(0, st().coins - profile.state.coins) : 0;
   host.innerHTML = `
-    <div class="game"><div class="game__inner" style="display:flex">
+    <div class="game game--results"><div class="game__inner" style="display:flex">
       <div class="results">
         <div class="results__kicker">${rest.name.toUpperCase()}${run.config.mode === 'daily' ? ' · RETO DEL DÍA' : ''}</div>
         <h1>${result.closed ? '¡Te cerraron la cocina!' : result.coins < 0 ? 'Servicio con pérdidas' : HEADLINES[result.stars]}</h1>
