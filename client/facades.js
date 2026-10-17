@@ -2,6 +2,7 @@
 // ventanas redondas y puerta, más un detalle propio de cada cocina.
 // Etapas (ver facadeStage en shared/economy.js):
 //   0 en obra · 1 recién abierto · 2 con clientela · 3 local leyenda.
+// La fachada se ve completa desde que se abre; la etapa leyenda sólo suma la estrella.
 
 const scallops = (p, alt = '#fff') => Array.from({ length: 9 }, (_, i) => `<circle cx="${62 + i * 22}" cy="108" r="11" fill="${i % 2 ? alt : p}"/>`).join('');
 const plant = (x, a = '#5E9E4A') => `<circle cx="${x}" cy="214" r="16" fill="${a}"/><path d="M${x - 12} 236l4-18h16l4 18z" fill="#C2703A"/>`;
@@ -71,9 +72,6 @@ const FACADES = {
   }
 };
 
-// Guirnalda de foquitos (etapa 2 en adelante).
-const garland = (y = 84) => `<path d="M58 ${y}q92 34 184 0" fill="none" stroke="#2A170D" stroke-width="1.5"/>${[[74, 6], [98, 13], [124, 17], [150, 18], [176, 17], [202, 13], [226, 6]].map(([x, dy], i) => `<circle class="facade-bulb" cx="${x}" cy="${y + dy}" r="4" fill="${['#FFE08A', '#F28C8C', '#9FD3F0'][i % 3]}" style="--i:${i}"/>`).join('')}`;
-
 // Local leyenda: la estrella dorada (lo demás de la fachada queda igual).
 const legend = (d, sx = 240) => `<g class="facade-star"><circle cx="${sx}" cy="58" r="17" fill="#FFC23D" stroke="${d}" stroke-width="3"/><path d="M${sx} 47l3.4 7 7.6 1.1-5.5 5.4 1.3 7.6-6.8-3.6-6.8 3.6 1.3-7.6-5.5-5.4 7.6-1.1z" fill="#fff"/></g>`;
 
@@ -85,15 +83,19 @@ export function storefrontSvg(theme, id = 'arepera', { stage = 1 } = {}) {
     <ellipse cx="150" cy="236" rx="140" ry="12" fill="${d}" opacity=".18"/>
     ${f.pre?.(p, d) ?? ''}
     <path d="M40 236V120a110 110 0 0 1 220 0v116z" fill="#FFF8EE"/>
+    <path d="M228 236V44a110 110 0 0 1 32 76v116z" fill="${d}" opacity=".07"/>
     ${f.body?.(p, d) ?? ''}
     ${f.arch ? f.arch(p, d) : `<path d="M40 120a110 110 0 0 1 220 0" fill="none" stroke="${d}" stroke-width="10"/>`}
     ${f.roof?.(p, d) ?? ''}
     ${f.sign(p, d)}
-    ${stage >= 2 && id !== 'taqueria' ? garland(f.roof ? 66 : 68) : ''}
-    <path d="M50 98h200v10H50z" fill="${p}"/>
+    <path d="M50 110h200v14H50z" fill="${d}" opacity=".1"/>
+    <path d="M50 98h200v10H50z" fill="${p}"/><path d="M50 98h200v3H50z" fill="#fff" opacity=".25"/>
     ${scallops(p)}
     ${f.front(p, d)}
-    ${stage >= 2 ? f.sides(p, d) : ''}
+    <path d="M74 158a14 14 0 0 1 8-10M202 158a14 14 0 0 1 8-10" stroke="#fff" stroke-width="3" opacity=".75" fill="none" stroke-linecap="round"/>
+    ${id === 'cevicheria' || id === 'diner' ? '' : `<rect x="116" y="231" width="68" height="5" rx="2" fill="#C9B8A4"/>`}
+    <path d="M24 236h252" stroke="${d}" stroke-width="3" opacity=".22" stroke-linecap="round"/>
+    ${f.sides(p, d)}
     ${stage >= 3 ? legend(d, id === 'asador' ? 60 : 240) : ''}
   </svg>`;
 }
