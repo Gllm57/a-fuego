@@ -1360,23 +1360,3 @@ button { -webkit-appearance: none; appearance: none; }
 @keyframes coach-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.04); } }
 @keyframes coach-tap { 0%, 100% { transform: translate(-30%, 0) scale(1); } 45% { transform: translate(-30%, -8px) scale(1.05); } 60% { transform: translate(-30%, 0) scale(.92); } }
 @keyframes coach-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
-
-/* Pantalla de idioma (la primera vez) y selector en el perfil. */
-.lang { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 24px 20px calc(24px + var(--safe-bottom)); text-align: center; }
-.lang .boot__pan { width: 104px; height: 104px; }
-.lang__hint { margin: 6px 0 4px; font-family: var(--font-display); font-size: 22px; font-weight: 600; color: var(--ink); line-height: 1.2; animation: rise .5s .25s var(--ease-out) both; }
-.lang__hint span { font-size: 16px; color: var(--ink-2); }
-.lang__list { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
-.lang__btn { appearance: none; border: 0; font: inherit; cursor: pointer; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 999px; background: var(--card); color: var(--ink); box-shadow: 0 5px 0 var(--line-deep), inset 0 0 0 2px var(--line); transition: transform .12s, box-shadow .12s, background .2s; animation: rise .5s var(--ease-out) both; -webkit-tap-highlight-color: transparent; }
-.lang__btn:nth-child(1) { animation-delay: .35s; }
-.lang__btn:nth-child(2) { animation-delay: .45s; }
-.lang__btn b { flex: 1; text-align: left; font-family: var(--font-display); font-size: 21px; font-weight: 600; }
-.lang__btn > svg { width: 22px; height: 22px; color: var(--brand); }
-.lang__btn:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--line-deep), inset 0 0 0 2px var(--line); }
-.lang__btn.is-picked { background: var(--brand-soft); box-shadow: 0 5px 0 var(--brand-deep), inset 0 0 0 3px var(--brand); }
-.lang__flag { flex: none; width: 46px; height: 32px; border-radius: 8px; overflow: hidden; isolation: isolate; box-shadow: 0 0 0 2px #3B2416; display: block; }
-.lang__flag svg { width: 100%; height: 100%; display: block; }
-.lang-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
-.lang-row__btn { appearance: none; border: 0; font: inherit; font-weight: 800; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 10px; padding: 10px; border-radius: 999px; background: var(--card); color: var(--ink-2); box-shadow: 0 4px 0 var(--line-deep), inset 0 0 0 2px var(--line); -webkit-tap-highlight-color: transparent; }
-.lang-row__btn .lang__flag { width: 30px; height: 21px; border-radius: 5px; box-shadow: 0 0 0 1.5px #3B2416; }
-.lang-row__btn[aria-pressed="true"] { background: var(--brand-soft); color: var(--ink); box-shadow: 0 4px 0 var(--brand-deep), inset 0 0 0 2px var(--brand); }

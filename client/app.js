@@ -13,7 +13,6 @@ import { lightsHtml, decoHtml } from './decor-art.js';
 import { storefrontSvg, obraSvg } from './facades.js';
 import { ingredientSvg, processSvg, icon, coinSvg, starSvg, panLogoSvg, UPGRADE_ICONS, customerSvg, plateSvgItems, staffSvg } from './art.js';
 import { toast, openSheet, countUp, confetti, escapeHtml, fmt } from './ui.js';
-import { t, setLang, getLang, chosenLang, LANGS } from './i18n.js';
 import { Coach } from './coach.js';
 
 const app = {
@@ -39,8 +38,6 @@ if (!SANDBOX && 'serviceWorker' in navigator && location.protocol === 'https:') 
 }
 
 async function boot() {
-  // Lo primero de todo: el idioma (sólo la primera vez).
-  if (!chosenLang()) await chooseLanguage();
   root.innerHTML = `<div class="boot">${panLogoSvg()}<div class="boot__logo">¡A Fuego!</div><div class="boot__text">Encendiendo los fogones…</div></div>`;
   try {
     app.api = await createApi();
@@ -52,32 +49,6 @@ async function boot() {
   if (!app.profile.state.restaurants.includes(app.restaurantId)) app.restaurantId = app.profile.state.restaurants[0];
   renderShell();
   maybeStartTutorial();
-}
-
-// ── Idioma ──────────────────────────────────────────────────
-const FLAGS = {
-  es: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect width="60" height="40" fill="#C8102E"/><rect y="10" width="60" height="20" fill="#F2C200"/></svg>`,
-  en: `<svg viewBox="0 0 60 40" aria-hidden="true"><rect width="60" height="40" fill="#012169"/><path d="M0 0l60 40M60 0L0 40" stroke="#fff" stroke-width="8"/><path d="M0 0l60 40M60 0L0 40" stroke="#C8102E" stroke-width="3"/><path d="M30 0v40M0 20h60" stroke="#fff" stroke-width="12"/><path d="M30 0v40M0 20h60" stroke="#C8102E" stroke-width="7"/></svg>`
-};
-
-function chooseLanguage() {
-  return new Promise((resolve) => {
-    root.innerHTML = `
-      <div class="lang">
-        ${panLogoSvg()}
-        <div class="boot__logo">¡A Fuego!</div>
-        <p class="lang__hint">Elige tu idioma<br><span>Choose your language</span></p>
-        <div class="lang__list">${LANGS.map((l) => `
-          <button class="lang__btn" data-lang="${l.id}"><span class="lang__flag">${FLAGS[l.id]}</span><b>${l.name}</b>${icon('arrow')}</button>`).join('')}
-        </div>
-      </div>`;
-    root.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
-      sfx.tap();
-      setLang(b.dataset.lang);
-      b.classList.add('is-picked');
-      setTimeout(resolve, 260);
-    }));
-  });
 }
 
 // ── Tutorial de la primera vez ──────────────────────────────
@@ -117,15 +88,15 @@ function homeTour() {
   const coach = new Coach(document.body, { block: true });
   const q = (sel) => () => root.querySelector(sel);
   const steps = [
-    { target: q('.empire'), title: t('Tu cadena'), text: t('Aquí ves tu <b>título de chef</b> y cuánto llevas de tu imperio. La meta de abajo te dice qué conseguir después.') },
-    { target: q('#screen [data-act="play"]'), title: t('Abrir servicio'), text: t('Empieza un servicio en el restaurante elegido. Se cocina con los ingredientes de tu despensa.') },
-    { target: q('.rest-scroller'), title: t('Tus restaurantes'), text: t('Desliza para ver los locales que puedes abrir: cada uno trae su cocina, recetas y clientes. Su fachada mejora mientras más juegas ahí.') },
-    { target: q('.nav [data-tab="market"]'), title: t('Mercado'), text: t('Compra ingredientes. Los precios cambian cada día y siempre hay ofertas.') },
-    { target: q('.nav [data-tab="recipes"]'), title: t('Recetario'), text: t('Aprende recetas nuevas para tu menú: más platos, más clientes distintos.') },
-    { target: q('.nav [data-tab="upgrades"]'), title: t('Mejoras'), text: t('Cocina más rápido, suma fogones y contrata ayudantes que trabajan contigo.') },
-    { target: q('[data-act="decor"]'), title: t('Mi local'), text: t('Decora tu restaurante con toldos, paredes, luces y adornos.') },
-    { target: q('.chef-btn'), title: t('Tu perfil'), text: t('Aquí cambias el sonido y el idioma, y puedes repetir este tutorial cuando quieras.') },
-    { target: q('.fire-btn'), title: t('¡A cocinar!'), text: t('Este botón de fuego también abre un servicio. ¡Vamos con el primero de verdad!'), last: true }
+    { target: q('.empire'), title: 'Tu cadena', text: 'Aquí ves tu <b>título de chef</b> y cuánto llevas de tu imperio. La meta de abajo te dice qué conseguir después.' },
+    { target: q('#screen [data-act="play"]'), title: 'Abrir servicio', text: 'Empieza un servicio en el restaurante elegido. Se cocina con los ingredientes de tu despensa.' },
+    { target: q('.rest-scroller'), title: 'Tus restaurantes', text: 'Desliza para ver los locales que puedes abrir: cada uno trae su cocina, recetas y clientes. Su fachada mejora mientras más juegas ahí.' },
+    { target: q('.nav [data-tab="market"]'), title: 'Mercado', text: 'Compra ingredientes. Los precios cambian cada día y siempre hay ofertas.' },
+    { target: q('.nav [data-tab="recipes"]'), title: 'Recetario', text: 'Aprende recetas nuevas para tu menú: más platos, más clientes distintos.' },
+    { target: q('.nav [data-tab="upgrades"]'), title: 'Mejoras', text: 'Cocina más rápido, suma fogones y contrata ayudantes que trabajan contigo.' },
+    { target: q('[data-act="decor"]'), title: 'Mi local', text: 'Decora tu restaurante con toldos, paredes, luces y adornos.' },
+    { target: q('.chef-btn'), title: 'Tu perfil', text: 'Aquí cambias el sonido y la vibración, y puedes repetir este tutorial cuando quieras.' },
+    { target: q('.fire-btn'), title: '¡A cocinar!', text: 'Este botón de fuego también abre un servicio. ¡Vamos con el primero de verdad!', last: true }
   ];
   let i = -1;
   const end = (playNow) => {
@@ -139,9 +110,9 @@ function homeTour() {
     s.target()?.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
     coach.show({
       ...s, step: i + 1, total: steps.length,
-      button: s.last ? `${t('¡A cocinar!')}` : t('Siguiente'),
+      button: s.last ? '¡A cocinar!' : 'Siguiente',
       onButton: () => { sfx.tap(); next(); },
-      skip: i === 0 ? { label: t('Saltar'), onClick: () => { sfx.tap(); end(false); } } : null
+      skip: i === 0 ? { label: 'Saltar', onClick: () => { sfx.tap(); end(false); } } : null
     });
   };
   next();
@@ -1174,19 +1145,11 @@ function openProfile() {
       </div>
     </div>
     ${prefTilesHtml()}
-    <div class="lang-row" role="group" aria-label="${t('Idioma')}">${LANGS.map((l) => `<button class="lang-row__btn" data-lang="${l.id}" aria-pressed="${l.id === getLang()}"><span class="lang__flag">${FLAGS[l.id]}</span>${l.name}</button>`).join('')}</div>
-    <button class="btn btn--ghost btn--wide" data-act="tutorial">${icon('hand')} ${t('Repetir el tutorial')}</button>
+    <button class="btn btn--ghost btn--wide" data-act="tutorial">${icon('hand')} Repetir el tutorial</button>
     <button class="btn btn--ghost btn--wide" data-act="ledger">${icon('refresh')} Historial de monedas</button>
     ${online ? accountSection(p) : `<div class="card"><p class="note" style="margin:0 0 10px">Tu progreso se guarda en este celular.</p><button class="btn btn--ghost btn--wide" data-act="reset">Borrar progreso</button></div>`}
   `, (sheet, close) => {
     bindPrefTiles(sheet);
-    sheet.querySelectorAll('[data-lang]').forEach((b) => b.addEventListener('click', () => {
-      if (b.dataset.lang === getLang()) return;
-      sfx.tap();
-      setLang(b.dataset.lang);
-      close();
-      renderShell();
-    }));
     sheet.querySelector('[data-act="tutorial"]').addEventListener('click', () => { close(); startPractice(); });
     sheet.querySelector('[data-act="ledger"]').addEventListener('click', () => { close(); openLedger(); });
     sheet.querySelector('[data-act="reset"]')?.addEventListener('click', async (e) => {

@@ -3,7 +3,6 @@
 //   const c = new Coach(document.body);
 //   c.show({ target: el, title, text, button: 'Siguiente', onButton, step: 2, total: 9 });
 
-import { t } from './i18n.js';
 import { icon } from './art.js';
 
 const PAD = 8;
@@ -27,7 +26,7 @@ export class Coach {
     this.hand = hand;
     this.card.classList.remove('is-in'); void this.card.offsetWidth; this.card.classList.add('is-in');
     this.card.innerHTML = `
-      ${step != null ? `<div class="coach__step">${t('Paso {n} de {total}', { n: step, total })}</div>` : ''}
+      ${step != null ? `<div class="coach__step">Paso ${step} de ${total}</div>` : ''}
       ${title ? `<h3>${title}</h3>` : ''}
       <p>${text}</p>
       ${button || skip ? `<div class="coach__actions">

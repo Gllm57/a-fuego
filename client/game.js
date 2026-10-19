@@ -12,7 +12,6 @@ import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
 import { lightsHtml, decoHtml, floorHtml, decorAttrs, awningStyle } from './decor-art.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
 import { Coach } from './coach.js';
-import { t } from './i18n.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
 
@@ -89,7 +88,7 @@ export class Kitchen {
                 <span class="ring timer__ring"><span class="ring__inner timer__clock">${this.guide ? '∞' : clockText(this.config.durationMs)}</span></span>
                 <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span>${this.helper
                   ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
-                  : `<span class="timer__sub">${this.guide ? t('Práctica · sin reloj') : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
+                  : `<span class="timer__sub">${this.guide ? 'Práctica · sin reloj' : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
               </div>
               <span class="hud__right"><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
                 <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span></span>
@@ -225,24 +224,24 @@ export class Kitchen {
     const ready = (st) => { const it = this.stations[st]; return it && it.kind === 'timer' && this.#timerState(it) === 'ready'; };
     const ing = (id) => INGREDIENTS[id].name.toLowerCase();
     return [
-      { title: t('¡Bienvenido a tu cocina!'), text: t('Te enseño a cocinar paso a paso. Tranquilo: en esta práctica <b>no corre el reloj</b> y nadie se va.'), button: t('Empezar'), skip: true },
-      { target: cust(0), title: t('Llegó tu primer cliente'), text: t('En su globo ves lo que quiere comer. <b>Tócalo</b> para atenderlo.'), allow: '[data-order="0"]', hand: true, on: (ev, a) => ev === 'select' && a === 0 },
-      { target: () => this.el.order, title: t('Su comanda'), text: t('Aquí ves su plato: <b>{dish}</b>. Cada ficha es un ingrediente y cómo se prepara. Ve haciéndolas una por una.', { dish: t(this.orders[0].recipe.name) }), button: t('Entendido') },
-      { target: jar('harina_maiz'), title: t('Saca de la despensa'), text: t('Toca la <b>{ing}</b>. Va sola al {station} para freírse.', { ing: ing('harina_maiz'), station: fry }), allow: '[data-ing="harina_maiz"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina_maiz' },
-      { target: station('sarten'), title: t('Se está cocinando'), text: t('Mira el anillo: se va llenando. Cuando se ponga <b>verde</b>, está listo. Espera un momento…'), tick: () => ready('sarten') },
-      { target: station('sarten'), title: t('¡Listo!'), text: t('<b>Tócalo</b> para sacarlo al plato. Si lo sacas enseguida sale <b>¡Perfecto!</b> y cobras más.'), allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'deliver' },
-      { target: jar('queso'), title: t('Directo al plato'), text: t('El <b>{ing}</b> no se cocina: va crudo. Tócalo y cae directo en el plato.', { ing: ing('queso') }), allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'served' && a === 0 },
-      { target: () => this.el.coins, title: t('¡Servido!'), text: t('Con el plato completo se sirve solo y <b>cobras</b>. Si sirves seguido sube el <b>combo</b> y cada plato paga más.'), button: t('Siguiente'), delay: 900 },
-      { enter: () => { this.orders[1].arriveAt = this.t; }, target: cust(1), title: t('Otro cliente'), text: t('Quiere <b>{dish}</b>. Tócalo para ver su comanda.', { dish: t(this.orders[1].recipe.name) }), allow: '[data-order="1"]', hand: true, on: (ev, a) => ev === 'select' && a === 1 },
-      { target: jar('harina'), title: t('Dos cosas a la vez'), text: t('Empieza por lo que tarda: toca la <b>{ing}</b> para que se fría mientras haces lo demás.', { ing: ing('harina') }), allow: '[data-ing="harina"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina' },
-      { target: jar('queso'), title: t('Mientras se fríe…'), text: t('Este <b>{ing}</b> se corta. Tócalo para ponerlo en la tabla.', { ing: ing('queso') }), allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'queso' },
-      { target: station('tabla'), title: t('Corta, corta, corta'), text: t('Toca la <b>tabla</b> varias veces seguidas hasta terminar de cortar.'), allow: '[data-station="tabla"]', hand: true, on: (ev, a) => ev === 'deliver' && a === 'tabla' },
-      { target: station('sarten'), title: t('Recógelo a tiempo'), text: t('Cuando el anillo del {station} esté <b>verde</b>, tócalo para terminar el plato. En un servicio de verdad, si tardas mucho <b>se quema</b>.', { station: fry }), allow: '[data-station="sarten"]', hand: true, on: (ev, a) => ev === 'served' && a === 1 },
-      { enter: () => { this.fires.sarten = { taps: FIRE_TAPS }; this.sig.stations.sarten = ''; sfx.burn(); }, delay: 900, target: station('sarten'), title: t('¡Fuego!'), text: t('A veces se prende un fogón y no se puede usar. <b>Tócalo varias veces</b> para apagarlo.'), allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'fireOut' },
-      { target: () => this.el.root.querySelector('.lives'), title: t('Paciencia y vidas'), text: t('En un servicio de verdad, el anillo de cada cliente es su <b>paciencia</b>. Si se acaba, se va enojado y pierdes una vida. Sin vidas, cierran la cocina.'), button: t('Siguiente') },
-      { target: () => this.el.timer, title: t('El reloj'), text: t('Cada servicio dura un minuto y medio. Atiende a todos los que puedas; al final pagas los gastos del local con lo que ganaste.'), button: t('Siguiente') },
-      { target: () => this.el.root.querySelector('.shelf__head'), title: t('Tu despensa'), text: t('El número de cada frasco es lo que te queda. Si algo se agota, tócalo y llega un <b>pedido urgente</b> al doble de precio. Compra más en el mercado.'), button: t('Siguiente') },
-      { title: t('¡Ya sabes cocinar!'), text: t('Ahora te muestro tu restaurante. Después abres tu primer servicio de verdad.'), button: t('Vamos'), done: true }
+      { title: '¡Bienvenido a tu cocina!', text: 'Te enseño a cocinar paso a paso. Tranquilo: en esta práctica <b>no corre el reloj</b> y nadie se va.', button: 'Empezar', skip: true },
+      { target: cust(0), title: 'Llegó tu primer cliente', text: 'En su globo ves lo que quiere comer. <b>Tócalo</b> para atenderlo.', allow: '[data-order="0"]', hand: true, on: (ev, a) => ev === 'select' && a === 0 },
+      { target: () => this.el.order, title: 'Su comanda', text: `Aquí ves su plato: <b>${this.orders[0].recipe.name}</b>. Cada ficha es un ingrediente y cómo se prepara. Ve haciéndolas una por una.`, button: 'Entendido' },
+      { target: jar('harina_maiz'), title: 'Saca de la despensa', text: `Toca la <b>${ing('harina_maiz')}</b>. Va sola al ${fry} para freírse.`, allow: '[data-ing="harina_maiz"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina_maiz' },
+      { target: station('sarten'), title: 'Se está cocinando', text: 'Mira el anillo: se va llenando. Cuando se ponga <b>verde</b>, está listo. Espera un momento…', tick: () => ready('sarten') },
+      { target: station('sarten'), title: '¡Listo!', text: '<b>Tócalo</b> para sacarlo al plato. Si lo sacas enseguida sale <b>¡Perfecto!</b> y cobras más.', allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'deliver' },
+      { target: jar('queso'), title: 'Directo al plato', text: `El <b>${ing('queso')}</b> no se cocina: va crudo. Tócalo y cae directo en el plato.`, allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'served' && a === 0 },
+      { target: () => this.el.coins, title: '¡Servido!', text: 'Con el plato completo se sirve solo y <b>cobras</b>. Si sirves seguido sube el <b>combo</b> y cada plato paga más.', button: 'Siguiente', delay: 900 },
+      { enter: () => { this.orders[1].arriveAt = this.t; }, target: cust(1), title: 'Otro cliente', text: `Quiere <b>${this.orders[1].recipe.name}</b>. Tócalo para ver su comanda.`, allow: '[data-order="1"]', hand: true, on: (ev, a) => ev === 'select' && a === 1 },
+      { target: jar('harina'), title: 'Dos cosas a la vez', text: `Empieza por lo que tarda: toca la <b>${ing('harina')}</b> para que se fría mientras haces lo demás.`, allow: '[data-ing="harina"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina' },
+      { target: jar('queso'), title: 'Mientras se fríe…', text: `Este <b>${ing('queso')}</b> se corta. Tócalo para ponerlo en la tabla.`, allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'queso' },
+      { target: station('tabla'), title: 'Corta, corta, corta', text: 'Toca la <b>tabla</b> varias veces seguidas hasta terminar de cortar.', allow: '[data-station="tabla"]', hand: true, on: (ev, a) => ev === 'deliver' && a === 'tabla' },
+      { target: station('sarten'), title: 'Recógelo a tiempo', text: `Cuando el anillo del ${fry} esté <b>verde</b>, tócalo para terminar el plato. En un servicio de verdad, si tardas mucho <b>se quema</b>.`, allow: '[data-station="sarten"]', hand: true, on: (ev, a) => ev === 'served' && a === 1 },
+      { enter: () => { this.fires.sarten = { taps: FIRE_TAPS }; this.sig.stations.sarten = ''; sfx.burn(); }, delay: 900, target: station('sarten'), title: '¡Fuego!', text: 'A veces se prende un fogón y no se puede usar. <b>Tócalo varias veces</b> para apagarlo.', allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'fireOut' },
+      { target: () => this.el.root.querySelector('.lives'), title: 'Paciencia y vidas', text: 'En un servicio de verdad, el anillo de cada cliente es su <b>paciencia</b>. Si se acaba, se va enojado y pierdes una vida. Sin vidas, cierran la cocina.', button: 'Siguiente' },
+      { target: () => this.el.timer, title: 'El reloj', text: 'Cada servicio dura un minuto y medio. Atiende a todos los que puedas; al final pagas los gastos del local con lo que ganaste.', button: 'Siguiente' },
+      { target: () => this.el.root.querySelector('.shelf__head'), title: 'Tu despensa', text: 'El número de cada frasco es lo que te queda. Si algo se agota, tócalo y llega un <b>pedido urgente</b> al doble de precio. Compra más en el mercado.', button: 'Siguiente' },
+      { title: '¡Ya sabes cocinar!', text: 'Ahora te muestro tu restaurante. Después abres tu primer servicio de verdad.', button: 'Vamos', done: true }
     ];
   }
 
@@ -267,7 +266,7 @@ export class Kitchen {
         target: s.target ?? null, title: s.title, text: s.text, hand: s.hand,
         step: g.step + 1, total: g.steps.length,
         button: s.button, onButton: () => { sfx.tap(); s.done ? this.#guideFinish() : this.#guideNext(); },
-        skip: s.skip ? { label: t('Saltar tutorial'), onClick: () => { sfx.tap(); this.#guideFinish(); } } : null
+        skip: s.skip ? { label: 'Saltar tutorial', onClick: () => { sfx.tap(); this.#guideFinish(); } } : null
       });
     };
     if (s.delay) setTimeout(show, s.delay); else show();
