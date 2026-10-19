@@ -416,12 +416,13 @@ export function nextGoal(state) {
   const pending = RECIPES
     .filter((x) => !state.recipes.includes(x.id) && state.restaurants.includes(x.restaurant))
     .sort((a, b) => a.reqLevel - b.reqLevel || a.learnCost - b.learnCost);
-  const asGoal = (r) => ({ kind: 'recipe', id: r.id, name: `Aprender ${r.name}`, price: r.learnCost, reqLevel: r.reqLevel });
+  // `name` va en español; el cliente arma el texto traducido con `target` (nombre del plato o local).
+  const asGoal = (r) => ({ kind: 'recipe', id: r.id, name: `Aprender ${r.name}`, target: r.name, price: r.learnCost, reqLevel: r.reqLevel });
   if (nextRest) {
     const prev = previousRestaurant(nextRest.id);
     const blocking = prev ? pending.filter((r) => r.restaurant === prev.id) : [];
     if (blocking.length) return asGoal(blocking.find((r) => level >= r.reqLevel) ?? blocking[0]);
-    return { kind: 'restaurant', id: nextRest.id, name: `Abrir ${nextRest.name}`, price: nextRest.cost, reqLevel: nextRest.reqLevel };
+    return { kind: 'restaurant', id: nextRest.id, name: `Abrir ${nextRest.name}`, target: nextRest.name, price: nextRest.cost, reqLevel: nextRest.reqLevel };
   }
   if (pending.length) return asGoal(pending.find((r) => level >= r.reqLevel) ?? pending[0]);
   return { kind: 'done', name: '¡Eres Chef Leyenda!', price: 0, reqLevel: 0 };
@@ -473,15 +474,17 @@ export function facadeStage(state, restaurantId) {
 }
 
 // Lo que falta para la siguiente etapa, en palabras cortas (null si ya es leyenda).
-export function facadeNext(state, restaurantId) {
+// `tr(plantilla, valores)` permite traducirlo; por defecto queda en español.
+const fill = (s, v) => s.replace(/\{(\w+)\}/g, (m, k) => v[k] ?? m);
+export function facadeNext(state, restaurantId, tr = fill) {
   const stage = facadeStage(state, restaurantId);
   const rs = state.restStats?.[restaurantId] ?? {};
-  if (stage === 1) return `${Math.min(rs.runs ?? 0, FACADE_CLIENTELA_RUNS)}/${FACADE_CLIENTELA_RUNS} servicios`;
+  if (stage === 1) return tr('{n}/{total} servicios', { n: Math.min(rs.runs ?? 0, FACADE_CLIENTELA_RUNS), total: FACADE_CLIENTELA_RUNS });
   if (stage === 2) {
     const recipes = recipesOf(restaurantId);
     const learned = recipes.filter((r) => state.recipes?.includes(r.id)).length;
-    if (learned < recipes.length) return `Menú ${learned}/${recipes.length}`;
-    return `${Math.min(rs.threeStars ?? 0, FACADE_LEYENDA_STARS)}/${FACADE_LEYENDA_STARS} con 3 estrellas`;
+    if (learned < recipes.length) return tr('Menú {n}/{total}', { n: learned, total: recipes.length });
+    return tr('{n}/{total} con 3 estrellas', { n: Math.min(rs.threeStars ?? 0, FACADE_LEYENDA_STARS), total: FACADE_LEYENDA_STARS });
   }
   return null;
 }

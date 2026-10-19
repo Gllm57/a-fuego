@@ -11,11 +11,15 @@ import { sfx, music, vibrate } from './audio.js';
 import { prefTilesHtml, bindPrefTiles } from './prefs-ui.js';
 import { lightsHtml, decoHtml, floorHtml, decorAttrs, awningStyle } from './decor-art.js';
 import { floatText, flyIcon, flyPlate, escapeHtml, fmt } from './ui.js';
+import { Coach } from './coach.js';
+import { t } from './i18n.js';
 
 const TAP_PERFECT_MS_PER_TAP = 380;
 
 export class Kitchen {
-  constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor }) {
+  constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor, guide = false }) {
+    // Práctica guiada: pedidos fijos, sin reloj ni prisa; el entrenador explica cada paso.
+    this.guide = guide ? { step: -1, allow: null } : null;
     // Decoración elegida en «Mi local» (sólo se ve; no cambia las reglas).
     this.decor = decor ?? { toldo: 'toldo_local', pared: 'pared_lisa', luces: 'luces_colgantes', barra: 'barra_roble', deco: [] };
     this.host = host;
@@ -25,7 +29,7 @@ export class Kitchen {
     this.onFinish = onFinish;
     this.onQuit = onQuit;
     this.stats = config.stats;
-    this.orders = ordersForConfig(config).map((o) => {
+    this.orders = (config.orders ?? ordersForConfig(config)).map((o) => {
       const recipe = RECIPE_BY_ID[o.recipeId];
       return { ...o, recipe, status: 'waiting', filled: recipe.components.map(() => false), busy: recipe.components.map(() => false), perfects: 0 };
     });
@@ -35,8 +39,8 @@ export class Kitchen {
       .flatMap((st) => Array.from({ length: Math.max(1, this.stats.stations?.[st] ?? 1) }, (_, i) => (i ? `${st}#${i + 1}` : st)));
     this.stations = Object.fromEntries(this.stationKeys.map((s) => [s, null]));
     this.fires = {};
-    this.events = generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
-    this.rush = rushWindow(config.seed, config.durationMs, config.tier ?? 0);
+    this.events = guide ? [] : generateEvents({ seed: config.seed, durationMs: config.durationMs, tier: config.tier ?? 0 }).map((e) => ({ ...e, done: false }));
+    this.rush = guide ? { from: Infinity, to: Infinity, pace: 1 } : rushWindow(config.seed, config.durationMs, config.tier ?? 0);
     this.rushState = 'before';
     this.stock = { ...(config.stock ?? {}) };
     this.waste = {};
@@ -82,10 +86,10 @@ export class Kitchen {
             <div class="hud">
               <button class="round-btn" data-act="pause" aria-label="Pausa">${icon('pause')}</button>
               <div class="timer">
-                <span class="ring timer__ring"><span class="ring__inner timer__clock">${clockText(this.config.durationMs)}</span></span>
+                <span class="ring timer__ring"><span class="ring__inner timer__clock">${this.guide ? '∞' : clockText(this.config.durationMs)}</span></span>
                 <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span>${this.helper
                   ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
-                  : `<span class="timer__sub">Gastos del local: ${fmt(this.config.upkeep ?? 0)}</span>`}</span>
+                  : `<span class="timer__sub">${this.guide ? t('Práctica · sin reloj') : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
               </div>
               <span class="hud__right"><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
                 <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span></span>
@@ -135,6 +139,7 @@ export class Kitchen {
   #bind() {
     const root = this.el.root;
     root.addEventListener('pointerdown', (e) => {
+      if (this.guide && !this.#guideAllows(e.target)) return;
       const ing = e.target.closest('[data-ing]');
       if (ing) { e.preventDefault(); return this.#onIngredient(ing.dataset.ing, ing); }
       const st = e.target.closest('[data-station]');
@@ -145,7 +150,7 @@ export class Kitchen {
     root.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const target = e.target.closest('[data-ing],[data-station],[data-order]');
-      if (!target) return;
+      if (!target || (this.guide && !this.#guideAllows(target))) return;
       e.preventDefault();
       if (target.dataset.ing) this.#onIngredient(target.dataset.ing, target);
       else if (target.dataset.station) this.#onStation(target.dataset.station, target);
@@ -209,9 +214,91 @@ export class Kitchen {
     this.host.innerHTML = '';
   }
 
+  // ── Práctica guiada ─────────────────────────────────────
+  // Pasos del tutorial jugable. Cada paso ilumina algo y avanza con un botón,
+  // cuando el jugador hace lo que se pide (on) o cuando pasa algo en la cocina (tick).
+  #guideSteps() {
+    const jar = (id) => () => this.el.pantry.find((b) => b.dataset.ing === id);
+    const station = (st) => () => this.el.stations[st];
+    const cust = (id) => () => this.custEls.get(id)?.querySelector('.avatar');
+    const fry = this.#stName('sarten').toLowerCase();
+    const ready = (st) => { const it = this.stations[st]; return it && it.kind === 'timer' && this.#timerState(it) === 'ready'; };
+    const ing = (id) => INGREDIENTS[id].name.toLowerCase();
+    return [
+      { title: t('¡Bienvenido a tu cocina!'), text: t('Te enseño a cocinar paso a paso. Tranquilo: en esta práctica <b>no corre el reloj</b> y nadie se va.'), button: t('Empezar'), skip: true },
+      { target: cust(0), title: t('Llegó tu primer cliente'), text: t('En su globo ves lo que quiere comer. <b>Tócalo</b> para atenderlo.'), allow: '[data-order="0"]', hand: true, on: (ev, a) => ev === 'select' && a === 0 },
+      { target: () => this.el.order, title: t('Su comanda'), text: t('Aquí ves su plato: <b>{dish}</b>. Cada ficha es un ingrediente y cómo se prepara. Ve haciéndolas una por una.', { dish: t(this.orders[0].recipe.name) }), button: t('Entendido') },
+      { target: jar('harina_maiz'), title: t('Saca de la despensa'), text: t('Toca la <b>{ing}</b>. Va sola al {station} para freírse.', { ing: ing('harina_maiz'), station: fry }), allow: '[data-ing="harina_maiz"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina_maiz' },
+      { target: station('sarten'), title: t('Se está cocinando'), text: t('Mira el anillo: se va llenando. Cuando se ponga <b>verde</b>, está listo. Espera un momento…'), tick: () => ready('sarten') },
+      { target: station('sarten'), title: t('¡Listo!'), text: t('<b>Tócalo</b> para sacarlo al plato. Si lo sacas enseguida sale <b>¡Perfecto!</b> y cobras más.'), allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'deliver' },
+      { target: jar('queso'), title: t('Directo al plato'), text: t('El <b>{ing}</b> no se cocina: va crudo. Tócalo y cae directo en el plato.', { ing: ing('queso') }), allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'served' && a === 0 },
+      { target: () => this.el.coins, title: t('¡Servido!'), text: t('Con el plato completo se sirve solo y <b>cobras</b>. Si sirves seguido sube el <b>combo</b> y cada plato paga más.'), button: t('Siguiente'), delay: 900 },
+      { enter: () => { this.orders[1].arriveAt = this.t; }, target: cust(1), title: t('Otro cliente'), text: t('Quiere <b>{dish}</b>. Tócalo para ver su comanda.', { dish: t(this.orders[1].recipe.name) }), allow: '[data-order="1"]', hand: true, on: (ev, a) => ev === 'select' && a === 1 },
+      { target: jar('harina'), title: t('Dos cosas a la vez'), text: t('Empieza por lo que tarda: toca la <b>{ing}</b> para que se fría mientras haces lo demás.', { ing: ing('harina') }), allow: '[data-ing="harina"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'harina' },
+      { target: jar('queso'), title: t('Mientras se fríe…'), text: t('Este <b>{ing}</b> se corta. Tócalo para ponerlo en la tabla.', { ing: ing('queso') }), allow: '[data-ing="queso"]', hand: true, on: (ev, a) => ev === 'ingredient' && a === 'queso' },
+      { target: station('tabla'), title: t('Corta, corta, corta'), text: t('Toca la <b>tabla</b> varias veces seguidas hasta terminar de cortar.'), allow: '[data-station="tabla"]', hand: true, on: (ev, a) => ev === 'deliver' && a === 'tabla' },
+      { target: station('sarten'), title: t('Recógelo a tiempo'), text: t('Cuando el anillo del {station} esté <b>verde</b>, tócalo para terminar el plato. En un servicio de verdad, si tardas mucho <b>se quema</b>.', { station: fry }), allow: '[data-station="sarten"]', hand: true, on: (ev, a) => ev === 'served' && a === 1 },
+      { enter: () => { this.fires.sarten = { taps: FIRE_TAPS }; this.sig.stations.sarten = ''; sfx.burn(); }, delay: 900, target: station('sarten'), title: t('¡Fuego!'), text: t('A veces se prende un fogón y no se puede usar. <b>Tócalo varias veces</b> para apagarlo.'), allow: '[data-station="sarten"]', hand: true, on: (ev) => ev === 'fireOut' },
+      { target: () => this.el.root.querySelector('.lives'), title: t('Paciencia y vidas'), text: t('En un servicio de verdad, el anillo de cada cliente es su <b>paciencia</b>. Si se acaba, se va enojado y pierdes una vida. Sin vidas, cierran la cocina.'), button: t('Siguiente') },
+      { target: () => this.el.timer, title: t('El reloj'), text: t('Cada servicio dura un minuto y medio. Atiende a todos los que puedas; al final pagas los gastos del local con lo que ganaste.'), button: t('Siguiente') },
+      { target: () => this.el.root.querySelector('.shelf__head'), title: t('Tu despensa'), text: t('El número de cada frasco es lo que te queda. Si algo se agota, tócalo y llega un <b>pedido urgente</b> al doble de precio. Compra más en el mercado.'), button: t('Siguiente') },
+      { title: t('¡Ya sabes cocinar!'), text: t('Ahora te muestro tu restaurante. Después abres tu primer servicio de verdad.'), button: t('Vamos'), done: true }
+    ];
+  }
+
+  #guideAllows(el) {
+    const a = this.guide.allow;
+    return Boolean(a && el?.closest?.(a));
+  }
+
+  #guideNext() {
+    const g = this.guide;
+    g.steps ??= this.#guideSteps();
+    g.coach ??= new Coach(this.el.root);
+    g.step += 1;
+    const s = g.steps[g.step];
+    if (!s) return;
+    g.allow = null;
+    s.enter?.();
+    const show = () => {
+      if (!this.guide || g.steps[g.step] !== s) return;
+      g.allow = s.allow ?? null;
+      g.coach.show({
+        target: s.target ?? null, title: s.title, text: s.text, hand: s.hand,
+        step: g.step + 1, total: g.steps.length,
+        button: s.button, onButton: () => { sfx.tap(); s.done ? this.#guideFinish() : this.#guideNext(); },
+        skip: s.skip ? { label: t('Saltar tutorial'), onClick: () => { sfx.tap(); this.#guideFinish(); } } : null
+      });
+    };
+    if (s.delay) setTimeout(show, s.delay); else show();
+  }
+
+  #guideEvent(ev, arg) {
+    const g = this.guide;
+    const s = g?.steps?.[g.step];
+    if (s?.on?.(ev, arg)) this.#guideNext();
+  }
+
+  #guideTick() {
+    const g = this.guide;
+    const s = g.steps?.[g.step];
+    if (s?.tick?.()) this.#guideNext();
+  }
+
+  #guideFinish() {
+    if (!this.guide || this.guide.finished) return;
+    this.guide.finished = true;
+    this.guide.coach?.destroy();
+    this.running = false;
+    cancelAnimationFrame(this.raf);
+    music.stop();
+    this.onFinish({ practice: true });
+  }
+
   // ── Introducción y cuenta atrás ─────────────────────────
   // Antes del servicio: tutorial ilustrado (la primera vez) y el parte del día.
   #intro() {
+    if (this.guide) { this.start(); this.#guideNext(); return; }
     if (this.firstTime) this.#tutorial(() => this.#briefing());
     else this.#briefing();
   }
@@ -436,6 +523,7 @@ export class Kitchen {
       this.t += dt;
       this.#update();
       this.#paint();
+      if (this.guide) this.#guideTick();
     }
     if (this.closed || this.t >= this.config.durationMs) return this.#finish();
     this.raf = requestAnimationFrame(this.frame);
@@ -667,10 +755,10 @@ export class Kitchen {
   #paint() {
     const left = Math.max(0, this.config.durationMs - this.t);
     const secs = Math.ceil(left / 1000);
-    const clock = clockText(left);
+    const clock = this.guide ? '∞' : clockText(left);
     if (this.el.clock.textContent !== clock) this.el.clock.textContent = clock;
-    this.el.ring.style.setProperty('--p', ((left / this.config.durationMs) * 100).toFixed(1));
-    this.el.timer.classList.toggle('is-low', secs <= 15);
+    this.el.ring.style.setProperty('--p', this.guide ? '100' : ((left / this.config.durationMs) * 100).toFixed(1));
+    this.el.timer.classList.toggle('is-low', !this.guide && secs <= 15);
 
     for (const o of this.#visible()) {
       const el = this.custEls.get(o.id);
@@ -829,6 +917,7 @@ export class Kitchen {
       el.classList.toggle('is-selected', cid === id);
       el.setAttribute('aria-pressed', String(cid === id));
     }
+    this.#guideEvent('select', id);
   }
 
   #stackSvg(o, i, ingId) {
@@ -1057,6 +1146,7 @@ export class Kitchen {
       o.filled[idx] = true;
       this.#toPlate(o, idx, btn, ingId);
       this.#checkComplete(o);
+      this.#guideEvent('ingredient', ingId);
       return;
     }
     const keys = this.stationKeys.filter((k) => this.#type(k) === proc.station);
@@ -1085,6 +1175,7 @@ export class Kitchen {
     sfx.place();
     const fly = flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
     this.landAt.set(`st:${base.id}`, performance.now() + fly);
+    this.#guideEvent('ingredient', ingId);
   }
 
   // Pedido urgente: 2 unidades al doble de precio; llegan en 3 segundos.
@@ -1119,6 +1210,7 @@ export class Kitchen {
         this.firesOut += 1;
         floatText(el, '¡Apagado!', 'good');
         sfx.ready();
+        this.#guideEvent('fireOut', st);
       }
       this.sig.stations[st] = '';
       return;
@@ -1173,6 +1265,7 @@ export class Kitchen {
     }
     this.#toPlate(o, item.compIndex, this.el.stations[st], item.ingredient);
     this.#checkComplete(o);
+    this.#guideEvent('deliver', st);
   }
 
   // El ingrediente vuela en arco al plato de la comanda (o al cliente, si no es el
@@ -1241,6 +1334,7 @@ export class Kitchen {
     const visible = this.#visible();
     if (this.selected === o.id) this.selected = visible[0]?.id ?? null;
     this.#renderCustomers();
+    this.#guideEvent('served', o.id);
   }
 
   // Animación al servir: el plato vuela al cliente y las monedas suben al contador.
