@@ -186,13 +186,17 @@ export class Kitchen {
     const ring = parseFloat(getComputedStyle(counter).getPropertyValue('--ring-max')) || 60;
     const n = this.pantryIds.length;
     const jar = n <= 5 ? 84 : n <= 10 ? 64 : n <= 15 ? 56 : 52;
-    // Primero ceden los fogones (hasta 40 px); los frascos, con los alimentos, sólo si no alcanza.
+    // Los fogones se quedan de su tamaño: primero los frascos se achican un poco (así suelen
+    // caber más por fila y sobra una fila entera). Los fogones sólo ceden en pantallas muy bajas.
     const fits = () => grid.scrollHeight <= grid.clientHeight + 1;
-    shelf.style.setProperty('--jar', `${jar}px`);
-    let r = ring;
+    const setJar = (k) => shelf.style.setProperty('--jar', `${Math.round(jar * k)}px`);
+    let r = ring, k = 1;
     counter.style.setProperty('--ring-max', `${r}px`);
+    setJar(k);
+    while (!fits() && k > 0.76) setJar(k -= 0.03);
+    while (!fits() && r > 48) { r -= 2; counter.style.setProperty('--ring-max', `${r}px`); }
+    while (!fits() && k > 0.6) setJar(k -= 0.03);
     while (!fits() && r > 40) { r -= 2; counter.style.setProperty('--ring-max', `${r}px`); }
-    for (let k = 0.97; !fits() && k >= 0.6; k -= 0.03) shelf.style.setProperty('--jar', `${Math.round(jar * k)}px`);
   }
 
   destroy() {
