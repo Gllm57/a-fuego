@@ -21,7 +21,7 @@ const app = {
   market: null,
   cart: {},
   tab: 'home',
-  restaurantId: localGet('afuego.restaurant') ?? (SANDBOX ? 'cevicheria' : 'arepera'),
+  restaurantId: localGet('afuego.restaurant') ?? (SANDBOX ? RESTAURANTS.at(-1).id : 'arepera'),
   recipeTab: null,
   boardTab: null,
   busy: false
@@ -54,7 +54,7 @@ async function boot() {
 // ── Tutorial de la primera vez ──────────────────────────────
 // 1) Práctica guiada en la cocina (sin reloj). 2) Recorrido por el menú. 3) Primer servicio.
 function maybeStartTutorial() {
-  if (localGet('afuego.tutorial') === '2') return;
+  if (SANDBOX || localGet('afuego.tutorial') === '2') return;
   if (st().stats.runs > 0) { localSet('afuego.tutorial', '2'); return; }
   startPractice();
 }
@@ -1235,7 +1235,7 @@ async function play(restaurantId, mode) {
   applyTheme(run.config.restaurantId);
   const host = document.createElement('div');
   document.body.appendChild(host);
-  const firstTime = localGet('afuego.tutorial') !== '2';
+  const firstTime = !SANDBOX && localGet('afuego.tutorial') !== '2';
   const kitchen = new Kitchen(host, {
     config: run.config,
     restaurant: RESTAURANT_BY_ID[run.config.restaurantId],

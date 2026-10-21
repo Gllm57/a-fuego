@@ -21,7 +21,7 @@ export const SANDBOX = typeof __AFUEGO_SANDBOX__ !== 'undefined' && __AFUEGO_SAN
 const LOCAL_KEY = SANDBOX ? 'afuego.sandbox.v1' : 'afuego.local.v1';
 const SANDBOX_COINS = 9_999_999;
 
-// Estado de prueba: el final del juego, con todo comprado y la cevichería abierta.
+// Estado de prueba: el final del juego, con todo comprado y el último local elegido.
 function sandboxState() {
   const base = newPlayerState();
   const upgrades = Object.fromEntries(UPGRADES.map((u) => [u.id, u.costs.length]));
@@ -200,7 +200,7 @@ class LocalApi {
         return data;
       }
     } catch { /* datos corruptos: empezar de nuevo */ }
-    if (SANDBOX) return { state: sandboxRefill(sandboxState(), 'cevicheria'), name: 'Chef de prueba', bests: {}, history: [], ledger: [] };
+    if (SANDBOX) return { state: sandboxRefill(sandboxState(), RESTAURANTS.at(-1).id), name: 'Chef de prueba', bests: {}, history: [], ledger: [] };
     const state = newPlayerState();
     return { state, name: 'Chef Invitado', bests: {}, history: [], ledger: [{ delta: state.coins, reason: 'bono_bienvenida', t: Date.now() }] };
   }
