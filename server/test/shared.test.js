@@ -461,6 +461,11 @@ test('cocina para dos: en cooperativo los fogones son dobles, hay una mesa más 
   assert.ok(Object.values(coop.stats.stations).every((n) => n >= 2));
   assert.equal(coop.stats.slots, normal.stats.slots + 1);
   assert.ok(ordersForConfig(coop).length > ordersForConfig(normal).length);
+  const withHelper = { ...s, xp: xpForLevel(20), restaurants: ['arepera', 'taqueria', 'diner'], staff: { hired: 'pepe', owned: ['pepe'], exp: {} } };
+  assert.ok(buildRunConfig(withHelper, { restaurantId: 'arepera', randomSeed: 'x', day: '2026-10-23' }).staff);
+  const coopHelper = buildRunConfig(withHelper, { restaurantId: 'arepera', mode: 'coop', randomSeed: 'x', day: '2026-10-23' });
+  assert.equal(coopHelper.staff, null);
+  assert.equal(coopHelper.salary, 0);
   const res = scoreRun(coop, { serves: honestServes(coop) });
   assert.ok(res.served > 0);
 });

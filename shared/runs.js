@@ -41,7 +41,8 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
   // Asistente contratado: su rango queda fijo durante el servicio.
   const stats = kitchenStats(state.upgrades, restaurantId);
   const member = STAFF_BY_ID[state.staff?.hired];
-  const allowed = member && state.restaurants.includes(member.reqRestaurant);
+  // En cooperativo no trabaja el ayudante: la cocina es de los dos chefs (y no se paga sueldo).
+  const allowed = member && mode !== 'coop' && state.restaurants.includes(member.reqRestaurant);
   let staff = null;
   if (allowed) {
     const rank = staffRank(state.staff.exp?.[member.id] ?? 0);

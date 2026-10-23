@@ -1519,7 +1519,7 @@ function renderLobby(note) {
       <div class="card coop-rest">
         <small>COCINA DE HOY</small>
         <b>${escapeHtml(rest.name)}</b>
-        <span class="note">${coop.host ? 'Se usan tu menú, tus mejoras y tu despensa; tú te quedas la ganancia del local y tu amigo cobra aparte la mitad. Cambia el local desde el inicio antes de crear la sala.' : 'Se usan el menú y la despensa del anfitrión: tú no gastas ingredientes y te llevas la mitad de la ganancia.'}</span>
+        <span class="note">${coop.host ? 'Se usan tu menú, tus mejoras y tu despensa (sin ayudante: hoy cocinan ustedes dos); tú te quedas la ganancia del local y tu amigo cobra aparte la mitad. Cambia el local desde el inicio antes de crear la sala.' : 'Se usan el menú y la despensa del anfitrión: tú no gastas ingredientes y te llevas la mitad de la ganancia.'}</span>
         <span class="coop-perk">${icon('fire')} Cocina para dos: fogones dobles, una mesa más y más clientes</span>
       </div>
       ${note ? `<p class="coop-note">${escapeHtml(note)}</p>` : ''}
