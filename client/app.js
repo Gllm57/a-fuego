@@ -1390,8 +1390,8 @@ function showResults(host, run, res, outcome = {}) {
 // ── Cocinar juntos (cooperativo) ────────────────────────────
 // Dos celulares en una sala. Quien la crea (anfitrión) pone su local, su menú y su
 // despensa, y corre la partida; el invitado la ve en vivo y le manda sus toques.
-// Uno atiende la barra (clientes y despensa) y el otro los fogones.
-const coop = { room: null, code: null, host: false, me: null, members: [], hostRole: 'barra', view: null, kitchen: null, host_el: null };
+// Los dos hacen de todo («cocina para dos»: fogones dobles, una mesa más y más clientes).
+const coop = { room: null, code: null, host: false, me: null, members: [], view: null, kitchen: null, host_el: null };
 
 // Un id por pestaña: así también se puede probar con dos pestañas del mismo navegador.
 let tabId = null;
@@ -1403,10 +1403,10 @@ function coopId() {
 function openCoop() {
   openSheet(`
     <div class="sheet__head"><h2>Cocinar juntos</h2><button class="icon-btn" data-close aria-label="Cerrar">${icon('close')}</button></div>
-    <p class="note" style="margin:0">Un amigo y tú en la misma cocina, cada uno en su celular. Uno atiende <b>la barra</b> (clientes y despensa) y el otro <b>los fogones</b>. Necesitan internet.</p>
+    <p class="note" style="margin:0">Un amigo y tú en la misma cocina, cada uno en su celular. Los dos pueden hacer de todo, como en el modo solo: cada uno atiende a su cliente y ves en su color lo que hace el otro. Necesitan internet.</p>
     <div class="coop-roles">
-      <div class="coop-role coop-role--barra">${icon('people')}<b>La barra</b><span>Elige clientes y saca de la despensa</span></div>
-      <div class="coop-role coop-role--fogones">${icon('fire')}<b>Los fogones</b><span>Corta, bate, fríe, voltea y saca a tiempo</span></div>
+      <div class="coop-role coop-role--barra">${icon('store')}<b>El local</b><span>Se cocina en el de quien crea la sala, con su menú y su despensa</span></div>
+      <div class="coop-role coop-role--fogones">${icon('fire')}<b>Cocina para dos</b><span>Todos los fogones dobles, una mesa más y llegan más clientes</span></div>
     </div>
     <button class="btn btn--gold btn--xl" data-act="create">${icon('sparkle')} Crear sala</button>
     <form class="coop-join" data-act="join">
@@ -1431,7 +1431,6 @@ async function enterRoom(code, isHost) {
   await leaveRoom();
   coop.code = code;
   coop.host = isHost;
-  coop.hostRole = 'barra';
   coop.members = [];
   coop.me = { id: coopId(), name: app.profile.player.displayName, host: isHost, joinedAt: Date.now() };
   showLobby('Conectando…');
@@ -1454,8 +1453,6 @@ async function leaveRoom() {
 
 const hostMember = () => coop.members.find((m) => m.host);
 const partnerOf = () => coop.members.find((m) => m.id !== coop.me.id && (coop.host ? !m.host : m.host));
-const myRole = () => (coop.host ? coop.hostRole : coop.hostRole === 'barra' ? 'fogones' : 'barra');
-const roleName = (r) => (r === 'barra' ? 'La barra' : 'Los fogones');
 
 function onCoopMembers(members) {
   // Sala de dos: el tercero que llega (el más reciente) se queda fuera.
@@ -1469,7 +1466,6 @@ function onCoopMembers(members) {
 }
 
 function onCoopMessage(m) {
-  if (m.type === 'roles' && !coop.host) { coop.hostRole = m.hostRole; renderLobby(); return; }
   if (m.type === 'start' && !coop.host) { startCoopGuest(m); return; }
   if (m.type === 'end' && !coop.host) { endCoopGuest(m.r); return; }
   if (m.type === 'lobby' && !coop.host) { if (coop.guestResults) { coop.guestResults.remove(); coop.guestResults = null; } showLobby(); renderLobby(); return; }
@@ -1503,11 +1499,10 @@ function renderLobby(note) {
   const host = coop.host ? coop.me : hostMember();
   const rest = RESTAURANT_BY_ID[coop.host ? app.restaurantId : (host?.rest ?? app.restaurantId)];
   const slot = (m, role, you) => m
-    ? `<div class="coop-slot coop-slot--${role}"><span class="coop-slot__face">${customerSvg(m.host ? 1 : 4, 'happy', '')}</span><b>${escapeHtml(m.name)}${you ? ' (tú)' : ''}</b><span class="coop-slot__role">${roleName(role)}</span><small>${m.host ? 'Anfitrión' : 'Invitado'}</small></div>`
+    ? `<div class="coop-slot coop-slot--${role}"><span class="coop-slot__face">${customerSvg(m.host ? 1 : 4, 'happy', '')}</span><b>${escapeHtml(m.name)}${you ? ' (tú)' : ''}</b><span class="coop-slot__role">${role === 'h' ? 'Chef rojo' : 'Chef azul'}</span><small>${m.host ? 'Anfitrión' : 'Invitado'}</small></div>`
     : `<div class="coop-slot is-empty"><span class="coop-slot__face"></span><b>Esperando…</b><small>Comparte el código</small></div>`;
-  const guestRole = coop.hostRole === 'barra' ? 'fogones' : 'barra';
-  const meSlot = coop.host ? slot(coop.me, coop.hostRole, true) : slot(host, coop.hostRole, false);
-  const otherSlot = coop.host ? slot(partner, guestRole, false) : slot(coop.me, guestRole, true);
+  const meSlot = coop.host ? slot(coop.me, 'h', true) : slot(host, 'h', false);
+  const otherSlot = coop.host ? slot(partner, 'g', false) : slot(coop.me, 'g', true);
   coop.view.innerHTML = `
     <div class="coop-lobby__inner">
       <div class="coop-lobby__head">
@@ -1521,11 +1516,11 @@ function renderLobby(note) {
         ${coop.host && navigator.share ? `<button class="btn btn--sm btn--gold" data-act="share">${icon('arrow')} Compartir</button>` : ''}
       </div>
       <div class="coop-slots">${meSlot}${otherSlot}</div>
-      ${coop.host ? `<button class="btn btn--ghost btn--wide" data-act="swap">${icon('refresh')} Cambiar de puesto</button>` : ''}
       <div class="card coop-rest">
         <small>COCINA DE HOY</small>
         <b>${escapeHtml(rest.name)}</b>
-        <span class="note">${coop.host ? 'Se usan tu menú y tu despensa. Cambia el local desde el inicio antes de crear la sala.' : 'Se usan el menú y la despensa del anfitrión. Te llevas la mitad de la ganancia.'}</span>
+        <span class="note">${coop.host ? 'Se usan tu menú, tus mejoras y tu despensa; tú te quedas la ganancia del local y tu amigo cobra aparte la mitad. Cambia el local desde el inicio antes de crear la sala.' : 'Se usan el menú y la despensa del anfitrión: tú no gastas ingredientes y te llevas la mitad de la ganancia.'}</span>
+        <span class="coop-perk">${icon('fire')} Cocina para dos: fogones dobles, una mesa más y más clientes</span>
       </div>
       ${note ? `<p class="coop-note">${escapeHtml(note)}</p>` : ''}
       ${coop.host
@@ -1535,12 +1530,6 @@ function renderLobby(note) {
   coop.view.querySelector('[data-act="leave"]').addEventListener('click', async () => { sfx.tap(); await leaveRoom(); closeLobby(); });
   coop.view.querySelector('[data-act="share"]')?.addEventListener('click', () => {
     navigator.share({ title: '¡A Fuego!', text: `¡Cocinemos juntos en ¡A Fuego! Entra a «Cocinar juntos» y escribe el código ${coop.code}` }).catch(() => {});
-  });
-  coop.view.querySelector('[data-act="swap"]')?.addEventListener('click', () => {
-    sfx.tap();
-    coop.hostRole = coop.hostRole === 'barra' ? 'fogones' : 'barra';
-    coop.room?.send({ type: 'roles', hostRole: coop.hostRole });
-    renderLobby();
   });
   coop.view.querySelector('[data-act="start"]')?.addEventListener('click', startCoopHost);
   if (coop.host && coop.me.rest !== app.restaurantId) { coop.me.rest = app.restaurantId; coop.room?.update({ rest: app.restaurantId }); }
@@ -1553,15 +1542,14 @@ async function startCoopHost() {
   sfx.tap();
   let run;
   try {
-    run = await app.api.startRun(app.restaurantId, 'normal');
+    run = await app.api.startRun(app.restaurantId, 'coop');
   } catch (err) {
     app.busy = false;
     errorToast(err);
     return;
   }
   app.busy = false;
-  coop.room.send({ type: 'roles', hostRole: coop.hostRole });
-  coop.room.send({ type: 'start', config: run.config, decor: decorOf(st()).equipped, hostRole: coop.hostRole, hostName: coop.me.name });
+  coop.room.send({ type: 'start', config: run.config, decor: decorOf(st()).equipped, hostName: coop.me.name });
   closeLobby();
   applyTheme(run.config.restaurantId);
   const host = document.createElement('div');
@@ -1581,7 +1569,7 @@ async function startCoopHost() {
     config: run.config,
     restaurant: RESTAURANT_BY_ID[run.config.restaurantId],
     decor: decorOf(st()).equipped,
-    coop: { host: true, role: coop.hostRole, partner: partner.name, send: (m) => coop.room?.send(m) },
+    coop: { host: true, partner: partner.name, send: (m) => coop.room?.send(m) },
     onQuit: () => { coop.kitchen = null; app.api.abandonRun(run.runId); host.remove(); applyTheme(app.restaurantId); leaveRoom(); },
     onFinish: (outcome) => { coop.kitchen = null; submitRun(host, kitchen, run, outcome); }
   });
@@ -1591,7 +1579,6 @@ async function startCoopHost() {
 
 function startCoopGuest(m) {
   closeLobby();
-  coop.hostRole = m.hostRole;
   const config = m.config;
   applyTheme(config.restaurantId);
   const host = document.createElement('div');
@@ -1601,7 +1588,7 @@ function startCoopGuest(m) {
     config,
     restaurant: RESTAURANT_BY_ID[config.restaurantId],
     decor: m.decor,
-    coop: { host: false, role: myRole(), partner: m.hostName, send: (msg) => coop.room?.send(msg) },
+    coop: { host: false, partner: m.hostName, send: (msg) => coop.room?.send(msg) },
     onQuit: () => { coop.kitchen = null; host.remove(); applyTheme(app.restaurantId); leaveRoom(); },
     onFinish: () => {}
   });
@@ -1630,7 +1617,7 @@ async function endCoopGuest(r) {
           <div class="stars">${[0, 1, 2].map((i) => starSvg(`star ${i < r.stars ? 'is-on' : ''}`)).join('')}</div>
           <div class="results__coins">${coinSvg()}<span data-count>0</span></div>
           <div class="results__label">TU PARTE · LA MITAD DE LA GANANCIA DEL EQUIPO</div>
-          <div class="bubbles"><div><b>${r.served}/${r.total}</b><span>clientes</span></div><div><b>${fmt(r.net)}</b><span>equipo</span></div><div><b>${roleName(myRole()).replace('La ', '').replace('Los ', '')}</b><span>tu puesto</span></div></div>
+          <div class="bubbles"><div><b>${r.served}/${r.total}</b><span>clientes</span></div><div><b>${fmt(r.net)}</b><span>equipo</span></div><div><b>${r.stars}★</b><span>estrellas</span></div></div>
           <div class="bonus-line">${icon('people')} Cocinaste con ${escapeHtml(coop.partnerName ?? '')}</div>
           <div class="results__actions">
             <button class="btn btn--xl" data-act="wait">Esperar otro servicio</button>

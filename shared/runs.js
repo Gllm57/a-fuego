@@ -14,8 +14,10 @@ export class RunStartError extends Error {
   }
 }
 
+export const COOP_MAX_SLOTS = 6;
+
 export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSeed, day }) {
-  if (mode !== 'normal' && mode !== 'daily') throw new RunStartError('modo_invalido');
+  if (mode !== 'normal' && mode !== 'daily' && mode !== 'coop') throw new RunStartError('modo_invalido');
   let seed = randomSeed;
   if (mode === 'daily') {
     const challenge = dailyChallenge(day, state);
@@ -48,6 +50,12 @@ export function buildRunConfig(state, { restaurantId, mode = 'normal', randomSee
     if (lv.patience) stats.patienceMult = Math.round(stats.patienceMult * lv.patience * 100) / 100;
     if (lv.tip) stats.tipBonus = Math.round((stats.tipBonus + lv.tip) * 100) / 100;
     if (lv.plate) stats.plateBonus = lv.plate;
+  }
+  // Cocina para dos (cooperativo): todos los fogones dobles, una mesa más y llegan
+  // más clientes (el ritmo lo sube generateOrders), para que dos chefs no se estorben.
+  if (mode === 'coop') {
+    for (const st of Object.keys(stats.stations)) stats.stations[st] = Math.max(stats.stations[st], 2);
+    stats.slots = Math.min(stats.slots + 1, COOP_MAX_SLOTS);
   }
   return {
     version: 3,

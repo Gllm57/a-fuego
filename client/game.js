@@ -18,9 +18,10 @@ const TAP_PERFECT_MS_PER_TAP = 380;
 export class Kitchen {
   constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor, guide = false, coop = null }) {
     // Cooperativo: el anfitrión corre la partida y manda su estado; el invitado la refleja
-    // y le manda sus toques. Cada uno sólo toca su puesto: la barra o los fogones.
-    //   coop = { host: bool, role: 'barra'|'fogones', partner: nombre, send(msg) }
-    this.coop = coop ? { ...coop, solo: false, base: 0, at: 0, lastSnap: 0 } : null;
+    // y le manda sus toques. Los dos pueden hacer de todo; cada uno atiende a su cliente
+    // y tiene su color (anfitrión rojo, invitado azul).
+    //   coop = { host: bool, partner: nombre, send(msg) }
+    this.coop = coop ? { ...coop, solo: false, base: 0, at: 0, lastSnap: 0, partnerSel: null, me: coop.host ? 'h' : 'g', mate: coop.host ? 'g' : 'h' } : null;
     // Práctica guiada: pedidos fijos, sin reloj ni prisa; el entrenador explica cada paso.
     this.guide = guide ? { step: -1, allow: null } : null;
     // Decoración elegida en «Mi local» (sólo se ve; no cambia las reglas).
@@ -83,7 +84,7 @@ export class Kitchen {
   // ── Montaje ─────────────────────────────────────────────
   mount() {
     this.host.innerHTML = `
-      <div class="game ${this.coop ? 'game--coop' : ''}" ${this.coop ? `data-role="${this.coop.role}"` : ''} role="application" aria-label="Cocina">
+      <div class="game ${this.coop ? 'game--coop' : ''}" role="application" aria-label="Cocina">
         <div class="game__inner" data-station-rows="${this.#stationRows().length}" ${decorAttrs(this.decor)} style="${awningStyle(this.decor.toldo)}">
           <div class="wall">
             <div class="hud">
@@ -92,10 +93,10 @@ export class Kitchen {
                 <span class="ring timer__ring"><span class="ring__inner timer__clock">${this.guide ? '∞' : clockText(this.config.durationMs)}</span></span>
                 <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span>${this.helper
                   ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
-                  : `<span class="timer__sub">${this.guide ? 'Práctica · sin reloj' : this.coop ? `Con ${escapeHtml(this.coop.partner)} · tú: ${this.coop.role === 'barra' ? 'la barra' : 'los fogones'}` : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
+                  : `<span class="timer__sub">${this.guide ? 'Práctica · sin reloj' : this.coop ? `Cocinando con ${escapeHtml(this.coop.partner)}` : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
               </div>
               <span class="hud__right"><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
-                <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span>${this.coop ? `<span class="coop-badge" title="Con ${escapeHtml(this.coop.partner)}">${icon('people')}${this.coop.role === 'barra' ? 'Barra' : 'Fogones'}</span>` : ''}</span>
+                <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span>${this.coop ? `<span class="coop-chips"><span class="coop-chip" data-who="${this.coop.me}">Tú</span><span class="coop-chip" data-who="${this.coop.mate}">${escapeHtml(this.coop.partner)}</span></span>` : ''}</span>
             </div>
           </div>
           <div class="bar">
@@ -250,31 +251,61 @@ export class Kitchen {
     return null;
   }
 
-  // Lo que toca cada puesto: la barra elige clientes y saca de la despensa; los fogones cocinan.
+  // Toques en el cooperativo. El anfitrión juega directo (y su compañero ve dónde tocó);
+  // el invitado manda cada toque al anfitrión, que lo aplica y lo devuelve en su estado.
   #coopTap(e) {
     const el = e.target.closest?.('[data-ing],[data-station],[data-order]');
     if (!el) return false;
-    const kind = el.dataset.station ? 's' : el.dataset.ing ? 'i' : 'o';
-    const mine = this.coop.solo || (this.coop.role === 'barra' ? kind !== 's' : kind === 's');
-    if (!mine) {
-      e.preventDefault();
-      floatText(el, kind === 's' ? `Los fogones son de ${this.coop.partner}` : `La barra es de ${this.coop.partner}`, '');
-      return true;
-    }
-    if (this.coop.host) return false;
-    // Invitado: avisa al anfitrión; él aplica la jugada y la devuelve en su estado.
+    if (this.coop.host) { this.#coopFx({ k: 'tap', to: this.#desc(el) }); return false; }
     e.preventDefault();
     if (!this.running) return true;
-    const id = kind === 's' ? el.dataset.station : kind === 'i' ? el.dataset.ing : Number(el.dataset.order);
-    this.coop.send({ type: 'act', a: kind, id });
-    if (kind === 'o') {
-      this.selected = id;
-      for (const [cid, c] of this.custEls) c.classList.toggle('is-selected', cid === id);
-      sfx.tap();
-    } else if (kind === 's') {
-      el.classList.remove('is-chop'); void el.offsetWidth; el.classList.add('is-chop');
-    }
+    if (el.dataset.order) { this.coop.manual = true; this.#coopSelect(Number(el.dataset.order)); return true; }
+    const kind = el.dataset.station ? 's' : 'i';
+    this.coop.send({ type: 'act', a: kind, id: kind === 's' ? el.dataset.station : el.dataset.ing, sel: this.selected });
+    if (kind === 's') { el.classList.remove('is-chop'); void el.offsetWidth; el.classList.add('is-chop'); }
     return true;
+  }
+
+  // Invitado: elige su cliente (se ve al instante) y avisa al anfitrión.
+  #coopSelect(id, quiet = false) {
+    const o = this.orders[id];
+    if (!o || o.status !== 'seated') return;
+    this.selected = id;
+    this.coop.sentSel = id;
+    if (!quiet) sfx.tap();
+    for (const [cid, c] of this.custEls) { c.classList.toggle('is-selected', cid === id); c.setAttribute('aria-pressed', String(cid === id)); }
+    this.sig.order = '';
+    this.sig.pantry = '';
+    this.coop.send({ type: 'act', a: 'o', id });
+    this.#coopMarks();
+  }
+
+  // El primer cliente libre: mejor uno que no esté atendiendo tu compañero.
+  #freeCustomer(list) {
+    const mate = this.coop && !this.coop.solo ? this.coop.partnerSel : null;
+    return (list.find((o) => o.id !== mate) ?? list[0])?.id ?? null;
+  }
+
+  // Anillo y etiqueta del color de quien atiende a cada cliente.
+  #coopMarks() {
+    const mate = this.coop.solo ? null : this.coop.partnerSel;
+    for (const [id, el] of this.custEls) {
+      const mine = id === this.selected, theirs = id === mate;
+      const by = mine && theirs ? 'both' : mine ? this.coop.me : theirs ? this.coop.mate : '';
+      if (el.dataset.by !== by) el.dataset.by = by;
+      const tag = mine && theirs ? 'Los dos' : mine ? 'Tú' : theirs ? this.coop.partner : '';
+      if (el.dataset.tag !== tag) { if (tag) el.dataset.tag = tag; else delete el.dataset.tag; }
+    }
+  }
+
+  // Dónde tocó tu compañero: un círculo de su color.
+  #ghost(el, who) {
+    if (!el) return;
+    const g = document.createElement('span');
+    g.className = 'ghost-tap';
+    g.dataset.who = who;
+    el.appendChild(g);
+    setTimeout(() => g.remove(), 650);
   }
 
   #coopFx(fx) {
@@ -304,9 +335,17 @@ export class Kitchen {
     if (!this.coop || !this.el) return;
     if (this.coop.host) {
       if (m.type !== 'act' || !this.running || this.paused) return;
-      if (m.a === 'o') this.#select(m.id);
-      else if (m.a === 'i') { const b = this.el.pantry.find((x) => x.dataset.ing === m.id); if (b) this.#onIngredient(m.id, b); }
-      else if (m.a === 's' && this.el.stations[m.id]) this.#onStation(m.id, this.el.stations[m.id]);
+      if (m.a === 'o') {
+        this.coop.partnerSel = m.id;
+        this.#coopMarks();
+        this.#ghost(this.custEls.get(m.id), 'g');
+      } else if (m.a === 'i') {
+        const b = this.el.pantry.find((x) => x.dataset.ing === m.id);
+        if (b) { this.#ghost(b, 'g'); this.#onIngredient(m.id, b, m.sel ?? null); }
+      } else if (m.a === 's' && this.el.stations[m.id]) {
+        this.#ghost(this.el.stations[m.id], 'g');
+        this.#onStation(m.id, this.el.stations[m.id]);
+      }
       return;
     }
     if (m.type === 'snap') this.#coopApply(m.s);
@@ -362,16 +401,27 @@ export class Kitchen {
     }
     if (s.l < this.lives) this.#loseLife(this.lives - s.l);
     if (this.helper && s.ht !== this.helper.task) { this.helper.task = s.ht; this.#helperUi(); }
-    this.ticketHold = s.h;
-    if (seats || s.sel !== this.selected) {
-      this.selected = s.sel;
-      this.#renderCustomers();
-    }
+    // Cada uno ve su propio cliente; el del anfitrión se marca con su color.
+    const mateChanged = s.sel !== this.coop.partnerSel;
+    this.coop.partnerSel = s.sel;
+    if (seats) this.#renderCustomers();
+    const mine = this.selected != null ? this.orders[this.selected] : null;
+    if (!mine || mine.status !== 'seated' || !this.custEls.has(mine.id)) {
+      const next = this.#freeCustomer(this.#visible().filter((o) => this.custEls.has(o.id)));
+      this.coop.manual = false;
+      if (next != null) this.#coopSelect(next, true); else this.selected = null;
+    } else if (this.selected === s.sel && !this.coop.manual) {
+      // Los dos en el mismo cliente: si llega otro, el invitado pasa a atenderlo.
+      const other = this.#visible().find((o) => o.id !== s.sel && this.custEls.has(o.id));
+      if (other) this.#coopSelect(other.id, true); else if (mateChanged) this.#coopMarks();
+    } else if (mateChanged) this.#coopMarks();
+    if (this.selected != null && this.selected !== this.coop.sentSel) this.#coopSelect(this.selected, true);
     this.sig.order = '';
   }
 
   #coopShowFx(fx) {
     if (fx.k === 'ft') { const el = this.#find(fx.to); if (el) floatText(el, fx.text, fx.cls); return; }
+    if (fx.k === 'tap') { this.#ghost(this.#find(fx.to), 'h'); return; }
     if (fx.k === 'rib') { this.#ribbon(fx.title, fx.sub, fx.variant); return; }
     if (fx.k === 'fly') {
       const from = this.#find(fx.from), to = this.#find(fx.to);
@@ -422,7 +472,7 @@ export class Kitchen {
     if (!this.coop || this.coop.solo) return;
     this.coop.solo = true;
     this.#ribbon(`${this.coop.partner} salió`, 'Sigues solo: ahora toda la cocina es tuya');
-    this.el.root.closest('.game')?.removeAttribute('data-role');
+    this.#coopMarks();
   }
 
   // ── Práctica guiada ─────────────────────────────────────
@@ -889,7 +939,7 @@ export class Kitchen {
     if (changed) {
       const visible = this.#visible();
       if (this.selected === null || !visible.some((o) => o.id === this.selected)) {
-        this.selected = visible[0]?.id ?? null;
+        this.selected = this.#freeCustomer(visible);
       }
       this.#renderCustomers();
     }
@@ -1065,6 +1115,7 @@ export class Kitchen {
       this.leaving.set(id, el);
       el.classList.remove('is-selected', 'is-waiting-friend');
       el.setAttribute('aria-hidden', 'true');
+      delete el.dataset.by; delete el.dataset.tag;
       if (o.status === 'served') {
         const bubble = el.querySelector('.bubble');
         if (bubble) bubble.innerHTML = `<span class="bubble__thanks">${THANKS[(o.id * 7) % THANKS.length]}</span>`;
@@ -1125,12 +1176,13 @@ export class Kitchen {
       }
     }
     if (this.selected !== null && !this.custEls.has(this.selected)) {
-      this.selected = visible.find((o) => this.custEls.has(o.id))?.id ?? null;
+      this.selected = this.#freeCustomer(visible.filter((o) => this.custEls.has(o.id)));
     }
     for (const [id, el] of this.custEls) {
       el.classList.toggle('is-selected', id === this.selected);
       el.setAttribute('aria-pressed', String(id === this.selected));
     }
+    if (this.coop) this.#coopMarks();
   }
 
   // Despedida en su propia silla: el contento salta y baja tras la barra; el enojado
@@ -1322,6 +1374,7 @@ export class Kitchen {
     const item = this.stations[st];
     const fire = this.fires[st];
     const el = this.el.stations[st];
+    if (this.coop) { const by = item && !fire ? item.by : ''; if (el.dataset.by !== by) el.dataset.by = by; }
     const state = fire ? 'fire' : !item ? 'idle' : item.kind === 'tap' ? 'working' : this.#timerState(item);
     const sig = fire ? `fire|${fire.taps}` : item ? `${item.id}|${state}|${item.taps ?? ''}` : 'idle';
     if (this.sig.stations[st] === sig) return;
@@ -1377,10 +1430,12 @@ export class Kitchen {
   }
 
   // ── Acciones del jugador ────────────────────────────────
-  #onIngredient(ingId, btn) {
+  // `sel`: el cliente que atiende el compañero (cooperativo); si no, el tuyo.
+  #onIngredient(ingId, btn, sel) {
     if (!this.running || this.paused) return;
     if ((this.stock[ingId] ?? 0) <= 0) return this.#orderUrgent(ingId, btn);
-    const o = this.selected !== null ? this.orders[this.selected] : null;
+    const oid = sel === undefined ? this.selected : sel;
+    const o = oid != null && this.orders[oid]?.status === 'seated' ? this.orders[oid] : null;
     if (!o) { this.#float(btn, 'Elige un cliente', 'bad'); sfx.error(); return; }
     const idx = o.recipe.components.findIndex((c, i) => c.ingredient === ingId && !o.filled[i] && !o.busy[i]);
     if (idx < 0) {
@@ -1412,7 +1467,7 @@ export class Kitchen {
       return;
     }
     this.#take(ingId);
-    const base = { id: ++this.itemSeq, orderId: o.id, compIndex: idx, ingredient: ingId, process: comp.process, startedAt: this.t };
+    const base = { id: ++this.itemSeq, orderId: o.id, compIndex: idx, ingredient: ingId, process: comp.process, startedAt: this.t, by: sel === undefined ? 'h' : 'g' };
     if (proc.kind === 'tap') {
       this.stations[st] = { ...base, kind: 'tap', need: this.stats.taps[comp.process], taps: 0, lastTapAt: -Infinity };
     } else {
@@ -1586,7 +1641,7 @@ export class Kitchen {
     }
     this.#comboUi(true);
     const visible = this.#visible();
-    if (this.selected === o.id) this.selected = visible[0]?.id ?? null;
+    if (this.selected === o.id) this.selected = this.#freeCustomer(visible);
     this.#renderCustomers();
     this.#guideEvent('served', o.id);
   }

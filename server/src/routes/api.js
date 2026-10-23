@@ -113,7 +113,7 @@ export default async function api(app, { service, config }) {
     schema: {
       body: {
         type: 'object', additionalProperties: false,
-        properties: { restaurantId: id, mode: { type: 'string', enum: ['normal', 'daily'], default: 'normal' } }
+        properties: { restaurantId: id, mode: { type: 'string', enum: ['normal', 'daily', 'coop'], default: 'normal' } }
       }
     }
   }, async (req, reply) => {

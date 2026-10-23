@@ -18,7 +18,8 @@ export function generateOrders({ seed, menu, durationMs, stats, mode = 'normal',
   if (!Array.isArray(menu) || menu.length === 0) throw new Error('El menú está vacío');
   const rng = createRng(`${seed}:orders`);
   const rush = rushWindow(seed, durationMs, tier);
-  const pace = (mode === 'daily' ? 0.85 : 1) * tierValue(TIER_PACE, tier);
+  // Reto del día: algo más de gente; cooperativo: bastante más (son dos cocineros).
+  const pace = (mode === 'daily' ? 0.85 : mode === 'coop' ? 0.72 : 1) * tierValue(TIER_PACE, tier);
   // Los grupos aparecen cuando sube la dificultad (y hay mesas para sentarlos).
   const slots = stats.slots ?? 3;
   const groupChance = slots >= 4 ? tierValue(TIER_GROUP_CHANCE, tier) : 0;

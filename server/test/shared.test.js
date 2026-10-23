@@ -453,3 +453,14 @@ test('las mejoras de la parrilla se venden sólo con un local con parrilla', () 
   assert.equal(evaluatePurchase({ ...s, restaurants: [...s.restaurants, 'cevicheria'] }, 'upgrade', 'parrilla').ok, true);
   assert.equal(evaluatePurchase(s, 'upgrade', 'sarten').ok, true);
 });
+
+test('cocina para dos: en cooperativo los fogones son dobles, hay una mesa más y más clientes', () => {
+  const s = { ...newPlayerState(), inventory: { harina_maiz: 40, carne_res: 40, queso: 40 } };
+  const normal = buildRunConfig(s, { restaurantId: 'arepera', randomSeed: 'x', day: '2026-10-23' });
+  const coop = buildRunConfig(s, { restaurantId: 'arepera', mode: 'coop', randomSeed: 'x', day: '2026-10-23' });
+  assert.ok(Object.values(coop.stats.stations).every((n) => n >= 2));
+  assert.equal(coop.stats.slots, normal.stats.slots + 1);
+  assert.ok(ordersForConfig(coop).length > ordersForConfig(normal).length);
+  const res = scoreRun(coop, { serves: honestServes(coop) });
+  assert.ok(res.served > 0);
+});
