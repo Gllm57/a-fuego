@@ -102,6 +102,9 @@ class HttpApi {
     return data.profile;
   }
 
+  // En el modo con servidor el cooperativo todavía no paga al invitado.
+  async coopReward() { return { coins: 0, profile: await this.init() }; }
+
   async init() {
     if (this.token) {
       try { return await this.#req('GET', '/me'); }
@@ -361,6 +364,17 @@ class LocalApi {
   }
 
   async history() { return { entries: this.data.history }; }
+
+  // Cooperativo: el invitado cobra su parte del servicio del anfitrión (se guarda en su celular).
+  async coopReward(coins) {
+    const n = Math.max(0, Math.min(5000, Math.round(Number(coins) || 0)));
+    if (n > 0 && !SANDBOX) {
+      this.data.state.coins += n;
+      this.#log(n, 'cooperativo');
+      this.#save();
+    }
+    return { coins: n, profile: this.#profile() };
+  }
 
   async leaderboard(restaurantId) {
     const best = this.data.bests[restaurantId];

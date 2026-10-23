@@ -16,7 +16,11 @@ import { Coach } from './coach.js';
 const TAP_PERFECT_MS_PER_TAP = 380;
 
 export class Kitchen {
-  constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor, guide = false }) {
+  constructor(host, { config, restaurant, firstTime, onFinish, onQuit, decor, guide = false, coop = null }) {
+    // Cooperativo: el anfitrión corre la partida y manda su estado; el invitado la refleja
+    // y le manda sus toques. Cada uno sólo toca su puesto: la barra o los fogones.
+    //   coop = { host: bool, role: 'barra'|'fogones', partner: nombre, send(msg) }
+    this.coop = coop ? { ...coop, solo: false, base: 0, at: 0, lastSnap: 0 } : null;
     // Práctica guiada: pedidos fijos, sin reloj ni prisa; el entrenador explica cada paso.
     this.guide = guide ? { step: -1, allow: null } : null;
     // Decoración elegida en «Mi local» (sólo se ve; no cambia las reglas).
@@ -79,7 +83,7 @@ export class Kitchen {
   // ── Montaje ─────────────────────────────────────────────
   mount() {
     this.host.innerHTML = `
-      <div class="game" role="application" aria-label="Cocina">
+      <div class="game ${this.coop ? 'game--coop' : ''}" ${this.coop ? `data-role="${this.coop.role}"` : ''} role="application" aria-label="Cocina">
         <div class="game__inner" data-station-rows="${this.#stationRows().length}" ${decorAttrs(this.decor)} style="${awningStyle(this.decor.toldo)}">
           <div class="wall">
             <div class="hud">
@@ -88,10 +92,10 @@ export class Kitchen {
                 <span class="ring timer__ring"><span class="ring__inner timer__clock">${this.guide ? '∞' : clockText(this.config.durationMs)}</span></span>
                 <span style="min-width:0"><span class="timer__name" style="display:block">${escapeHtml(this.restaurant.name)}</span>${this.helper
                   ? `<button class="helper-chip" data-act="helper" aria-label="Pausar o reanudar a ${escapeHtml(this.helper.name)}"><span class="helper-chip__face">${staffSvg(this.helper)}</span><span class="helper-chip__text"></span></button>`
-                  : `<span class="timer__sub">${this.guide ? 'Práctica · sin reloj' : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
+                  : `<span class="timer__sub">${this.guide ? 'Práctica · sin reloj' : this.coop ? `Con ${escapeHtml(this.coop.partner)} · tú: ${this.coop.role === 'barra' ? 'la barra' : 'los fogones'}` : `Gastos del local: ${fmt(this.config.upkeep ?? 0)}`}</span>`}</span>
               </div>
               <span class="hud__right"><span class="hud__coins">${coinSvg()}<span class="hud__num">0</span></span>
-                <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span></span>
+                <span class="lives" role="img" aria-label="${SERVICE_LIVES} vidas">${Array.from({ length: SERVICE_LIVES }, () => `<span class="life">${icon('heart')}</span>`).join('')}</span>${this.coop ? `<span class="coop-badge" title="Con ${escapeHtml(this.coop.partner)}">${icon('people')}${this.coop.role === 'barra' ? 'Barra' : 'Fogones'}</span>` : ''}</span>
             </div>
           </div>
           <div class="bar">
@@ -139,6 +143,7 @@ export class Kitchen {
     const root = this.el.root;
     root.addEventListener('pointerdown', (e) => {
       if (this.guide && !this.#guideAllows(e.target)) return;
+      if (this.coop && this.#coopTap(e)) return;
       const ing = e.target.closest('[data-ing]');
       if (ing) { e.preventDefault(); return this.#onIngredient(ing.dataset.ing, ing); }
       const st = e.target.closest('[data-station]');
@@ -150,6 +155,7 @@ export class Kitchen {
       if (e.key !== 'Enter' && e.key !== ' ') return;
       const target = e.target.closest('[data-ing],[data-station],[data-order]');
       if (!target || (this.guide && !this.#guideAllows(target))) return;
+      if (this.coop && this.#coopTap({ target, preventDefault: () => e.preventDefault() })) return;
       e.preventDefault();
       if (target.dataset.ing) this.#onIngredient(target.dataset.ing, target);
       else if (target.dataset.station) this.#onStation(target.dataset.station, target);
@@ -166,7 +172,7 @@ export class Kitchen {
       }
       this.#helperUi(true);
     });
-    this.onVisibility = () => { if (document.hidden && this.running) this.pause(); };
+    this.onVisibility = () => { if (document.hidden && this.running && !this.coop) this.pause(); };
     document.addEventListener('visibilitychange', this.onVisibility);
     this.onResize = () => { cancelAnimationFrame(this.fitRaf); this.fitRaf = requestAnimationFrame(() => this.#fitLayout()); };
     addEventListener('resize', this.onResize);
@@ -211,6 +217,212 @@ export class Kitchen {
     removeEventListener('resize', this.onResize);
     cancelAnimationFrame(this.fitRaf);
     this.host.innerHTML = '';
+  }
+
+  // ── Cooperativo ─────────────────────────────────────────
+  // Texto flotante que también ve el compañero.
+  #float(el, text, cls = '') {
+    floatText(el, text, cls);
+    if (this.coop?.host && !this.coop.solo) this.#coopFx({ k: 'ft', to: this.#desc(el), text, cls });
+  }
+
+  // Nombre corto de un elemento para encontrarlo en el otro celular.
+  #desc(el) {
+    if (!el) return '';
+    if (el.dataset?.station) return `s:${el.dataset.station}`;
+    if (el.dataset?.ing) return `i:${el.dataset.ing}`;
+    if (el.dataset?.order) return `o:${el.dataset.order}`;
+    if (el === this.el.combo) return 'combo';
+    if (el === this.el.coins) return 'coins';
+    if (this.el.order.contains(el)) return 'plate';
+    return '';
+  }
+
+  #find(d) {
+    if (!d) return null;
+    const [k, id] = d.split(':');
+    if (k === 's') return this.el.stations[id];
+    if (k === 'i') return this.el.pantry.find((b) => b.dataset.ing === id);
+    if (k === 'o') return this.custEls.get(Number(id)) ?? null;
+    if (d === 'combo') return this.el.combo;
+    if (d === 'coins') return this.el.coins;
+    if (d === 'plate') return this.el.order.querySelector('.order__plate') ?? this.el.order;
+    return null;
+  }
+
+  // Lo que toca cada puesto: la barra elige clientes y saca de la despensa; los fogones cocinan.
+  #coopTap(e) {
+    const el = e.target.closest?.('[data-ing],[data-station],[data-order]');
+    if (!el) return false;
+    const kind = el.dataset.station ? 's' : el.dataset.ing ? 'i' : 'o';
+    const mine = this.coop.solo || (this.coop.role === 'barra' ? kind !== 's' : kind === 's');
+    if (!mine) {
+      e.preventDefault();
+      floatText(el, kind === 's' ? `Los fogones son de ${this.coop.partner}` : `La barra es de ${this.coop.partner}`, '');
+      return true;
+    }
+    if (this.coop.host) return false;
+    // Invitado: avisa al anfitrión; él aplica la jugada y la devuelve en su estado.
+    e.preventDefault();
+    if (!this.running) return true;
+    const id = kind === 's' ? el.dataset.station : kind === 'i' ? el.dataset.ing : Number(el.dataset.order);
+    this.coop.send({ type: 'act', a: kind, id });
+    if (kind === 'o') {
+      this.selected = id;
+      for (const [cid, c] of this.custEls) c.classList.toggle('is-selected', cid === id);
+      sfx.tap();
+    } else if (kind === 's') {
+      el.classList.remove('is-chop'); void el.offsetWidth; el.classList.add('is-chop');
+    }
+    return true;
+  }
+
+  #coopFx(fx) {
+    if (!this.coop.solo) this.coop.send({ type: 'fx', fx });
+  }
+
+  // Foto del estado de la cocina, unas diez veces por segundo.
+  #coopSnap() {
+    const bits = (arr) => arr.reduce((a, v, i) => a | (v ? 1 << i : 0), 0);
+    const stations = {};
+    for (const st of this.stationKeys) {
+      const it = this.stations[st];
+      stations[st] = it ? { ...it, burnAt: it.burnAt === Infinity ? -1 : it.burnAt } : null;
+    }
+    this.coop.send({
+      type: 'snap',
+      s: {
+        t: Math.round(this.t), c: this.coins, k: this.combo, l: this.lives, x: this.closed, sel: this.selected, h: this.ticketHold,
+        sk: this.stock, eu: this.emergencyUnits, dv: this.deliveries, f: this.fires, st: stations, ht: this.helper?.task ?? '',
+        o: this.orders.map((o) => [STATUSES.indexOf(o.status), bits(o.filled), bits(o.busy), o.perfects])
+      }
+    });
+  }
+
+  // Mensajes de la sala que llegan a la cocina.
+  coopMessage(m) {
+    if (!this.coop || !this.el) return;
+    if (this.coop.host) {
+      if (m.type !== 'act' || !this.running || this.paused) return;
+      if (m.a === 'o') this.#select(m.id);
+      else if (m.a === 'i') { const b = this.el.pantry.find((x) => x.dataset.ing === m.id); if (b) this.#onIngredient(m.id, b); }
+      else if (m.a === 's' && this.el.stations[m.id]) this.#onStation(m.id, this.el.stations[m.id]);
+      return;
+    }
+    if (m.type === 'snap') this.#coopApply(m.s);
+    else if (m.type === 'fx' && this.running) this.#coopShowFx(m.fx);
+  }
+
+  #coopApply(s) {
+    this.coop.base = s.t;
+    this.coop.at = performance.now();
+    let seats = false;
+    s.o.forEach(([st, f, b, p], i) => {
+      const o = this.orders[i];
+      if (!o) return;
+      const status = STATUSES[st];
+      if (o.status !== status) {
+        if (status === 'left') sfx.angry();
+        o.status = status;
+        seats = true;
+      }
+      o.filled = o.recipe.components.map((_, j) => Boolean(f & (1 << j)));
+      o.busy = o.recipe.components.map((_, j) => Boolean(b & (1 << j)));
+      o.perfects = p;
+    });
+    for (const st of this.stationKeys) {
+      const it = s.st[st];
+      const prev = this.stations[st];
+      this.stations[st] = it ? { ...it, burnAt: it.burnAt === -1 ? Infinity : it.burnAt } : null;
+      const now = this.stations[st];
+      if (now?.kind === 'timer') {
+        const state = this.#timerState(now);
+        if (prev?.id === now.id && prev.lastSeen !== state) {
+          if (state === 'ready') sfx.ready();
+          if (state === 'burnt') sfx.burn();
+          if (state === 'flip') sfx.tap();
+        }
+        now.lastSeen = state;
+      }
+    }
+    if (Object.keys(s.f ?? {}).some((k) => !this.fires[k])) sfx.burn();
+    this.fires = s.f ?? {};
+    const stockSig = JSON.stringify([s.sk, s.dv, s.eu]);
+    if (stockSig !== this.coop.stockSig) {
+      this.coop.stockSig = stockSig;
+      this.stock = s.sk; this.deliveries = s.dv; this.emergencyUnits = s.eu;
+      this.#renderStock();
+    }
+    if (s.c !== this.coins) { this.coins = s.c; this.el.coinNum.textContent = fmt(this.coins); }
+    if (s.k !== this.combo) {
+      const up = s.k > this.combo;
+      if (!up && this.combo >= 3) this.#comboLost();
+      this.combo = s.k;
+      this.#comboUi(up);
+    }
+    if (s.l < this.lives) this.#loseLife(this.lives - s.l);
+    if (this.helper && s.ht !== this.helper.task) { this.helper.task = s.ht; this.#helperUi(); }
+    this.ticketHold = s.h;
+    if (seats || s.sel !== this.selected) {
+      this.selected = s.sel;
+      this.#renderCustomers();
+    }
+    this.sig.order = '';
+  }
+
+  #coopShowFx(fx) {
+    if (fx.k === 'ft') { const el = this.#find(fx.to); if (el) floatText(el, fx.text, fx.cls); return; }
+    if (fx.k === 'rib') { this.#ribbon(fx.title, fx.sub, fx.variant); return; }
+    if (fx.k === 'fly') {
+      const from = this.#find(fx.from), to = this.#find(fx.to);
+      if (from && to) { sfx.place(); flyIcon(from, to, ingredientSvg(fx.ing, { title: '' })); }
+      return;
+    }
+    if (fx.k === 'plate') {
+      const o = this.orders[fx.o];
+      const onTicket = o && o.id === this.selected;
+      const to = onTicket ? this.el.order.querySelector('.order__plate') : this.custEls.get(fx.o);
+      const from = this.#find(fx.from);
+      if (o && from && to) {
+        sfx.plate();
+        const dur = flyIcon(from, to, ingredientSvg(fx.ing, { title: '' }));
+        this.landAt.set(`${o.id}:${fx.idx}`, performance.now() + dur);
+      }
+      return;
+    }
+    if (fx.k === 'serve') {
+      const o = this.orders[fx.o];
+      if (o) this.#serveFx(o, this.custEls.get(o.id) ?? this.leaving.get(o.id), fx.amount, fx.fromTicket, true);
+    }
+  }
+
+  // Menú del cooperativo: el servicio no se detiene (tu compañero sigue cocinando).
+  #coopMenu() {
+    if (this.el.root.querySelector('.overlay--coop')) return;
+    const ov = document.createElement('div');
+    ov.className = 'overlay overlay--coop';
+    ov.innerHTML = `
+      <h2>Servicio en equipo</h2>
+      <p>El reloj sigue corriendo: ${escapeHtml(this.coop.partner)} está cocinando contigo.</p>
+      ${prefTilesHtml('pref-tiles--dark')}
+      <button class="btn btn--gold btn--xl" data-act="resume">Volver a la cocina</button>
+      <button class="btn btn--ghost" data-act="quit">Salir de la sala</button>`;
+    bindPrefTiles(ov);
+    ov.querySelector('[data-act="resume"]').addEventListener('click', () => ov.remove());
+    ov.querySelector('[data-act="quit"]').addEventListener('click', () => {
+      this.coop.send({ type: 'quit' });
+      this.destroy();
+      this.onQuit();
+    });
+    this.el.root.appendChild(ov);
+  }
+
+  // El compañero se fue: el anfitrión sigue solo con toda la cocina.
+  coopPartnerLeft() {
+    if (!this.coop || this.coop.solo) return;
+    this.coop.solo = true;
+    this.#ribbon(`${this.coop.partner} salió`, 'Sigues solo: ahora toda la cocina es tuya');
+    this.el.root.closest('.game')?.removeAttribute('data-role');
   }
 
   // ── Práctica guiada ─────────────────────────────────────
@@ -298,6 +510,7 @@ export class Kitchen {
   // Antes del servicio: tutorial ilustrado (la primera vez) y el parte del día.
   #intro() {
     if (this.guide) { this.start(); this.#guideNext(); return; }
+    if (this.coop) { this.#countdown(); return; }
     if (this.firstTime) this.#tutorial(() => this.#briefing());
     else this.#briefing();
   }
@@ -484,6 +697,22 @@ export class Kitchen {
     step();
   }
 
+  // Invitado: el anfitrión cerró el servicio.
+  coopEnd(closed) {
+    if (!this.running) return;
+    this.running = false;
+    cancelAnimationFrame(this.raf);
+    this.rushGlow?.remove();
+    music.stop();
+    const ov = document.createElement('div');
+    ov.className = 'overlay';
+    ov.innerHTML = closed
+      ? `<div class="countdown countdown--closed" style="font-size:52px">¡Cerraron la cocina!</div><p>Se fueron demasiados clientes enojados.</p>`
+      : `<div class="countdown" style="font-size:72px">¡Tiempo!</div><p>Cerrando caja…</p>`;
+    this.el.root.appendChild(ov);
+    if (closed) sfx.burn(); else sfx.count(true);
+  }
+
   start() {
     this.running = true;
     music.start(this.restaurant.id);
@@ -493,6 +722,7 @@ export class Kitchen {
 
   pause() {
     if (!this.running || this.paused) return;
+    if (this.coop) return this.#coopMenu();
     this.paused = true;
     music.pause();
     const ov = document.createElement('div');
@@ -518,13 +748,35 @@ export class Kitchen {
     if (!this.running) return;
     const dt = Math.min(100, now - this.last);
     this.last = now;
+    if (this.coop && !this.coop.host) {
+      // Invitado: el reloj sigue al del anfitrión; la partida la lleva él.
+      if (this.coop.at) this.t = Math.min(this.config.durationMs, this.coop.base + Math.min(400, now - this.coop.at));
+      if (this.rushState === 'before' && this.t >= this.rush.from) {
+        this.rushState = 'on';
+        this.rushGlow = document.createElement('div');
+        this.rushGlow.className = 'rush-glow';
+        this.el.root.appendChild(this.rushGlow);
+        music.setRush(true);
+      } else if (this.rushState === 'on' && this.t >= this.rush.to) {
+        this.rushState = 'after';
+        this.rushGlow?.remove();
+        music.setRush(false);
+      }
+      this.#paint();
+      this.raf = requestAnimationFrame(this.frame);
+      return;
+    }
     if (!this.paused) {
       this.t += dt;
       this.#update();
       this.#paint();
       if (this.guide) this.#guideTick();
+      if (this.coop && !this.coop.solo && now - this.coop.lastSnap >= 100) { this.coop.lastSnap = now; this.#coopSnap(); }
     }
-    if (this.closed || this.t >= this.config.durationMs) return this.#finish();
+    if (this.closed || this.t >= this.config.durationMs) {
+      if (this.coop) this.#coopSnap();
+      return this.#finish();
+    }
     this.raf = requestAnimationFrame(this.frame);
   }
 
@@ -556,7 +808,7 @@ export class Kitchen {
         // Lo que ya estaba en su plato se desperdicia.
         o.recipe.components.forEach((c, i) => { if (o.filled[i]) this.#addWaste(c.ingredient); });
         const el = this.custEls.get(o.id);
-        if (el) floatText(el, '¡Me voy!', 'bad');
+        if (el) this.#float(el, '¡Me voy!', 'bad');
       }
     }
     for (const st of this.stationKeys) {
@@ -564,7 +816,7 @@ export class Kitchen {
       if (item && this.orders[item.orderId].status === 'left') {
         this.stations[st] = null;
         this.#addWaste(item.ingredient);
-        floatText(this.el.stations[st], 'Se fue', 'bad');
+        this.#float(this.el.stations[st], 'Se fue', 'bad');
       }
     }
     // Eventos de fuego.
@@ -593,7 +845,7 @@ export class Kitchen {
         for (const d of arrived) {
           this.stock[d.ing] = (this.stock[d.ing] ?? 0) + d.n;
           const jar = this.el.pantry.find((b) => b.dataset.ing === d.ing);
-          if (jar) floatText(jar, `+${d.n} llegó`, 'good');
+          if (jar) this.#float(jar, `+${d.n} llegó`, 'good');
         }
         sfx.ready();
         this.#renderStock();
@@ -618,17 +870,17 @@ export class Kitchen {
       if (!item || item.kind !== 'timer') continue;
       const state = this.#timerState(item);
       if (state !== item.lastState) {
-        if (state === 'flip') { sfx.tap(); floatText(this.el.stations[st], '¡Voltéalo!', ''); }
+        if (state === 'flip') { sfx.tap(); this.#float(this.el.stations[st], '¡Voltéalo!', ''); }
         if (state === 'ready' && item.flip && !item.flip.done) {
           // Sin voltear: se pega de un lado y se quema el doble de rápido.
           item.burnAt = item.readyAt + (item.burnAt - item.readyAt) / 2;
-          floatText(this.el.stations[st], 'Se pegó de un lado', 'bad');
+          this.#float(this.el.stations[st], 'Se pegó de un lado', 'bad');
         }
         if (state === 'ready') sfx.ready();
         if (state === 'burnt') {
           sfx.burn();
           this.orders[item.orderId].busy[item.compIndex] = false;
-          floatText(this.el.stations[st], '¡Quemado!', 'bad');
+          this.#float(this.el.stations[st], '¡Quemado!', 'bad');
           this.sig.order = '';
         }
         item.lastState = state;
@@ -712,6 +964,7 @@ export class Kitchen {
 
   // Avisos grandes en fila: nunca se enciman dos a la vez.
   #ribbon(title, sub, variant = '') {
+    if (this.coop?.host) this.#coopFx({ k: 'rib', title, sub, variant });
     this.ribbonQueue ??= [];
     this.ribbonQueue.push({ title, sub, variant });
     if (!this.ribbonBusy) this.#nextRibbon();
@@ -1128,11 +1381,11 @@ export class Kitchen {
     if (!this.running || this.paused) return;
     if ((this.stock[ingId] ?? 0) <= 0) return this.#orderUrgent(ingId, btn);
     const o = this.selected !== null ? this.orders[this.selected] : null;
-    if (!o) { floatText(btn, 'Elige un cliente', 'bad'); sfx.error(); return; }
+    if (!o) { this.#float(btn, 'Elige un cliente', 'bad'); sfx.error(); return; }
     const idx = o.recipe.components.findIndex((c, i) => c.ingredient === ingId && !o.filled[i] && !o.busy[i]);
     if (idx < 0) {
       const inRecipe = o.recipe.components.some((c) => c.ingredient === ingId);
-      floatText(btn, inRecipe ? 'Ya lo tienes' : 'No lo pide', 'bad');
+      this.#float(btn, inRecipe ? 'Ya lo tienes' : 'No lo pide', 'bad');
       shake(btn);
       sfx.error();
       return;
@@ -1154,7 +1407,7 @@ export class Kitchen {
       const first = this.el.stations[keys[0]];
       const allFire = keys.every((k) => this.fires[k]);
       keys.forEach((k) => shake(this.el.stations[k]));
-      floatText(first, allFire ? '¡Hay fuego!' : keys.length > 1 ? 'Todas ocupadas' : 'Ocupado', 'bad');
+      this.#float(first, allFire ? '¡Hay fuego!' : keys.length > 1 ? 'Todas ocupadas' : 'Ocupado', 'bad');
       sfx.error();
       return;
     }
@@ -1174,21 +1427,22 @@ export class Kitchen {
     sfx.place();
     const fly = flyIcon(btn, this.el.stations[st], ingredientSvg(ingId, { title: '' }));
     this.landAt.set(`st:${base.id}`, performance.now() + fly);
+    if (this.coop?.host) this.#coopFx({ k: 'fly', from: this.#desc(btn), to: `s:${st}`, ing: ingId });
     this.#guideEvent('ingredient', ingId);
   }
 
   // Pedido urgente: 2 unidades al doble de precio; llegan en 3 segundos.
   #orderUrgent(ingId, btn) {
-    if (this.deliveries.some((d) => d.ing === ingId)) { floatText(btn, 'Ya viene en camino', ''); return; }
+    if (this.deliveries.some((d) => d.ing === ingId)) { this.#float(btn, 'Ya viene en camino', ''); return; }
     const n = Math.min(2, EMERGENCY_MAX_UNITS - this.emergencyUnits);
     const price = this.config.emergencyPrices?.[ingId];
-    if (n <= 0 || !price) { floatText(btn, 'Agotado', 'bad'); shake(btn); sfx.error(); return; }
+    if (n <= 0 || !price) { this.#float(btn, 'Agotado', 'bad'); shake(btn); sfx.error(); return; }
     this.emergency[ingId] = (this.emergency[ingId] ?? 0) + n;
     this.emergencyUnits += n;
     this.deliveries.push({ ing: ingId, n, at: this.t + EMERGENCY_DELAY_MS });
     this.coins -= price * n;
     this.el.coinNum.textContent = fmt(this.coins);
-    floatText(btn, `Urgente −${price * n}`, 'bad');
+    this.#float(btn, `Urgente −${price * n}`, 'bad');
     sfx.place();
     this.#renderStock();
   }
@@ -1207,7 +1461,7 @@ export class Kitchen {
       if (fire.taps <= 0) {
         delete this.fires[st];
         this.firesOut += 1;
-        floatText(el, '¡Apagado!', 'good');
+        this.#float(el, '¡Apagado!', 'good');
         sfx.ready();
         this.#guideEvent('fireOut', st);
       }
@@ -1215,7 +1469,7 @@ export class Kitchen {
       return;
     }
     const item = this.stations[st];
-    if (!item) { floatText(el, STATIONS[this.#type(st)].hint, ''); return; }
+    if (!item) { this.#float(el, STATIONS[this.#type(st)].hint, ''); return; }
     if (item.kind === 'tap') {
       // Toques más rápidos que un humano no cuentan (igual que valida el servidor).
       if (this.t - item.lastTapAt < MIN_TAP_MS) return;
@@ -1236,15 +1490,15 @@ export class Kitchen {
       item.flip.good = this.t - item.flip.at <= 1500;
       sfx.sizzle();
       el.classList.remove('is-flipping'); void el.offsetWidth; el.classList.add('is-flipping');
-      floatText(el, item.flip.good ? '¡Buen volteo!' : 'Volteado', item.flip.good ? 'good' : '');
+      this.#float(el, item.flip.good ? '¡Buen volteo!' : 'Volteado', item.flip.good ? 'good' : '');
       this.sig.stations[st] = '';
       return;
     }
-    if (state === 'cooking') { floatText(el, item.flip && !item.flip.done ? 'Espera para voltear' : 'Aún no', ''); return; }
+    if (state === 'cooking') { this.#float(el, item.flip && !item.flip.done ? 'Espera para voltear' : 'Aún no', ''); return; }
     if (state === 'burnt') {
       this.stations[st] = null;
       this.#addWaste(item.ingredient);
-      floatText(el, 'A la basura', 'bad');
+      this.#float(el, 'A la basura', 'bad');
       sfx.tap();
       return;
     }
@@ -1255,12 +1509,12 @@ export class Kitchen {
   #deliver(st, item, perfect) {
     this.stations[st] = null;
     const o = this.orders[item.orderId];
-    if (o.status !== 'seated') { this.#addWaste(item.ingredient); floatText(this.el.stations[st], 'Se fue', 'bad'); return; }
+    if (o.status !== 'seated') { this.#addWaste(item.ingredient); this.#float(this.el.stations[st], 'Se fue', 'bad'); return; }
     o.filled[item.compIndex] = true;
     o.busy[item.compIndex] = false;
     if (perfect) {
       o.perfects += 1;
-      floatText(this.el.stations[st], '¡Perfecto!', 'good');
+      this.#float(this.el.stations[st], '¡Perfecto!', 'good');
     }
     this.#toPlate(o, item.compIndex, this.el.stations[st], item.ingredient);
     this.#checkComplete(o);
@@ -1283,6 +1537,7 @@ export class Kitchen {
     });
     this.landAt.set(`${o.id}:${idx}`, performance.now() + dur);
     o.landsAt = performance.now() + dur;
+    if (this.coop?.host) this.#coopFx({ k: 'plate', o: o.id, idx, from: this.#desc(from), ing: ingId });
     o.lastFromTicket = onTicket;
   }
 
@@ -1321,12 +1576,12 @@ export class Kitchen {
     }
     if (together) {
       sfx.together();
-      if (el) setTimeout(() => floatText(el, '¡Comieron juntos!', 'good'), 450);
+      if (el) setTimeout(() => this.#float(el, '¡Comieron juntos!', 'good'), 450);
     } else {
       for (const m of mates) {
         if (m.status !== 'seated') continue;
         const pel = this.custEls.get(m.id);
-        if (pel) { pel.classList.add('is-waiting-friend'); floatText(pel, '¡Ahora yo!', ''); }
+        if (pel) { pel.classList.add('is-waiting-friend'); this.#float(pel, '¡Ahora yo!', ''); }
       }
     }
     this.#comboUi(true);
@@ -1337,8 +1592,9 @@ export class Kitchen {
   }
 
   // Animación al servir: el plato vuela al cliente y las monedas suben al contador.
-  #serveFx(o, el, amount, fromTicket = true) {
+  #serveFx(o, el, amount, fromTicket = true, mirror = false) {
     if (!this.el.root?.isConnected) return;
+    if (this.coop?.host) this.#coopFx({ k: 'serve', o: o.id, amount, fromTicket });
     const from = fromTicket ? this.el.order.querySelector('.order__plate') ?? this.el.order : null;
     const dish = o.recipe.components.slice(0, 3).map((c) => ingredientSvg(c.ingredient, { title: '' })).join('');
     sfx.serve();
@@ -1352,6 +1608,7 @@ export class Kitchen {
       }
       setTimeout(() => {
         sfx.coin();
+        if (mirror) return;
         this.coins += amount;
         this.el.coinNum.textContent = fmt(this.coins);
         this.el.coins.classList.remove('is-bump'); void this.el.coins.offsetWidth; this.el.coins.classList.add('is-bump');
@@ -1421,6 +1678,8 @@ export class Kitchen {
     setTimeout(() => this.onFinish({ serves: this.serves, waste: this.waste, emergency: this.emergency, firesOut: this.firesOut, estimate: this.coins, helperStats: this.helperStats }), 1100);
   }
 }
+
+const STATUSES = ['waiting', 'seated', 'served', 'left'];
 
 function clockText(ms) {
   const secs = Math.ceil(ms / 1000);

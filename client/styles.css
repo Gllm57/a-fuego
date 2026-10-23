@@ -1360,3 +1360,58 @@ button { -webkit-appearance: none; appearance: none; }
 @keyframes coach-pulse { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: .45; transform: scale(1.04); } }
 @keyframes coach-tap { 0%, 100% { transform: translate(-30%, 0) scale(1); } 45% { transform: translate(-30%, -8px) scale(1.05); } 60% { transform: translate(-30%, 0) scale(.92); } }
 @keyframes coach-in { from { opacity: 0; transform: translateY(10px) scale(.96); } }
+
+/* Cocinar juntos: botón del inicio, hoja, sala de espera y cocina compartida. */
+.coop-cta { appearance: none; border: 0; font: inherit; color: var(--ink); cursor: pointer; display: flex; align-items: center; gap: 14px; text-align: left; padding: 14px 18px; border-radius: 30px; background: var(--card); box-shadow: 0 5px 0 var(--line-deep), inset 0 0 0 2px var(--line); -webkit-tap-highlight-color: transparent; transition: transform .1s, box-shadow .1s; }
+.coop-cta:active { transform: translateY(4px); box-shadow: 0 1px 0 var(--line-deep), inset 0 0 0 2px var(--line); }
+.coop-cta__icon { flex: none; width: 48px; height: 48px; border-radius: 50%; background: var(--gold); display: grid; place-items: center; }
+.coop-cta__icon svg { width: 26px; height: 26px; }
+.coop-cta__text { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.coop-cta__text b { font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.coop-cta__text span { font-size: 13px; font-weight: 700; color: var(--ink-2); }
+.coop-roles { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.coop-role { border-radius: 22px; padding: 12px; display: flex; flex-direction: column; gap: 4px; }
+.coop-role svg { width: 26px; height: 26px; }
+.coop-role b { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.coop-role span { font-size: 12px; font-weight: 700; color: var(--ink-2); line-height: 1.3; }
+.coop-role--barra { background: var(--brand-soft); box-shadow: inset 0 0 0 2px color-mix(in srgb, var(--brand) 35%, transparent); color: var(--brand-deep); }
+.coop-role--fogones { background: #FFF0C7; box-shadow: inset 0 0 0 2px #F5D68A; color: var(--gold-deep); }
+.coop-role b { color: var(--ink); }
+.coop-join { display: flex; flex-direction: column; gap: 8px; }
+.coop-join label { font-size: 12px; font-weight: 900; letter-spacing: .6px; color: var(--ink-2); text-transform: uppercase; }
+.coop-join__row { display: flex; gap: 8px; }
+.coop-join input { flex: 1; min-width: 0; border: 0; border-radius: 999px; padding: 12px 18px; background: var(--card); box-shadow: inset 0 0 0 2px var(--line-deep); font-family: var(--font-display); font-weight: 600; font-size: 20px; letter-spacing: 2px; color: var(--ink); text-transform: uppercase; }
+.coop-lobby { position: fixed; inset: 0; z-index: 55; background: var(--ground); overflow-y: auto; animation: fade-in .25s ease both; }
+.coop-lobby__inner { max-width: 440px; margin: 0 auto; padding: calc(16px + var(--safe-top)) 16px calc(24px + var(--safe-bottom)); display: flex; flex-direction: column; gap: 14px; min-height: 100%; box-sizing: border-box; }
+.coop-lobby__inner > * { animation: rise .4s var(--ease-out) both; }
+.coop-lobby__head { display: flex; align-items: center; gap: 12px; }
+.coop-lobby__head h2 { font-size: 26px; }
+.coop-code { border-radius: 30px; background: var(--night); color: #fff; padding: 18px; display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; }
+.coop-code small { font-size: 11px; font-weight: 900; letter-spacing: 1.2px; color: var(--gold); }
+.coop-code b { font-family: var(--font-display); font-weight: 700; font-size: 40px; letter-spacing: 4px; }
+.coop-code span { font-size: 13px; font-weight: 700; color: #EADBD0; }
+.coop-code .btn { margin-top: 8px; }
+.coop-slots { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.coop-slot { border-radius: 28px; background: var(--card); padding: 14px 10px; display: flex; flex-direction: column; align-items: center; gap: 6px; text-align: center; box-shadow: 0 5px 0 var(--line-deep), inset 0 0 0 2px var(--line); }
+.coop-slot--barra { box-shadow: 0 5px 0 var(--brand-deep), inset 0 0 0 3px var(--brand); }
+.coop-slot--fogones { box-shadow: 0 5px 0 var(--gold-deep), inset 0 0 0 3px var(--gold); }
+.coop-slot__face { width: 72px; height: 72px; border-radius: 50%; background: var(--ground-2); overflow: hidden; display: grid; place-items: center; }
+.coop-slot__face svg { width: 64px; height: 64px; }
+.coop-slot b { font-family: var(--font-display); font-weight: 600; font-size: 16px; }
+.coop-slot__role { border-radius: 999px; padding: 4px 12px; font-size: 12px; font-weight: 900; text-transform: uppercase; }
+.coop-slot--barra .coop-slot__role { background: var(--brand); color: #fff; }
+.coop-slot--fogones .coop-slot__role { background: var(--gold); color: var(--ink); }
+.coop-slot small { font-size: 12px; font-weight: 800; color: var(--ink-2); }
+.coop-slot.is-empty { opacity: .7; }
+.coop-slot.is-empty .coop-slot__face { animation: needed 1.4s ease-in-out infinite; }
+.coop-rest { display: flex; flex-direction: column; gap: 4px; }
+.coop-rest small { font-size: 11px; font-weight: 900; letter-spacing: 1.2px; color: var(--ink-2); }
+.coop-rest b { font-family: var(--font-display); font-weight: 600; font-size: 19px; }
+.coop-note { margin: 0; text-align: center; font-size: 13px; font-weight: 800; color: var(--ink-2); }
+.coop-lobby .btn--xl { margin-top: auto; }
+/* En la cocina compartida, lo que es del compañero se ve más apagado. */
+.game--coop[data-role="barra"] .counter { filter: saturate(.55); opacity: .72; }
+.game--coop[data-role="fogones"] .shelf, .game--coop[data-role="fogones"] .customers { filter: saturate(.55); opacity: .72; }
+.coop-badge { position: absolute; top: calc(100% + 32px); right: 4px; z-index: 6; display: inline-flex; align-items: center; gap: 4px; padding: 3px 9px; border-radius: 999px; background: var(--night); color: #fff; font-size: 11px; font-weight: 900; text-transform: uppercase; letter-spacing: .4px; }
+.coop-badge svg { width: 14px; height: 14px; }
+.game--coop[data-role="fogones"] .coop-badge { background: var(--gold); color: var(--ink); }
