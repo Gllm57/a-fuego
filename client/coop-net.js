@@ -1,14 +1,14 @@
 // Conexión del modo cooperativo: una «sala» donde dos celulares se mandan mensajes.
-// En el juego publicado usa Supabase Realtime (canales con presencia y mensajes al
+// En el juego publicado usa Supabase Realtime (proyecto propio «a-fuego») (canales con presencia y mensajes al
 // instante; no guarda nada en la base de datos). Para probar en un mismo navegador,
 // `?coop=local` usa un BroadcastChannel entre pestañas.
 //
 //   const room = await joinRoom('TACO-42', { id, name }, { onMessage, onMembers });
 //   room.send({ type: 'hola' }); room.update({ ready: true }); room.leave();
 
-const SUPABASE_URL = 'https://heaenlyhsgnuahbgawnv.supabase.co';
+const SUPABASE_URL = 'https://homninhiimgcpkbqbycg.supabase.co';
 // Clave pública (anon): está hecha para ir dentro de la app; sólo permite usar los canales.
-const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhlYWVubHloc2dudWFoYmdhd252Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODA2NjMsImV4cCI6MjEwODM1NjY2M30.1ngBOKy8Wi1X3qEQEKh36ULJsnNlJ_8uI6X6b16e5Ec';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImhvbW5pbmhpaW1nY3BrYnFieWNnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI3ODIyNjAsImV4cCI6MjEwODM1ODI2MH0.c5qdVOTT4NamG50arKtsaelQgZj8iziv6k1sPySVrRc';
 
 const localMode = () => {
   try { return new URLSearchParams(location.search).get('coop') === 'local' || localStorage.getItem('afuego.coopNet') === 'local'; } catch { return false; }
